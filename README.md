@@ -1,0 +1,151 @@
+# Dimensiona 5410
+
+Plataforma web para **projetos elétricos de baixa tensão**:
+- dimensionamento de condutores, proteção, eletrodutos e eletrocalhas pela **ABNT NBR 5410:2004**;
+- quadro de cargas;
+- cálculo luminotécnico pela **NBR ISO/CIE 8995-1**;
+- demanda para a concessionária pelas normas **Energisa NDU 001 / NDU 003**;
+- carga térmica de climatização pela **ABNT NBR 16401**.
+
+Cada módulo emite seu documento de saída: memória de cálculo, relatório luminotécnico, memorial de demanda e memorial de carga térmica, em **PDF**, **Word (.docx)** e **HTML**. O quadro de cargas sai em **Excel (.xlsx)**.
+
+Funciona 100% no navegador: **não precisa de servidor, banco de dados nem instalação**. Está publicada gratuitamente no **GitHub Pages**.
+
+**Acesse:** https://camposfabiano1981-hue.github.io/dimensiona-5410/
+
+---
+
+## Funcionalidades
+
+**Projeto e circuitos (NBR 5410)**
+- **Dados da obra:** identificação, sistema de alimentação, esquema de aterramento, temperatura ambiente e do solo, e fator de demanda editável (padrão 100 %).
+- **Esquemas de ligação:** F+N, F+N+PE, F+F, F+F+PE, F+F+N+PE, F+F+F, F+F+F+PE e F+F+F+N+PE. O esquema escolhido sai no quadro de cargas.
+- **Maneiras de instalar:** todos os métodos da Tabela 33, com desenho ilustrativo de cada um.
+- **Critérios verificados por circuito:**
+  - capacidade de condução (Tabelas 36 a 39, cobre e alumínio, 0,5 a 1000 mm²);
+  - fatores de correção de temperatura e de agrupamento (Tabelas 40 a 45);
+  - seção mínima (Tabela 47), neutro (Tabela 48) e condutor de proteção;
+  - coordenação da proteção (IB ≤ In ≤ Iz; I2 ≤ 1,45·Iz);
+  - queda de tensão com R e X do cabo, incluindo o fator para eletroduto de aço;
+  - curto-circuito (k²S² ≥ I²t).
+- **Eletrodutos:** taxa de ocupação de 53 %, 31 % ou 40 % (6.2.11.1.6) e tamanho nominal, com corte desenhado.
+- **Eletrocalhas:** eletrocalha lisa ou perfurada, bandeja, perfilado, eletrocalha aramada, leito e canaleta. O cálculo cobre ocupação, largura e altura comerciais, e os fatores de agrupamento do método de instalação adotado.
+- **Quadros de carga:**
+  - balanceamento de fases e demanda do alimentador;
+  - colunas de ligação, FCA, FCT e fator de potência;
+  - exportação para Excel com fórmulas.
+
+**Luminotécnica (NBR ISO/CIE 8995-1)**
+- **Requisitos por ambiente:** iluminância mantida, UGR, Ra e uniformidade.
+- **Cálculo:** método dos lúmens, com fator de utilização por radiosidade, e verificação ponto a ponto em malha.
+- **Catálogo de lâmpadas e luminárias:** Philips, Ledvance, Lumicenter, Elgin e outros.
+- **Relatório:** planta com o mapa de iluminâncias e locação cotada, além do desenho de cada luminária (vista inferior e corte).
+- **Integração:** a potência calculada pode alimentar os circuitos de iluminação.
+
+**Demanda Energisa (NDU 001 v7.0 e NDU 003 v8.1)**
+- **Unidades consumidoras individuais e agrupadas:** demanda D = (d1 + … + d7) / 0,92 pelas Tabelas 4 a 15 da NDU 001.
+- **Enquadramento de categoria:** Tabela 16 (220/127 V) e Tabela 21 (254/127 V), com o padrão de entrada, o disjuntor e os condutores.
+- **Edifícios de uso coletivo (NDU 003):** D = D1 + D2. As Tabelas 03 e 04 são preenchidas pelo projetista.
+- **Memorial para análise da concessionária:** declaração de carga, dados completos da UC e esquema da entrada.
+
+**Climatização — carga térmica (NBR 16401)**
+- **Cálculo:**
+  - hora a hora no dia de projeto, com radiação solar de céu claro (ASHRAE);
+  - temperatura sol-ar e condução periódica pelas camadas da parede e da cobertura, com atraso e amortecimento;
+  - ganhos por vidros, pessoas, iluminação, equipamentos, ar exterior e infiltração.
+- **Componentes construtivos:** transmitância, capacidade térmica e atraso térmico (NBR 15220-2), com editor de camadas.
+- **Conforto térmico (NBR 16401-2:2024):** PMV/PPD pela ISO 7730, com critério −0,5 ≤ PMV ≤ +0,5.
+- **Ar exterior:** Vef = Pz·Fp + Az·Fa pela NBR 16401-3:2008. A edição de 2024 está suspensa.
+- **Resultado:**
+  - carga sensível e latente, em W, BTU/h e TR;
+  - gráfico de 24 h;
+  - carga simultânea máxima do conjunto;
+  - equipamento indicado.
+- **Integração:** cria os circuitos dos aparelhos na aba Circuitos.
+
+**Documentos de saída**
+- **Memória de cálculo NBR 5410:** metodologia, cálculo detalhado de cada circuito, eletrodutos, eletrocalhas, quadros, luminotécnica, anexo da Tabela 33 e assinatura.
+- **Demais documentos:** relatório luminotécnico, memorial de demanda Energisa e memorial de carga térmica, todos com cabeçalho, rodapé, paginação e bloco de assinatura.
+- **Tabelas da norma:** consulta às tabelas da NBR 5410, da NBR ISO/CIE 8995-1 e da NDU 001 dentro da plataforma.
+
+---
+
+## Como usar
+
+### Online (GitHub Pages)
+Acesse https://camposfabiano1981-hue.github.io/dimensiona-5410/
+
+### No computador
+Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atualizados). A tela funciona sem internet. Só a emissão dos documentos baixa, na primeira vez, as bibliotecas de PDF, Word e Excel (jsPDF, docx e ExcelJS) da CDN jsDelivr.
+
+### Fluxo sugerido
+1. **Projeto:** dados da obra, tensão, esquema de aterramento e temperaturas.
+2. **Circuitos:** cadastre as cargas, o esquema de ligação e a maneira de instalar. O resultado é recalculado a cada alteração.
+3. **Eletrodutos / Eletrocalhas / Quadros de carga:** confira ocupação, balanceamento e demanda.
+4. **Luminotécnica, Demanda Energisa e Climatização:** quando o projeto exigir.
+5. **Memória de cálculo:** escolha o documento e emita em PDF, Word, HTML ou Excel.
+
+> **Onde ficam os dados?** No armazenamento local do navegador (localStorage). Use **Salvar projeto** para gravar um arquivo `.dimensiona5410.json` e **Abrir projeto** para carregá-lo em outro computador. Os dados digitados **não** vão para o GitHub.
+
+---
+
+## Fontes e premissas
+
+| Módulo | Referência |
+|---|---|
+| Condutores, proteção e eletrodutos | ABNT NBR 5410:2004 (versão corrigida 2008); tabelas conferidas com o Guia de Dimensionamento de Cabos para Baixa Tensão (Prysmian, Rev. 9) |
+| Iluminação | ABNT NBR ISO/CIE 8995-1:2013; catálogos dos fabricantes (conferir a ficha técnica oficial pelo código) |
+| Demanda | Energisa NDU 001 v7.0 e NDU 003 v8.1 (Tabelas 03 e 04 da NDU 003 a preencher pelo projetista) |
+| Carga térmica | ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008; NBR 15220-2; ISO 7730; ASHRAE Handbook — Fundamentals |
+
+**Dados que o projetista precisa confirmar:**
+- **Dados climáticos de projeto:** use o Anexo A da NBR 16401-1:2024 para a localidade. Os valores do exemplo são ilustrativos.
+- **Vazões de ar exterior (Fp, Fa):** confira na Tabela 1 da NBR 16401-3:2008.
+- **Propriedades de produtos:** catálogo de luminárias, fator solar de vidros e capacidades de equipamentos devem ser conferidos com o fabricante.
+
+A plataforma é uma ferramenta de apoio ao projeto. A responsabilidade técnica é do profissional habilitado que assina o documento.
+
+---
+
+## Estrutura do projeto
+
+```
+index.html            Aplicação completa em um único arquivo (gerada por build.py — não editar à mão)
+build.py              Junta src/ e as fontes em index.html
+src/shell.html        Estrutura da página e estilos
+src/tables.js         Tabelas da NBR 5410 (33, 35 a 48, resistências, diâmetros)
+src/engine.js         Motor NBR 5410: circuitos, eletrodutos, quadros e demanda
+src/calhas.js         Eletrocalhas, perfilados, bandejas e leitos
+src/lumi.js           Requisitos da 8995-1, catálogo e cálculo luminotécnico
+src/energisa.js       Tabelas e cálculo de demanda das NDU 001 / NDU 003
+src/clima.js          Carga térmica: clima, sol, condução periódica, psicrometria, PMV/PPD
+src/pictos.js         Desenhos da Tabela 33 e cortes de eletrodutos
+src/memorial.js       Memória de cálculo NBR 5410
+src/lumidoc.js        Relatório luminotécnico (plantas e desenhos das luminárias)
+src/energisadoc.js    Memorial de demanda para a concessionária
+src/climadoc.js       Memorial de carga térmica
+src/export.js         Saída em PDF (jsPDF), Word (docx), HTML e Excel (ExcelJS)
+src/ui*.js            Interface (abas, formulários, bancadas)
+src/sample.js         Projeto de exemplo
+fonts/                DejaVu Sans (subconjunto) embutida nos PDFs
+exemplo/              Documentos gerados a partir do projeto de exemplo
+test/                 Testes do motor e de ponta a ponta no navegador
+```
+
+## Desenvolvimento e testes
+
+```bash
+python3 build.py                 # gera index.html depois de editar src/
+node --test test/motor.test.js   # testes do motor de cálculo (Node 18+)
+
+npm install --no-save playwright && npx playwright install chromium
+node test/navegador.js           # percorre todas as abas, gera os documentos em exemplo/ e verifica erros
+```
+
+Os testes do motor conferem o projeto de exemplo com valores verificados à mão:
+- seções e disjuntores dos circuitos;
+- demanda e categoria Energisa;
+- carga térmica por ambiente;
+- PMV/PPD contra os exemplos da ISO 7730;
+- transmitâncias e regime permanente da condução;
+- psicrometria e radiação solar.

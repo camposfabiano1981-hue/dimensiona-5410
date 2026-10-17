@@ -1,0 +1,22 @@
+# configurações locais do editor/assistente
+.claude/
+.vscode/
+node_modules/
+
+# versão da aplicação para Artifact (gerada por build.py)
+dimensiona-5410.html
+
+# saídas de testes e documentos gerados localmente (podem conter dados de clientes)
+test/out/
+*.pdf
+*.docx
+*.xlsx
+*.dimensiona5410.json
+!exemplo/*.pdf
+!exemplo/*.docx
+!exemplo/*.xlsx
+
+# sistema operacional
+Thumbs.db
+desktop.ini
+.DS_Store

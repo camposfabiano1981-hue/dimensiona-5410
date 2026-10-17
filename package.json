@@ -1,0 +1,11 @@
+{
+  "name": "dimensiona-5410",
+  "version": "7.0.0",
+  "private": true,
+  "description": "Dimensionamento de instalações elétricas de baixa tensão (NBR 5410), luminotécnica, demanda Energisa e carga térmica (NBR 16401), com memoriais em PDF, Word, HTML e Excel.",
+  "scripts": {
+    "build": "python3 build.py",
+    "test": "node --test test/motor.test.js",
+    "test:navegador": "node test/navegador.js"
+  }
+}

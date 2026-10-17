@@ -1,0 +1,105 @@
+// Testes do motor de cálculo (sem navegador): node --test test/
+// Carrega os módulos de src/ num contexto isolado e confere o projeto de exemplo
+// contra valores verificados à mão e contra casos de referência das normas.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs'), path = require('path'), vm = require('vm');
+
+const SRC = path.join(__dirname, '..', 'src');
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'energisa', 'clima', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'export'];
+const ctx = { console };
+vm.createContext(ctx);
+vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
+this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
+  WdeTBU, URdeW, pAtm, construirMemorial, construirRelatorioLumi, construirMemorialDemanda, construirMemorialClima };`, ctx);
+const A = ctx.api;
+
+const P = A.projetoExemplo();
+const K = A.calcularProjeto(P);
+const E = A.calcEnergisa(P);
+const C = A.calcClima(P, K);
+const perto = (v, ref, tol, msg) => assert.ok(Math.abs(v - ref) <= tol, `${msg}: ${v} ≠ ${ref} ± ${tol}`);
+
+test('NBR 5410 — circuitos do exemplo dimensionados sem falhas', () => {
+  const esperado = { 1: [1.5, 10], 2: [1.5, 10], 3: [2.5, 16], 4: [4, 16], 5: [4, 16], 6: [4, 25], 7: [10, 40], 8: [2.5, 10], 9: [4, 16], 10: [2.5, 10], 11: [1.5, 10], 12: [2.5, 10], 'AL-1': [16, 63] };
+  for (const c of P.circuitos) {
+    const r = K.res[c.id];
+    assert.equal(r.status, 'ok', `circuito ${c.num}: ${r.falhas.concat(r.avisos).join(' | ')}`);
+    assert.deepEqual([r.Sf, r.In], esperado[c.num], `circuito ${c.num}: seção / disjuntor`);
+    assert.ok(r.IB <= r.In && r.In <= r.Iz, `circuito ${c.num}: IB ≤ In ≤ Iz`);
+  }
+});
+
+test('Luminotécnica — iluminância mantida atende a NBR ISO/CIE 8995-1', () => {
+  for (const a of P.lumi) {
+    const r = K.lumi[a.id];
+    assert.ok(r.okEm, `${a.nome}: Em ${r.Emed} < ${r.Em}`);
+    assert.notEqual(r.status, 'fail', a.nome);
+  }
+});
+
+test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {
+  const u = Object.values(E.ucs)[0];
+  perto(u.C, 23.688, 0.001, 'carga instalada (kW)');
+  perto(u.D, 20.108, 0.01, 'demanda (kVA)');
+  assert.equal(u.cat.cat, 'T3');
+  assert.equal(u.cat.disj, '70');
+});
+
+test('Conforto — PMV/PPD reproduz os exemplos da ISO 7730 (Anexo D)', () => {
+  // ta = tr = 22 °C, var 0,10 m/s, UR 60 %, 1,2 met, 0,5 clo → PMV −0,75, PPD 17 %
+  const a = A.pmvPPD(22, 22, 0.1, 60, 1.2, 0.5);
+  perto(a.pmv, -0.75, 0.02, 'PMV');
+  perto(a.ppd, 17, 0.5, 'PPD');
+  // ta = tr = 27 °C, var 0,10 m/s, UR 60 %, 1,2 met, 0,5 clo → PMV +0,77
+  perto(A.pmvPPD(27, 27, 0.1, 60, 1.2, 0.5).pmv, 0.77, 0.02, 'PMV');
+});
+
+test('Componentes — U, capacidade térmica e regime permanente da condução', () => {
+  const cons = A.consPadrao(), por = id => cons.find(k => k.id === id);
+  const p = A.propsCons({ ...por('pTij6'), tipo: 'parede' });
+  perto(p.U, 2.47, 0.01, 'U parede de bloco cerâmico (W/m²K)');
+  perto(p.CT, 159, 1, 'CT parede de bloco cerâmico (kJ/m²K)');
+  perto(A.propsCons(por('cTelhaLaje')).U, 2.00, 0.01, 'U telhado + laje');
+  // temperatura externa constante: o fluxo periódico tem de convergir para U·ΔT
+  const q = A.conducaoPeriodica({ ...por('pConc'), tipo: 'parede' }, Array(24).fill(34), 24).q;
+  const U = A.propsCons({ ...por('pConc'), tipo: 'parede' }).U;
+  q.forEach(v => perto(v, U * 10, 0.05, 'q permanente'));
+});
+
+test('Psicrometria — ar externo de projeto (TBS 34 °C / TBU 24 °C, 530 m)', () => {
+  const p = A.pAtm(530), W = A.WdeTBU(34, 24, p);
+  perto(W, 0.0159, 0.0002, 'umidade absoluta (kg/kg)');
+  perto(A.URdeW(34, W, p), 44.6, 0.5, 'umidade relativa (%)');
+});
+
+test('Solar — irradiância horizontal ao meio-dia de janeiro em Campo Grande', () => {
+  const I = A.irradiancia(A.climaPadrao(), 'H', 12);
+  perto(I.ED + I.Ed, 1151, 15, 'irradiância global horizontal (W/m²)');
+});
+
+test('Carga térmica — ambientes do exemplo e equipamentos indicados', () => {
+  const esperado = { 'Suíte': [2366, 9000], 'Sala de estar': [2736, 12000], 'Escritório (home office)': [2234, 9000] };
+  for (const a of P.clima.amb) {
+    const r = C.amb[a.id];
+    perto(r.Q, esperado[a.nome][0], 5, `${a.nome}: carga de pico (W)`);
+    assert.equal(r.equip.cap, esperado[a.nome][1], `${a.nome}: capacidade (BTU/h)`);
+    assert.ok(r.BTU <= r.equip.n * r.equip.cap, `${a.nome}: equipamento cobre a carga com margem`);
+  }
+  assert.ok(C.confOK, 'conforto térmico atendido');
+  perto(C.conf.pmv, -0.31, 0.01, 'PMV do exemplo');
+});
+
+test('Memoriais — todos os documentos são montados sem erro', () => {
+  const docs = {
+    'NBR 5410': A.construirMemorial(P, K, { metodologia: true, detalhe: true, eletrodutos: true, calhas: true, quadro: true, lumi: true, anexo33: true, assinatura: true }),
+    'luminotécnico': A.construirRelatorioLumi(P, K),
+    'Energisa': A.construirMemorialDemanda(P, K, E),
+    'carga térmica': A.construirMemorialClima(P, K, C)
+  };
+  for (const [nome, B] of Object.entries(docs)) {
+    assert.ok(Array.isArray(B) && B.length > 20, `${nome}: documento vazio`);
+    assert.equal(B[0].t, 'title', `${nome}: começa pelo bloco de título`);
+    assert.ok(!JSON.stringify(B.map(b => ({ ...b, svg: undefined }))).match(/NaN|undefined|Infinity/), `${nome}: valor inválido no texto`);
+  }
+});
