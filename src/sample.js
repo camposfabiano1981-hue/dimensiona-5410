@@ -7,7 +7,8 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao()
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(),
+    memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }
 function projetoExemplo() {
@@ -61,6 +62,15 @@ function projetoExemplo() {
       cg('aquec', 'Chuveiro elétrico 220 V — banheiro social (circ. 6)', { W: 5500 }), cg('aquec', 'Chuveiro elétrico 220 V — suíte (circ. 7)', { W: 7500 }),
       cg('arj', 'Ar-condicionado split 12.000 BTU/h (circ. 8)', { btu: 12000, tipoAr: 'split' }), cg('fogao', 'Forno elétrico (circ. 9)', { W: 1800 }),
       cg('secad', 'Forno de micro-ondas 25 L', { W: 1398 }), cg('mot1', 'Bomba d’água 1/2 cv (circ. 10)', { cv: 0.5 })] });
+  const T = proj.aterr;
+  Object.assign(T.solo, { modo: 'wenner', p: 0.2, media: 'geo', descartar: true, modelo: '2c', fs: 1, local: 'terreno da obra — direções A (frente) e B (lateral)', equip: 'terrômetro digital de 4 terminais',
+    med: [['A', 1, 26.57], ['A', 2, 11.05], ['A', 4, 4.53], ['A', 8, 1.85], ['A', 16, 0.92], ['B', 1, 24.53], ['B', 2, 11.74], ['B', 4, 4.18], ['B', 8, 1.96], ['B', 16, 0.88]].map(([dir, a, R]) => ({ dir, a, R })) });
+  const arK = (tipo, funcao, o) => Object.assign(arrPadrao(tipo, funcao), o);
+  T.arr = [
+    arK('linha', 'entrada', { nome: 'Padrão de entrada — categoria T3 (NDU 001)', n: 4, e: 2.4, haste: 'h34-240', L: 2.4, d: 17.3, rmax: 20 }),
+    arK('malha', 'spda', { nome: 'SPDA — anel de aterramento com 4 hastes', Lx: 14, Ly: 11, Nx: 2, Ny: 2, hc: 0.5, S: 50, posH: 'cantos', Lh: 2.4, dh: 17.3, seg: false, rmax: 10 }),
+    arK('malha', 'subestacao', { nome: 'Malha de terra — verificação de toque e passo (ilustrativo)', Lx: 16, Ly: 12, Nx: 5, Ny: 7, hc: 0.6, S: 50, posH: 'perimetro', Lh: 2.4, dh: 17.3, seg: true, I3I0: 1000, sf: 50, xr: 5, tf: 0.5, tc: 1.0, brita: true, rhoS: 3000, hs: 0.10, peso: 50, rmax: 10 })
+  ];
   return proj;
 }
 if (typeof module !== 'undefined') module.exports = { projetoExemplo, projetoVazio };

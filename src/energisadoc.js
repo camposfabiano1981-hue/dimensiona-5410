@@ -113,7 +113,7 @@ function construirMemorialDemanda(proj, calc, ce) {
   R.forEach(r => B.push({ t: 'p', text: `${r.u.nome}${r.u.titular ? ' — ' + r.u.titular : ''}: declaro, para fins de solicitação de fornecimento de energia elétrica à ${ENERGISA_UN[E.un] || 'distribuidora'}, que a carga instalada da unidade consumidora é de **${f2(r.C)} kW**, com demanda provável de **${f2(r.D)} kVA**, conforme a relação de cargas e o cálculo apresentados neste memorial, e que as instalações internas seguem a ABNT NBR 5410.` }));
   if (E.obs) B.push({ t: 'note', text: E.obs });
   const local = [E.municipio || I.cidade, dataExtenso(I.data)].filter(Boolean).join(', ');
-  B.push({ t: 'sign', place: local, name: R.length === 1 && R[0].u.titular ? R[0].u.titular : 'Titular / interessado', reg: R.length === 1 && R[0].u.doc ? `CPF/CNPJ ${R[0].u.doc}` : '' });
+  B.push({ t: 'sign', titular: true, place: local, name: R.length === 1 && R[0].u.titular ? R[0].u.titular : 'Titular / interessado', reg: R.length === 1 && R[0].u.doc ? `CPF/CNPJ ${R[0].u.doc}` : '' });
   B.push({ t: 'sign', place: '', name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
   return B;
 }

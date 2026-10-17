@@ -37,14 +37,21 @@ function potTxt(c, r) {
   return `${f0(r.S)} VA — ${f0(r.P)} W`;
 }
 
+/* A memória da NBR 5410 é emitida em partes independentes, que podem ser agrupadas no relatório consolidado */
+const PARTES_5410 = {
+  circuitos: { text: 'Memória de cálculo — condutores e proteção', sub: 'Dimensionamento dos condutores e dos dispositivos de proteção contra sobrecorrentes e choques elétricos dos circuitos de baixa tensão' },
+  eletrodutos: { text: 'Memória de cálculo — eletrodutos', sub: 'Dimensionamento dos eletrodutos pela taxa máxima de ocupação (NBR 5410, 6.2.11.1)' },
+  calhas: { text: 'Memória de cálculo — eletrocalhas', sub: 'Dimensionamento de eletrocalhas, perfilados, bandejas e leitos para cabos' },
+  quadros: { text: 'Memória de cálculo — quadros de carga', sub: 'Quadros de distribuição: cargas por circuito, equilíbrio de fases e demanda dos alimentadores' }
+};
+const trechosEletroduto = calc => Object.values(calc.trechos).filter(t => !(calc.calhas || {})[t.key]);
 function construirMemorial(proj, calc, opt = {}) {
-  const o = Object.assign({ metodologia: true, detalhe: true, eletrodutos: true, calhas: true, quadro: true, lumi: true, anexo33: true, assinatura: true }, opt);
+  const o = Object.assign({ parte: 'circuitos', metodologia: true, detalhe: true, anexo33: true, assinatura: true }, opt), pt = PARTES_5410[o.parte] ? o.parte : 'circuitos';
+  const pc = pt === 'circuitos', pe = pt === 'eletrodutos', pk = pt === 'calhas', pq = pt === 'quadros';
   const P = proj.params, I = proj.info, C = proj.circuitos, R = calc.res; const B = [];
   const nOK = C.filter(c => R[c.id].status !== 'fail').length;
-  const K = Object.values(calc.calhas || {}), temK = o.calhas && K.length > 0;
-  const A = proj.lumi || [], temL = o.lumi && A.length > 0;
-  const TE = Object.values(calc.trechos).filter(t => !(calc.calhas || {})[t.key]);
-  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 — Instalações elétricas de baixa tensão', text: 'Memória de cálculo', sub: `Dimensionamento de condutores, dispositivos de proteção, eletrodutos${K.length ? ' e eletrocalhas' : ''} dos circuitos elétricos${temL ? ' e cálculo luminotécnico (ABNT NBR ISO/CIE 8995-1)' : ''}` });
+  const K = Object.values(calc.calhas || {}), TE = trechosEletroduto(calc), Q = Object.values(calc.quadros);
+  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 — Instalações elétricas de baixa tensão', text: PARTES_5410[pt].text, sub: PARTES_5410[pt].sub });
   B.push({ t: 'meta', rows: [
     ['Obra', I.obra || '—'], ['Proprietário / cliente', I.cliente || '—'],
     ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'],
@@ -55,25 +62,26 @@ function construirMemorial(proj, calc, opt = {}) {
   const temAl = C.some(c => c.material === 'Al');
 
   sec('Objetivo');
-  B.push({ t: 'p', text: `Este documento apresenta a memória de cálculo do dimensionamento dos condutores, dos dispositivos de proteção contra sobrecorrentes e choques elétricos e dos eletrodutos dos ${C.length} circuitos de baixa tensão da obra acima identificada, segundo os critérios da ABNT NBR 5410:2004 (versão corrigida 2008). Conforme 6.2.6.1.2, a seção adotada para cada circuito é a maior entre as exigidas pelos critérios de seção mínima, capacidade de condução de corrente, queda de tensão, sobrecarga, curto-circuito e proteção contra choques elétricos.` });
+  if (pc) B.push({ t: 'p', text: `Este documento apresenta a memória de cálculo do dimensionamento dos condutores e dos dispositivos de proteção contra sobrecorrentes e choques elétricos dos ${C.length} circuitos de baixa tensão da obra acima identificada, segundo os critérios da ABNT NBR 5410:2004 (versão corrigida 2008). Conforme 6.2.6.1.2, a seção adotada para cada circuito é a maior entre as exigidas pelos critérios de seção mínima, capacidade de condução de corrente, queda de tensão, sobrecarga, curto-circuito e proteção contra choques elétricos.` });
+  if (pe) B.push({ t: 'p', text: `Este documento apresenta o dimensionamento dos ${TE.length} trechos de eletroduto da obra acima identificada pela taxa máxima de ocupação de 6.2.11.1.6 da ABNT NBR 5410:2004, a partir dos condutores dimensionados na memória de cálculo dos circuitos e dos diâmetros externos de catálogo.` });
+  if (pk) B.push({ t: 'p', text: `Este documento apresenta o dimensionamento dos ${K.length} trechos de eletrocalhas, perfilados, bandejas e leitos para cabos da obra acima identificada: ocupação da seção útil, largura e altura comerciais e verificação da carga dos cabos, considerando a maneira de instalar da Tabela 33 da ABNT NBR 5410:2004 adotada para cada circuito.` });
+  if (pq) B.push({ t: 'p', text: `Este documento apresenta os ${Q.length} quadros de distribuição da obra acima identificada: relação das cargas por circuito, distribuição entre fases, desequilíbrio e demanda adotada para o dimensionamento dos alimentadores, segundo a ABNT NBR 5410:2004.` });
 
   sec('Normas e documentos de referência');
   B.push({ t: 'list', items: [
     'ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão.',
-    'ABNT NBR NM 60898 — Disjuntores para proteção de sobrecorrentes para instalações domésticas e similares.',
-    'ABNT NBR IEC 60947-2 — Dispositivos de manobra e comando de baixa tensão — Disjuntores.',
-    'ABNT NBR NM 61008 / NBR NM 61009 — Interruptores e disjuntores a corrente diferencial-residual.',
-    'ABNT NBR NM 247-3 e ABNT NBR 13248 — Condutores isolados 450/750 V (PVC e não halogenados).',
-    'ABNT NBR 7288, NBR 7286 e NBR 7287 — Cabos de potência 0,6/1 kV com isolação de PVC, EPR/HEPR e XLPE.',
-    'ABNT NBR NM 280 — Condutores de cabos isolados (resistência elétrica).',
-    'ABNT NBR 15465 e ABNT NBR 5598 — Eletrodutos plásticos e de aço-carbono.',
-    ...(K.length ? ['ABNT NBR IEC 61537 — Encaminhamento de cabos — Sistemas de eletrocalhas e de leitos para cabos.'] : []),
-    ...(A.length ? ['ABNT NBR ISO/CIE 8995-1:2013 — Iluminação de ambientes de trabalho — Parte 1: Interior.', 'CIE 97:2005 — Guia de manutenção de sistemas de iluminação elétrica de interiores.'] : []),
-    'IEC 60364-5-52:2009 e IEC 60287-1-1 — Capacidade de condução, agrupamento e cálculo de resistência e reatância.',
-    'Guia de Dimensionamento de Cabos para Baixa Tensão — Prysmian, Rev. 9 (2020).',
-    ...(I.concessionaria ? [I.concessionaria + '.'] : [])
+    ...(pc || pq ? ['ABNT NBR NM 60898 — Disjuntores para proteção de sobrecorrentes para instalações domésticas e similares.', 'ABNT NBR IEC 60947-2 — Dispositivos de manobra e comando de baixa tensão — Disjuntores.'] : []),
+    ...(pc ? ['ABNT NBR NM 61008 / NBR NM 61009 — Interruptores e disjuntores a corrente diferencial-residual.'] : []),
+    ...(pc || pe || pk ? ['ABNT NBR NM 247-3 e ABNT NBR 13248 — Condutores isolados 450/750 V (PVC e não halogenados).', 'ABNT NBR 7288, NBR 7286 e NBR 7287 — Cabos de potência 0,6/1 kV com isolação de PVC, EPR/HEPR e XLPE.'] : []),
+    ...(pc ? ['ABNT NBR NM 280 — Condutores de cabos isolados (resistência elétrica).'] : []),
+    ...(pe ? ['ABNT NBR 15465 e ABNT NBR 5598 — Eletrodutos plásticos e de aço-carbono.'] : []),
+    ...(pk ? ['ABNT NBR IEC 61537 — Encaminhamento de cabos — Sistemas de eletrocalhas e de leitos para cabos.'] : []),
+    ...(pq ? ['ABNT NBR IEC 61439-1 e NBR IEC 61439-3 — Conjuntos de manobra e comando de baixa tensão — Quadros de distribuição.'] : []),
+    ...(pc || pk ? ['IEC 60364-5-52:2009 e IEC 60287-1-1 — Capacidade de condução, agrupamento e cálculo de resistência e reatância.', 'Guia de Dimensionamento de Cabos para Baixa Tensão — Prysmian, Rev. 9 (2020).'] : []),
+    ...(I.concessionaria && (pc || pq) ? [I.concessionaria + '.'] : [])
   ] });
 
+  if (pc || pq) {
   sec('Dados do sistema e premissas');
   const aterr = { 'TN-S': 'TN-S (neutro e proteção separados)', 'TN-C-S': 'TN-C-S', 'TT': 'TT (massas ligadas a eletrodo próprio)' }[P.aterramento] || P.aterramento;
   const orig = { entrega: 'ponto de entrega em tensão secundária de distribuição', trafo: 'terminais secundários do transformador MT/BT', gerador: 'terminais do grupo gerador próprio' }[P.origem];
@@ -91,6 +99,8 @@ function construirMemorial(proj, calc, opt = {}) {
     ['Verificação ao curto-circuito', P.verifCC ? (P.classe3 ? `disjuntores até 32 A: classe 3 de limitação de energia; demais: t = ${f3(P.tCC)} s` : `t = ${f3(P.tCC)} s`) + (P.verifPE ? '; inclui o condutor de proteção' : '') : 'não realizada'],
     ['Condutores em paralelo', `automático acima de ${fS(P.secMaxPar)} mm² por condutor, quando o circuito não definir outro valor`]
   ] });
+  }
+  if (pc) {
   B.push({ t: 'p', text: 'Premissas:' });
   B.push({ t: 'list', items: [
     'As potências dos circuitos são as informadas pelo projetista a partir da previsão de cargas (NBR 5410, 9.5.2, quando aplicável).',
@@ -103,8 +113,9 @@ function construirMemorial(proj, calc, opt = {}) {
     'Diâmetros externos de condutores e internos de eletrodutos: valores típicos de catálogo, a confirmar com o fabricante especificado.',
     ...(temAl ? ['Condutores de alumínio usados somente nas condições de 6.2.3.8 (instalações industriais e comerciais, nunca em residências).'] : [])
   ] });
+  }
 
-  if (o.metodologia) {
+  if (o.metodologia && pc) {
     const s = sec('Critérios de dimensionamento');
     B.push({ t: 'h3', text: `${s}.1 Corrente de projeto (IB)` });
     B.push({ t: 'eq', lines: ['F+N:    IB = S / U0            F+F:  IB = S / U', 'F+F+N:  IB = S / (2 × U0)      F+F+F e F+F+F+N:  IB = S / (√3 × U)', 'Motores: S = Peixo / (η × cosφ);  IB = In,motor × FS (fator de serviço)'] });
@@ -124,21 +135,24 @@ function construirMemorial(proj, calc, opt = {}) {
     B.push({ t: 'p', text: 'Seção mínima (6.2.6.1, Tabela 47): cobre 1,5 mm² em iluminação, 2,5 mm² em força e 0,5 mm² em sinalização e controle; alumínio 16 mm² (50 mm² em instalações comerciais). Neutro (6.2.6.2): igual à fase em circuitos monofásicos e bifásicos; redução pela Tabela 48 apenas em circuitos trifásicos equilibrados, com 3ª harmônica até 15 %. Condutor de proteção (Tabela 58): SPE = S até 16 mm²; 16 mm² de 16 a 35 mm²; S/2 acima de 35 mm².' });
     B.push({ t: 'h3', text: `${s}.7 Dispositivo DR (5.1.3.2.2)` });
     B.push({ t: 'p', text: 'Proteção complementar por DR de alta sensibilidade (IΔn ≤ 30 mA) nos circuitos que atendem locais com banheira ou chuveiro, tomadas em áreas externas, tomadas internas que possam alimentar equipamentos no exterior e, em locais de habitação, cozinhas, copas-cozinhas, lavanderias, áreas de serviço, garagens e demais dependências molhadas ou sujeitas a lavagens.' });
-    B.push({ t: 'h3', text: `${s}.8 Eletrodutos (6.2.11.1)` });
-    B.push({ t: 'eq', lines: ['Taxa máxima de ocupação: 53 % (1 condutor) · 31 % (2 condutores) · 40 % (3 ou mais)', 'Ai,mín = Σ(π × d² / 4) / taxa   →   Di ≥ √(4 × Ai,mín / π)'] });
-    B.push({ t: 'p', text: 'Trechos contínuos sem caixa de passagem: até 15 m em áreas internas e 30 m em áreas externas, reduzidos de 3 m por curva de 90°, com no máximo três curvas entre caixas.' });
-    if (K.length) {
-      B.push({ t: 'h3', text: `${s}.9 Eletrocalhas, perfilados, bandejas e leitos` });
-      B.push({ t: 'eq', lines: ['Wmín = ΣA × (1 + reserva) / (taxa × H)          (largura mínima para a altura útil H)', 'Camada única (suportes abertos, Tabela 42 ref. 2 a 5):  Σd × (1 + reserva) ≤ W', 'Peso dos cabos ≤ carga admissível do fabricante para o vão entre suportes'] });
-      B.push({ t: 'p', text: 'A NBR 5410 não fixa taxa de ocupação para condutos de seção não circular; adota-se como critério de projeto 40 % da seção útil, por analogia com 6.2.11.1.6, acrescida de reserva para ampliação. A capacidade de condução dos circuitos já considera a maneira de instalar da Tabela 33 e o agrupamento das Tabelas 42 e 43. Eletrocalhas e leitos metálicos devem ter continuidade elétrica e ser ligados à equipotencialização (6.4).' });
-    }
-    if (temL) {
-      B.push({ t: 'h3', text: `${s}.${K.length ? 10 : 9} Iluminação de interiores (NBR ISO/CIE 8995-1)` });
-      B.push({ t: 'eq', lines: ['K = L × W / [hm × (L + W)]          (índice do local; hm = altura da luminária ao plano de trabalho)', 'N = Em × A / (Φ × UF × FM)          Eméd = N × Φ × UF × FM / A', 'FM = LLMF × LSF × LMF × RSMF (CIE 97) ≥ 0,70;   Uo = Emín / Eméd ≥ 0,70 na área da tarefa', 'E(P) = Σ I(θ) × cos θ / d² + E refletida;   I(θ) = I0 × cosⁿθ'] });
-      B.push({ t: 'p', text: 'O fator de utilização (UF) é calculado pelo método da radiosidade em três superfícies (plano de trabalho, paredes e teto), com a distribuição de intensidade da luminária aproximada por cosⁿθ a partir da abertura do facho e com os fatores de forma entre o plano de trabalho e o teto; quando o fabricante fornece a tabela de UF, o valor tabelado é usado. A uniformidade é verificada ponto a ponto numa malha no plano de trabalho, excluída uma faixa de até 0,5 m junto às paredes.' });
-    }
+  }
+  if (o.metodologia && pe) {
+    const s = sec('Critérios de dimensionamento');
+    B.push({ t: 'eq', lines: ['Taxa máxima de ocupação (6.2.11.1.6): 53 % (1 condutor) · 31 % (2 condutores) · 40 % (3 ou mais)', 'Ai,mín = Σ(π × d² / 4) / taxa   →   Di ≥ √(4 × Ai,mín / π)'] });
+    B.push({ t: 'p', text: 'd é o diâmetro externo de cada condutor ou cabo contido no trecho. Trechos contínuos sem caixa de passagem: até 15 m em áreas internas e 30 m em áreas externas, reduzidos de 3 m por curva de 90°, com no máximo três curvas entre caixas (6.2.11.1.7 e 6.2.11.1.8). Eletrodutos de aço devem conter todos os condutores do circuito.' });
+  }
+  if (o.metodologia && pk) {
+    sec('Critérios de dimensionamento');
+    B.push({ t: 'eq', lines: ['Wmín = ΣA × (1 + reserva) / (taxa × H)          (largura mínima para a altura útil H)', 'Camada única (suportes abertos, Tabela 42 ref. 2 a 5):  Σd × (1 + reserva) ≤ W', 'Peso dos cabos ≤ carga admissível do fabricante para o vão entre suportes'] });
+    B.push({ t: 'p', text: 'A NBR 5410 não fixa taxa de ocupação para condutos de seção não circular; adota-se como critério de projeto 40 % da seção útil, por analogia com 6.2.11.1.6, acrescida de reserva para ampliação. A capacidade de condução dos circuitos já considera a maneira de instalar da Tabela 33 e o agrupamento das Tabelas 42 e 43. Eletrocalhas e leitos metálicos devem ter continuidade elétrica e ser ligados à equipotencialização (6.4).' });
+  }
+  if (o.metodologia && pq) {
+    sec('Critérios de dimensionamento');
+    B.push({ t: 'eq', lines: ['Demanda do quadro:  D = FD × ΣS(circuitos terminais) + Σ D(quadros a jusante)', 'Corrente de demanda:  Id = D / U0 (monofásico) · D / (2 × U0) (bifásico) · D / (√3 × U) (trifásico)', 'Desequilíbrio entre fases = (Smáx − Smín) / Smáx × 100'] });
+    B.push({ t: 'p', text: 'O fator de demanda (FD) é definido pelo projetista para cada quadro (100 % quando não informado, isto é, toda a carga instalada). As cargas são distribuídas pelas fases de acordo com a ligação de cada circuito, buscando o menor desequilíbrio. A demanda calculada é a corrente de projeto do circuito alimentador do quadro.' });
   }
 
+  if (pc) {
   const sR = sec('Quadro-resumo dos circuitos');
   B.push({ t: 'h3', text: `${sR}.1 Cargas e correntes` });
   B.push({ t: 'table', small: true, head: ['Circ.', 'Descrição', 'Quadro', 'Ligação', 'Fases', 'U (V)', 'P (W)', 'FP', 'S (VA)', 'IB (A)', 'L (m)'], widths: [6, 26, 8, 11, 7, 6, 8, 6, 8, 7, 7], align: 'lllllrrrrrr',
@@ -148,20 +162,31 @@ function construirMemorial(proj, calc, opt = {}) {
     rows: C.map(c => { const r = R[c.id]; const t = r.trecho; const k = r.nPar > 1 ? `${r.nPar}×` : ''; return [c.num, `${r.met.id}/${r.ref}`, f2(r.fTot), [k + fS(r.Sf), r.hasN ? k + fS(r.SN) : '—', r.SPE ? k + fS(r.SPE) : '—'].join(' / ') + (c.material === 'Al' ? ' Al' : ''), f1(r.Iz), protecaoCurta(c, r) + (c.dispositivo !== 'fus_gG' ? ` ${r.polos}P` : ''), r.drUsado ? `${r.drIn ?? '?'} A/${r.idn} mA` : '—', `${f2(r.dv)} / ${f2(r.dvTotal)}`, r.calha ? (r.calha.esc ? `${r.calha.esc.W}×${r.calha.esc.H} mm` : '—') : (t && t.esc ? `DN ${t.esc.dn} (${t.esc.pol})` : (t && !t.aplica ? 'n/a' : '—')), statusTxt(r.status)]; }) });
 
   if (o.detalhe) { const sD = sec('Memória detalhada por circuito'); C.forEach((c, i) => memCircuito(B, c, R[c.id], proj, calc, `${sD}.${i + 1}`)); }
-  if (o.eletrodutos && TE.length) { const sE = sec('Dimensionamento dos eletrodutos'); TE.forEach((t, i) => memTrecho(B, t, `${sE}.${i + 1}`)); }
-  if (temK) { const sK = sec('Dimensionamento das eletrocalhas, bandejas e leitos'); K.forEach((t, i) => memCalha(B, t, `${sK}.${i + 1}`)); }
-  if (o.quadro) { const sQ = sec('Quadros de carga e equilíbrio de fases'); Object.values(calc.quadros).forEach((q, i) => memQuadro(B, q, proj, calc, `${sQ}.${i + 1}`)); }
-  if (temL) memLumi(B, proj, calc, sec('Cálculo luminotécnico'));
+  }
+  if (pe) {
+    const sE = sec('Dimensionamento dos eletrodutos');
+    B.push({ t: 'h3', text: `${sE}.1 Quadro-resumo` });
+    B.push({ t: 'table', head: ['Trecho', 'Circuitos', 'Condutores', 'Ocupação', 'Eletroduto', 'Situação'], widths: [16, 24, 12, 14, 22, 12], align: 'lllrll',
+      rows: TE.map(t => [t.exclusivo ? 'Exclusivo' : t.key, t.circuitos.map(c => c.num).join(', '), t.aplica ? String(t.n) : '—', t.aplica && t.esc ? `${f1(t.esc.ocup)} %` : '—', t.aplica ? (t.esc ? `DN ${t.esc.dn} (${t.esc.pol})` : 'não dimensionado') : 'não se aplica', t.aplica ? (t.falhas.length ? 'Não atende' : 'Atende') : '—']) });
+    TE.forEach((t, i) => memTrecho(B, t, `${sE}.${i + 2}`));
+  }
+  if (pk) { const sK = sec('Dimensionamento das eletrocalhas, bandejas e leitos'); K.forEach((t, i) => memCalha(B, t, `${sK}.${i + 1}`)); }
+  if (pq) { const sQ = sec('Quadros de carga e equilíbrio de fases'); Q.forEach((q, i) => memQuadro(B, q, proj, calc, `${sQ}.${i + 1}`)); }
 
   sec('Conclusão');
-  const falhas = C.filter(c => R[c.id].status === 'fail'), obs = C.filter(c => R[c.id].status === 'warn');
-  if (!falhas.length) B.push({ t: 'p', text: `Os ${C.length} circuitos dimensionados atendem aos critérios da ABNT NBR 5410:2004 aplicados nesta memória.${obs.length ? ` Os circuitos ${obs.map(c => c.num).join(', ')} possuem observações, relacionadas na memória detalhada, que devem ser consideradas na execução.` : ''}` });
-  else { B.push({ t: 'p', text: `${nOK} de ${C.length} circuitos atendem aos critérios aplicados. Os circuitos abaixo apresentam pendências que devem ser resolvidas antes da emissão final:` }); B.push({ t: 'list', items: falhas.map(c => `Circuito ${c.num} — ${R[c.id].falhas.join(' ')}`) }); }
-  B.push({ t: 'p', text: 'Os dispositivos, condutores e eletrodutos especificados devem possuir certificação de conformidade e ser instalados conforme as prescrições da NBR 5410 e as recomendações dos fabricantes. Após a execução, a instalação deve ser submetida à verificação final (inspeção visual e ensaios) prevista na seção 7 da NBR 5410.' });
-  if (I.obs) B.push({ t: 'note', text: I.obs });
+  if (pc) {
+    const falhas = C.filter(c => R[c.id].status === 'fail'), obs = C.filter(c => R[c.id].status === 'warn');
+    if (!falhas.length) B.push({ t: 'p', text: `Os ${C.length} circuitos dimensionados atendem aos critérios da ABNT NBR 5410:2004 aplicados nesta memória.${obs.length ? ` Os circuitos ${obs.map(c => c.num).join(', ')} possuem observações, relacionadas na memória detalhada, que devem ser consideradas na execução.` : ''}` });
+    else { B.push({ t: 'p', text: `${nOK} de ${C.length} circuitos atendem aos critérios aplicados. Os circuitos abaixo apresentam pendências que devem ser resolvidas antes da emissão final:` }); B.push({ t: 'list', items: falhas.map(c => `Circuito ${c.num} — ${R[c.id].falhas.join(' ')}`) }); }
+    B.push({ t: 'p', text: 'Os dispositivos e condutores especificados devem possuir certificação de conformidade e ser instalados conforme as prescrições da NBR 5410 e as recomendações dos fabricantes. Após a execução, a instalação deve ser submetida à verificação final (inspeção visual e ensaios) prevista na seção 7 da NBR 5410.' });
+  }
+  if (pe) { const nf = TE.filter(t => t.aplica && !t.esc).length; B.push({ t: 'p', text: nf ? `${nf} trecho(s) sem eletroduto comercial que atenda à taxa de ocupação: divida os circuitos em mais de um eletroduto ou adote diâmetro maior.` : 'Todos os trechos de eletroduto atendem à taxa máxima de ocupação de 6.2.11.1.6. Os eletrodutos devem ser instalados com caixas de passagem nos limites de comprimento e de curvas indicados nos critérios.' }); }
+  if (pk) { const nf = K.filter(t => t.status === 'fail').length; B.push({ t: 'p', text: nf ? `${nf} trecho(s) de eletrocalha com pendência, relacionada no cálculo do trecho.` : 'Todos os trechos de eletrocalhas, perfilados, bandejas e leitos atendem aos critérios de ocupação e de carga adotados. Os condutos metálicos devem ter continuidade elétrica e ser ligados à equipotencialização.' }); }
+  if (pq) B.push({ t: 'p', text: 'As demandas acima são a base do dimensionamento dos circuitos alimentadores (memória de cálculo dos circuitos) e do padrão de entrada. Recomenda-se manter o desequilíbrio entre fases abaixo de cerca de 10 % e prever espaço de reserva nos quadros, conforme 6.5.4.7 da NBR 5410.' });
+  if (I.obs && pc) B.push({ t: 'note', text: I.obs });
   if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: I.registro || '' });
 
-  if (o.anexo33) {
+  if (o.anexo33 && pc) {
     const usados = [...new Set(C.map(c => c.metodo))].map(id => MET[id]).filter(Boolean);
     B.push({ t: 'break' });
     B.push({ t: 'h1', text: 'Anexo A — Maneiras de instalar adotadas (Tabela 33)' });
@@ -343,13 +368,3 @@ function memCalha(B, t, num) {
 }
 function arDe(svg) { const m = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/.exec(svg); return m ? +m[4] / +m[3] : 0.625; }
 function safeKey(k) { return String(k).replace(/[^a-zA-Z0-9]/g, ''); }
-
-function memLumi(B, proj, calc, s) {
-  const A = proj.lumi, R = calc.lumi, refs = refsLuminarias(proj, calc);
-  B.push({ t: 'p', text: `Cálculo da iluminação geral dos ${A.length} ambientes pelo método dos lúmens, com verificação ponto a ponto da uniformidade, segundo os requisitos da ABNT NBR ISO/CIE 8995-1:2013. Os dados das luminárias são os de catálogo dos fabricantes indicados e devem ser confirmados na ficha técnica do produto especificado.` });
-  B.push({ t: 'h3', text: `${s}.1 Resumo` });
-  B.push({ t: 'table', small: true, head: ['Ambiente', 'Área (m²)', 'Em (lx)', 'Luminária', 'N', 'Eméd (lx)', 'Uo', 'P (W)', 'W/m²', 'Circ.', 'Situação'], widths: [17, 7, 7, 21, 5, 8, 6, 7, 7, 6, 9], align: 'lrrlrrrrrll',
-    rows: A.map(a => { const r = R[a.id]; const c = proj.circuitos.find(x => x.id === a.circuito); return [a.nome, f2(r.A), String(r.Em), `${r.prod.fab !== '—' ? r.prod.fab + ' ' : ''}${r.prod.mod}`, String(r.N), f0(r.Emed), f2(r.Uo), f0(r.P), f1(r.dens), c ? c.num : '—', statusTxt(r.status)]; })
-      .concat([['Total', f2(A.reduce((x, a) => x + R[a.id].A, 0)), '', '', String(A.reduce((x, a) => x + R[a.id].N, 0)), '', '', f0(A.reduce((x, a) => x + R[a.id].P, 0)), '', '', '']]), lastBold: true });
-  A.forEach((a, i) => memLumiAmbiente(B, a, R[a.id], proj, `${s}.${i + 2}`, refs));
-}

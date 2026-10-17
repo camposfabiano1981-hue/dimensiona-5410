@@ -5,9 +5,10 @@ Plataforma web para **projetos elétricos de baixa tensão**:
 - quadro de cargas;
 - cálculo luminotécnico pela **NBR ISO/CIE 8995-1**;
 - demanda para a concessionária pelas normas **Energisa NDU 001 / NDU 003**;
-- carga térmica de climatização pela **ABNT NBR 16401**.
+- carga térmica de climatização pela **ABNT NBR 16401**;
+- aterramento, da haste única à malha, pelas **NBR 5410, NBR 7117-1 e NBR 15751 / IEEE Std 80**.
 
-Cada módulo emite seu documento de saída: memória de cálculo, relatório luminotécnico, memorial de demanda e memorial de carga térmica, em **PDF**, **Word (.docx)** e **HTML**. O quadro de cargas sai em **Excel (.xlsx)**.
+Cada disciplina emite sua memória de cálculo em **PDF**, **Word (.docx)** e **HTML**, separadamente ou agrupada num **relatório consolidado** com sumário e partes A, B, C… O quadro de cargas sai em **Excel (.xlsx)**.
 
 Funciona 100% no navegador: **não precisa de servidor, banco de dados nem instalação**. Está publicada gratuitamente no **GitHub Pages**.
 
@@ -63,9 +64,26 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
   - equipamento indicado.
 - **Integração:** cria os circuitos dos aparelhos na aba Circuitos.
 
-**Documentos de saída**
-- **Memória de cálculo NBR 5410:** metodologia, cálculo detalhado de cada circuito, eletrodutos, eletrocalhas, quadros, luminotécnica, anexo da Tabela 33 e assinatura.
-- **Demais documentos:** relatório luminotécnico, memorial de demanda Energisa e memorial de carga térmica, todos com cabeçalho, rodapé, paginação e bloco de assinatura.
+**Aterramento (NBR 5410, NBR 7117-1, NBR 15751 / IEEE 80)**
+- **Resistividade do solo:**
+  - medições pelo método de Wenner (NBR 7117-1:2020), com média geométrica ou aritmética por espaçamento e descarte de leituras com desvio acima de 50 %;
+  - modelo homogêneo ou de duas camadas (ρ₁, ρ₂, h₁) ajustado por mínimos quadrados, com curva de resistividade aparente;
+  - fator sazonal.
+- **Configurações:** haste única, hastes alinhadas, em triângulo, em quadrado vazio ou cheio e em circunferência, com resistência mútua entre hastes (Kindermann & Campagnolo); cabo contrapeso; malha.
+- **Malha:**
+  - resistência pelos métodos de Sverak e Schwarz;
+  - tensões de toque e de passo admissíveis (50 ou 70 kg, camada de brita) e calculadas (Em, Es);
+  - elevação de potencial (GPR) e dimensionamento térmico do condutor.
+- **Critérios:**
+  - padrão de entrada Energisa: R ≤ 20 Ω, hastes de 2,40 m espaçadas de 2,40 m e número mínimo de hastes da categoria (NDU 001 v7.0, 8.10);
+  - SPDA: resistência recomendada da ordem de 10 Ω (NBR 5419-3);
+  - esquema TT: RA × IΔn ≤ 50 V.
+- **Saídas:** planta e corte de cada arranjo, sugestão do número de hastes para atingir o limite e memorial com recomendações de execução e de medição (NBR 15749).
+
+**Memórias de cálculo**
+- **Memórias separadas:** condutores e proteção, eletrodutos, eletrocalhas, quadros de carga, luminotécnica, demanda Energisa, carga térmica e aterramento, cada uma em PDF, Word e HTML.
+- **Relatório consolidado:** reúne as memórias marcadas, com sumário, partes A, B, C… (numeração prefixada pela letra da parte) e uma única assinatura do responsável técnico. A declaração de carga do titular, exigida pela Energisa, é mantida.
+- **Formatação comum:** todos os documentos têm cabeçalho, rodapé, paginação e bloco de assinatura.
 - **Tabelas da norma:** consulta às tabelas da NBR 5410, da NBR ISO/CIE 8995-1 e da NDU 001 dentro da plataforma.
 
 ---
@@ -97,11 +115,16 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 | Iluminação | ABNT NBR ISO/CIE 8995-1:2013; catálogos dos fabricantes (conferir a ficha técnica oficial pelo código) |
 | Demanda | Energisa NDU 001 v7.0 e NDU 003 v8.1 (Tabelas 03 e 04 da NDU 003 a preencher pelo projetista) |
 | Carga térmica | ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008; NBR 15220-2; ISO 7730; ASHRAE Handbook — Fundamentals |
+| Aterramento | ABNT NBR 5410:2004 (6.4); NBR 7117-1:2020; NBR 15749:2009; NBR 15751:2013; IEEE Std 80-2013; Energisa NDU 001 v7.0 (8.10); Kindermann & Campagnolo, *Aterramento Elétrico* |
 
 **Dados que o projetista precisa confirmar:**
 - **Dados climáticos de projeto:** use o Anexo A da NBR 16401-1:2024 para a localidade. Os valores do exemplo são ilustrativos.
 - **Vazões de ar exterior (Fp, Fa):** confira na Tabela 1 da NBR 16401-3:2008.
 - **Propriedades de produtos:** catálogo de luminárias, fator solar de vidros e capacidades de equipamentos devem ser conferidos com o fabricante.
+- **Aterramento:**
+  - a resistividade deve vir de medição em campo, de preferência em época seca;
+  - as equações simplificadas da IEEE 80 valem para malhas regulares em solo homogêneo; em solo fortemente estratificado ou geometria irregular, confirme com software de malha;
+  - a resistência final deve ser medida após a execução (NBR 15749).
 
 A plataforma é uma ferramenta de apoio ao projeto. A responsabilidade técnica é do profissional habilitado que assina o documento.
 
@@ -119,11 +142,14 @@ src/calhas.js         Eletrocalhas, perfilados, bandejas e leitos
 src/lumi.js           Requisitos da 8995-1, catálogo e cálculo luminotécnico
 src/energisa.js       Tabelas e cálculo de demanda das NDU 001 / NDU 003
 src/clima.js          Carga térmica: clima, sol, condução periódica, psicrometria, PMV/PPD
+src/aterr.js          Aterramento: solo (Wenner, duas camadas), hastes, cabo, malha, toque e passo
 src/pictos.js         Desenhos da Tabela 33 e cortes de eletrodutos
 src/memorial.js       Memória de cálculo NBR 5410
 src/lumidoc.js        Relatório luminotécnico (plantas e desenhos das luminárias)
 src/energisadoc.js    Memorial de demanda para a concessionária
 src/climadoc.js       Memorial de carga térmica
+src/aterrdoc.js       Memorial de aterramento (planta, corte e curva do solo)
+src/memorias.js       Memórias separadas e relatório consolidado
 src/export.js         Saída em PDF (jsPDF), Word (docx), HTML e Excel (ExcelJS)
 src/ui*.js            Interface (abas, formulários, bancadas)
 src/sample.js         Projeto de exemplo
@@ -148,4 +174,9 @@ Os testes do motor conferem o projeto de exemplo com valores verificados à mão
 - carga térmica por ambiente;
 - PMV/PPD contra os exemplos da ISO 7730;
 - transmitâncias e regime permanente da condução;
-- psicrometria e radiação solar.
+- psicrometria e radiação solar;
+- aterramento:
+  - haste e conjunto de hastes;
+  - malha reproduzindo o exemplo 1 do anexo B da IEEE Std 80-2013 (Rg 2,78 Ω; Em 1.002 V);
+  - recuperação de um modelo de solo de duas camadas;
+- montagem das oito memórias e do relatório consolidado.

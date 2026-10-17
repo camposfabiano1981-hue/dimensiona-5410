@@ -6,18 +6,20 @@ const assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const SRC = path.join(__dirname, '..', 'src');
-const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'energisa', 'clima', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'export'];
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'energisa', 'clima', 'aterr', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'memorias', 'export'];
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
-  WdeTBU, URdeW, pAtm, construirMemorial, construirRelatorioLumi, construirMemorialDemanda, construirMemorialClima };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
 const K = A.calcularProjeto(P);
 const E = A.calcEnergisa(P);
 const C = A.calcClima(P, K);
+K.energisa = E; K.clima = C;
+const T = A.calcAterramento(P, K); K.aterr = T;
 const perto = (v, ref, tol, msg) => assert.ok(Math.abs(v - ref) <= tol, `${msg}: ${v} ≠ ${ref} ± ${tol}`);
 
 test('NBR 5410 — circuitos do exemplo dimensionados sem falhas', () => {
@@ -90,16 +92,46 @@ test('Carga térmica — ambientes do exemplo e equipamentos indicados', () => {
   perto(C.conf.pmv, -0.31, 0.01, 'PMV do exemplo');
 });
 
-test('Memoriais — todos os documentos são montados sem erro', () => {
-  const docs = {
-    'NBR 5410': A.construirMemorial(P, K, { metodologia: true, detalhe: true, eletrodutos: true, calhas: true, quadro: true, lumi: true, anexo33: true, assinatura: true }),
-    'luminotécnico': A.construirRelatorioLumi(P, K),
-    'Energisa': A.construirMemorialDemanda(P, K, E),
-    'carga térmica': A.construirMemorialClima(P, K, C)
-  };
+test('Aterramento — haste e conjunto de hastes (Kindermann)', () => {
+  perto(A.rHaste(100, 2.4, 0.0173), 41.90, 0.01, 'haste de 2,4 m × 17,3 mm em 100 Ω·m');
+  const q = A.reqHastes(100, 2.4, 0.0127, [[0, 0], [3, 0], [6, 0]]);
+  perto(q.Req, 17.38, 0.01, '3 hastes alinhadas a 3 m (Ω)');
+  perto(q.Req / q.R1, 0.395, 0.002, 'índice de redução K');
+});
+
+test('Aterramento — malha reproduz o exemplo 1 do anexo B da IEEE Std 80-2013', () => {
+  // 70 × 70 m, 11 × 11 condutores (D = 7 m), h = 0,5 m, d = 10 mm, sem hastes, ρ = 400 Ω·m, 3I0 = 3180 A, Sf = 0,6, ts = 0,5 s, brita 2500 Ω·m × 0,102 m, 70 kg
+  const a = Object.assign(A.arrPadrao('malha', 'subestacao'), { Lx: 70, Ly: 70, Nx: 11, Ny: 11, hc: 0.5, S: 61.5, posH: 'nenhuma', I3I0: 3180, sf: 60, xr: 0, tf: 0.5, rhoS: 2500, hs: 0.102, peso: 70, tc: 0.5 });
+  const r = { avisos: [], falhas: [] }; A.calcMalha(a, 400, r);
+  perto(r.R, 2.78, 0.01, 'Rg (Sverak)'); perto(r.IG, 1908, 1, 'IG'); perto(r.Cs, 0.74, 0.005, 'Cs');
+  perto(r.Etoque, 838, 4, 'Etoque 70 kg'); perto(r.Km, 0.89, 0.005, 'Km'); perto(r.Ki, 2.272, 0.001, 'Ki'); perto(r.Em, 1002, 2, 'Em');
+  assert.equal(r.okToque, false, 'o exemplo 1 da IEEE 80 não atende ao toque');
+});
+
+test('Aterramento — estratificação do solo em duas camadas recupera o modelo', () => {
+  const med = [1, 2, 4, 8, 16].map(a => ({ dir: 'A', a, R: A.rhoApar2c(a, 600, 150, 2.5) / (2 * Math.PI * a) }));
+  const s = A.calcSolo({ modo: 'wenner', p: 0, media: 'geo', descartar: true, modelo: '2c', fs: 1, med });
+  perto(s.m2.rho1, 600, 6, 'ρ1'); perto(s.m2.rho2, 150, 2, 'ρ2'); perto(s.m2.h, 2.5, 0.05, 'h1');
+});
+
+test('Aterramento — sistemas do exemplo', () => {
+  const [ent, spda, malha] = P.aterr.arr.map(a => T.arr[a.id]);
+  assert.ok(ent.R <= 20 && ent.status !== 'fail', `padrão de entrada ${ent.R} Ω`);
+  assert.ok(spda.R <= 10, `SPDA ${spda.R} Ω`);
+  assert.ok(malha.okToque && malha.okPasso && malha.cond.ok, 'malha atende toque, passo e condutor');
+});
+
+test('Memoriais — cada memória separada e o consolidado são montados sem erro', () => {
+  const opt = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
+  const docs = Object.fromEntries(A.MEMORIAS.map(m => [m.id, A.docMemoria(P, K, m.id, opt).blocos]));
+  docs.consolidado = A.docMemoria(P, K, 'consolidado', opt, A.MEMORIAS.map(m => m.id)).blocos;
   for (const [nome, B] of Object.entries(docs)) {
-    assert.ok(Array.isArray(B) && B.length > 20, `${nome}: documento vazio`);
+    assert.ok(Array.isArray(B) && B.length > 15, `${nome}: documento vazio`);
     assert.equal(B[0].t, 'title', `${nome}: começa pelo bloco de título`);
     assert.ok(!JSON.stringify(B.map(b => ({ ...b, svg: undefined }))).match(/NaN|undefined|Infinity/), `${nome}: valor inválido no texto`);
   }
+  const partes = docs.consolidado.filter(b => b.t === 'parte');
+  assert.equal(partes.length, A.MEMORIAS.length, 'uma parte por memória');
+  assert.equal(docs.consolidado.filter(b => b.t === 'sign' && !b.titular).length, 1, 'uma única assinatura do responsável técnico');
+  assert.ok(docs.consolidado.some(b => b.t === 'h1' && b.text.startsWith('H.')), 'numeração prefixada pela letra da parte');
 });

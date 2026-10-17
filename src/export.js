@@ -17,6 +17,9 @@ const DOC_CSS = `
 .doc .d-kicker{font:600 8.5pt/1.2 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--doc-accent)}
 .doc .d-title h2{font:700 21pt/1.1 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;margin:6px 0 4px;text-transform:uppercase;letter-spacing:.02em}
 .doc .d-title p{margin:0;color:var(--doc-muted)}
+.doc .d-parte{background:var(--doc-head);border-left:4px solid var(--doc-accent);padding:14px 18px 12px;margin:6px 0 8px}
+.doc .d-parte h2{font:700 17pt/1.15 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;margin:4px 0 2px;text-transform:uppercase;letter-spacing:.02em}
+.doc .d-parte p{margin:0;color:var(--doc-muted)}
 .doc .d-meta{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:9.5pt}
 .doc .d-meta th,.doc .d-meta td{border:1px solid var(--doc-ink);border-top:0;padding:5px 8px;text-align:left;vertical-align:top}
 .doc .d-meta th{width:28%;font:600 8pt/1.3 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--doc-muted)}
@@ -59,6 +62,7 @@ function renderHTMLDoc(blocks) {
   return blocks.map(b => {
     switch (b.t) {
       case 'title': return `<header class="d-title"><div class="d-kicker">${escH(b.kicker)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
+      case 'parte': return `<header class="d-parte"><div class="d-kicker">Parte ${escH(b.letra)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
       case 'meta': return `<table class="d-meta"><tbody>${b.rows.map(r => `<tr><th scope="row">${escH(r[0])}</th><td>${escH(r[1])}</td></tr>`).join('')}</tbody></table>`;
       case 'h1': return `<h3 class="d-h1">${escH(b.text)}</h3>`;
       case 'h2': return `<h4 class="d-h2">${escH(b.text)}</h4>`;
@@ -148,12 +152,13 @@ async function gerarPDF(blocks, meta) {
   }
   function tabela(head, rows, { small = false, widths = null, align = '', lastBold = false, noHead = false, colStyles = null } = {}) {
     const fs = small ? 7.2 : 8.4;
+    ensure(Math.min(rows.length, 2) * 6 + (noHead ? 0 : 9));   // não deixa o cabeçalho sozinho no pé da página
     const columnStyles = {};
     (widths || []).forEach((p, i) => { columnStyles[i] = { cellWidth: W * p / 100 }; });
     [...align].forEach((a, i) => { columnStyles[i] = { ...(columnStyles[i] || {}), halign: a === 'r' ? 'right' : 'left' }; });
     if (colStyles) Object.entries(colStyles).forEach(([i, s]) => { columnStyles[i] = { ...(columnStyles[i] || {}), ...s }; });
     doc.autoTable({
-      startY: y, head: noHead ? undefined : [head], body: rows, theme: 'grid', margin: { left: M.l, right: M.r, top: M.t, bottom: M.b },
+      startY: y, head: noHead ? undefined : [head], body: rows, theme: 'grid', rowPageBreak: 'avoid', margin: { left: M.l, right: M.r, top: M.t, bottom: M.b },
       styles: { font: 'DejaVu', fontSize: fs, cellPadding: small ? 1 : 1.4, lineColor: C.line, lineWidth: 0.15, textColor: C.ink, overflow: 'linebreak', valign: 'top' },
       headStyles: { fillColor: C.head, textColor: C.ink, fontStyle: 'bold' }, columnStyles,
       didParseCell: d => { if (lastBold && d.section === 'body' && d.row.index === rows.length - 1) { d.cell.styles.fontStyle = 'bold'; d.cell.styles.fillColor = C.eq; } }
@@ -164,12 +169,21 @@ async function gerarPDF(blocks, meta) {
     const b = blocks[i];
     switch (b.t) {
       case 'title': {
-        const h = 30; doc.setDrawColor(...C.ink); doc.setLineWidth(0.5); doc.rect(M.l, y, W, h);
+        font(false, 9); const subL = doc.splitTextToSize(b.sub, W - 10), h = Math.max(30, 22 + subL.length * lh(9) + 2.5);
+        doc.setDrawColor(...C.ink); doc.setLineWidth(0.5); doc.rect(M.l, y, W, h);
         font(true, 7.5, C.acc); doc.text(b.kicker.toUpperCase(), M.l + 5, y + 7);
         let ft = 19; font(true, ft, C.ink); while (doc.getTextWidth(b.text.toUpperCase()) > W - 10 && ft > 13) { ft -= 0.5; doc.setFontSize(ft); }
         doc.text(b.text.toUpperCase(), M.l + 5, y + 16);
-        font(false, 9, C.muted); doc.text(doc.splitTextToSize(b.sub, W - 10), M.l + 5, y + 22.5);
+        font(false, 9, C.muted); doc.text(subL, M.l + 5, y + 22.5);
         y += h; break;
+      }
+      case 'parte': {
+        const h = 24; ensure(h + 40); doc.setFillColor(...C.head); doc.rect(M.l, y, W, h, 'F'); doc.setFillColor(...C.acc); doc.rect(M.l, y, 1.6, h, 'F');
+        font(true, 8, C.acc); doc.text(`PARTE ${b.letra}`, M.l + 6, y + 6.5);
+        let ft = 15; font(true, ft, C.ink); while (doc.getTextWidth(b.text.toUpperCase()) > W - 12 && ft > 11) { ft -= 0.5; doc.setFontSize(ft); }
+        doc.text(b.text.toUpperCase(), M.l + 6, y + 13.5);
+        font(false, 8.6, C.muted); doc.text(doc.splitTextToSize(b.sub, W - 12)[0], M.l + 6, y + 19.5);
+        y += h + 4; break;
       }
       case 'meta': {
         doc.autoTable({ startY: y, body: b.rows, theme: 'grid', margin: { left: M.l, right: M.r },
@@ -283,6 +297,13 @@ async function gerarDOCX(blocks, meta) {
         out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows: b.rows.map(r => new D.TableRow({ children: [cell(r[0].toUpperCase(), { w: 28, size: 15, bold: true, color: MUT, borders: bordas('1B1F23') }), cell(r[1], { w: 72, size: 19, borders: bordas('1B1F23') })] })) }));
         out.push(P('', { after: 120 })); break;
       case 'h1': out.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, keepNext: true, spacing: { before: 320, after: 140 }, border: { bottom: borda() }, children: [new D.TextRun({ text: b.text.toUpperCase(), bold: true, size: 26, color: ACC, font: FONT })] })); break;
+      case 'parte': {
+        const band = { shading: { fill: HEAD, type: D.ShadingType.CLEAR, color: 'auto' }, border: { left: { style: D.BorderStyle.SINGLE, size: 36, color: ACC } }, keepNext: true };
+        out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' PARTE ' + b.letra, bold: true, size: 16, color: ACC, font: FONT })] }));
+        out.push(new D.Paragraph({ ...band, heading: D.HeadingLevel.HEADING_1, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' ' + b.text.toUpperCase(), bold: true, size: 32, color: '1B1F23', font: FONT })] }));
+        out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 240 }, children: [new D.TextRun({ text: ' ' + b.sub, size: 18, color: MUT, font: FONT })] }));
+        break;
+      }
       case 'h2': out.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_2, keepNext: true, spacing: { before: 280, after: 120 }, shading: { fill: HEAD, type: D.ShadingType.CLEAR, color: 'auto' }, border: { left: { style: D.BorderStyle.SINGLE, size: 18, color: ACC } }, children: [new D.TextRun({ text: ' ' + b.text, bold: true, size: 22, color: '1B1F23', font: FONT })] })); break;
       case 'h3': out.push(P(b.text, { bold: true, size: 20, before: 140, after: 60, keepNext: true })); break;
       case 'p': out.push(P(b.text)); break;

@@ -2,9 +2,9 @@
    INTERFACE
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'memoria', 'tabelas'];
-let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, CCONS_ABERTO = false, DOCSEL = 'memoria', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
-const MEMOPT = { metodologia: true, detalhe: true, eletrodutos: true, calhas: true, quadro: true, lumi: true, anexo33: true, assinatura: true };
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'memoria', 'tabelas'];
+let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, MEMSEL = 'consolidado', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
+const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = escH;
@@ -64,6 +64,8 @@ function normalizarProjeto(p) {
   out.catalogo = { ...(p.catalogo || {}) };
   out.energisa = normalizarEnergisa(p.energisa);
   out.clima = normalizarClima(p.clima);
+  out.aterr = normalizarAterr(p.aterr);
+  out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
   out.lumi = (Array.isArray(p.lumi) ? p.lumi : []).map((a, i) => { const n = { ...defaultsAmbiente(i + 1), ...a }; if (!AMB[n.amb]) n.amb = AMB_PADRAO; if (n.prod !== 'custom' && !CATL[n.prod]) n.prod = CAT_LUM[0].id; return n; });
   out.circuitos = (Array.isArray(p.circuitos) ? p.circuitos : []).map(c => { const d = defaultsCircuito(out.params, c.tipo || 'tug'); const n = { ...d, ...c, id: c.id || d.id }; if (!ISOL[n.isolacao]) n.isolacao = 'PVC'; if (!MET[n.metodo]) n.metodo = d.metodo; return n; });
   garantirQuadros(out);
@@ -80,7 +82,7 @@ function carregar() {
 }
 
 /* ---------- ciclo de atualização ---------- */
-function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); }
+function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); }
 function circSel() { return PROJ.circuitos.find(c => c.id === SEL) || null; }
 function ambSel() { return (PROJ.lumi || []).find(a => a.id === LSEL) || null; }
 function mudou(struct) { recalc(); salvarLocal(); renderCabecalho(); if (struct) renderAba(); else renderParcial(); }
@@ -111,6 +113,10 @@ function onCampo(ev, isChange) {
   else if (sc === 't003') { const row = PROJ.energisa.t003[box.dataset.tab][+box.dataset.i]; if (row) row[+k] = v; }
   else if (sc === 'amb') { const a = ambSel(); if (!a) return; a[k] = v; struct = efeitosAmbiente(a, k) || struct; }
   else if (sc === 'memopt') { MEMOPT[k] = v; struct = true; }
+  else if (sc === 'memgrupo') { const g = new Set(PROJ.memorias.grupo); if (v) g.add(k); else g.delete(k); PROJ.memorias.grupo = MEMORIAS.map(m => m.id).filter(id => g.has(id)); struct = true; }
+  else if (sc === 'asolo') { PROJ.aterr.solo[k] = v; }
+  else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
+  else if (sc === 'aarr') { const a = arrSel(); if (!a) return; a[k] = v; struct = efeitosArranjo(a, k) || struct; }
   else if (sc === 'cat') { if (v == null || !(v > 0)) delete PROJ.catalogo[k]; else PROJ.catalogo[k] = v; }
   mudou(struct);
 }
@@ -173,19 +179,7 @@ async function oferecerArquivo(nome, dados, mime) {
   toast(`${nome} gerado.`);
 }
 function slug() { return (PROJ.info.obra || 'projeto').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 50) || 'projeto'; }
-function metaDoc(doc) {
-  const I = PROJ.info, lumi = doc === 'lumi', ener = doc === 'energisa', clim = doc === 'clima', t = clim ? 'Memorial de cálculo de carga térmica' : ener ? 'Memorial de cálculo de demanda' : (lumi ? 'Relatório luminotécnico' : 'Memória de cálculo');
-  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`,
-    rodape: clim ? 'Carga térmica conforme ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008 — gerado com Dimensiona 5410' : ener ? `Cálculo de demanda conforme Energisa ${PROJ.energisa.modo === 'individual' ? 'NDU 001 v7.0' : 'NDU 001 v7.0 e NDU 003 v8.1'} — gerado com Dimensiona 5410` : lumi ? 'Relatório luminotécnico conforme ABNT NBR ISO/CIE 8995-1:2013 — gerado com Dimensiona 5410' : 'Memória de cálculo conforme ABNT NBR 5410:2004 — gerada com Dimensiona 5410',
-    assunto: clim ? 'Memorial de cálculo de carga térmica — NBR 16401' : ener ? 'Memorial de cálculo de demanda — Energisa NDU 001 / NDU 003' : lumi ? 'Relatório de cálculo luminotécnico — NBR ISO/CIE 8995-1' : 'Memória de cálculo — ABNT NBR 5410:2004' };
-}
-function docAtual(doc) {
-  const rev = (PROJ.info.revisao || 'R00').toLowerCase();
-  if (doc === 'clima') return { blocos: construirMemorialClima(PROJ, CALC, CALC.clima), nome: `memorial-carga-termica-${slug()}-${rev}`, meta: metaDoc('clima') };
-  if (doc === 'energisa') return { blocos: construirMemorialDemanda(PROJ, CALC, CALC.energisa), nome: `memorial-demanda-energisa-${slug()}-${rev}`, meta: metaDoc('energisa') };
-  if (doc === 'lumi' && (PROJ.lumi || []).length) return { blocos: construirRelatorioLumi(PROJ, CALC), nome: `relatorio-luminotecnico-${slug()}-${rev}`, meta: metaDoc('lumi') };
-  return { blocos: construirMemorial(PROJ, CALC, MEMOPT), nome: `memoria-calculo-${slug()}-${rev}`, meta: metaDoc() };
-}
+function docAtual(doc) { return docMemoria(PROJ, CALC, doc === 'memoria' ? 'consolidado' : doc, MEMOPT, PROJ.memorias.grupo); }
 async function exportar(tipo, bt, doc) {
   const txt = bt.textContent; bt.disabled = true; bt.textContent = 'Gerando…';
   try {
@@ -231,7 +225,7 @@ function irPara(tab) {
   ABAS.forEach(a => { $('#tab-' + a).hidden = a !== TAB; });
   renderCabecalho(); renderAba();
 }
-function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
+function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
 function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
@@ -239,6 +233,7 @@ function renderParcial() {
   else if (TAB === 'lumi') { renderLumiLista(); renderLumiRes(); }
   else if (TAB === 'energisa') atualizarEnergisaParcial();
   else if (TAB === 'clima') atualizarClimaParcial();
+  else if (TAB === 'aterr') atualizarAterrParcial();
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
   else if (TAB === 'quadros') Object.values(CALC.quadros).forEach(q => { const r = $('#q-' + safeId(q.q) + '-res'); if (r) r.innerHTML = quadroRes(q); });
 }
@@ -734,35 +729,37 @@ function renderLumiForm() {
 
 /* ---------- MEMÓRIA ---------- */
 function renderMemoria() {
-  const temL = (PROJ.lumi || []).length > 0; if (!temL && DOCSEL === 'lumi') DOCSEL = 'memoria';
-  const lumi = DOCSEL === 'lumi', ener = DOCSEL === 'energisa', clim = DOCSEL === 'clima';
-  const blocos = docAtual(DOCSEL).blocos;
-  const nf = PROJ.circuitos.filter(c => CALC.res[c.id].status === 'fail').length;
-  const nfl = (PROJ.lumi || []).filter(a => CALC.lumi[a.id].status === 'fail').length;
+  const disp = MEMORIAS.filter(m => m.tem(PROJ, CALC)), grupo = PROJ.memorias.grupo.filter(id => disp.some(m => m.id === id));
+  if (MEMSEL !== 'consolidado' && !disp.some(m => m.id === MEMSEL)) MEMSEL = 'consolidado';
+  const blocos = docAtual(MEMSEL).blocos, sel = MEMO[MEMSEL];
+  const linha = m => { const ok = disp.includes(m), fl = ok && m.falha(PROJ, CALC);
+    return `<div class="mem-item${MEMSEL === m.id ? ' on' : ''}${ok ? '' : ' vazio'}" data-scope="memgrupo">
+      <label class="chk" title="Incluir no relatório consolidado"><input type="checkbox" data-k="${m.id}" data-type="chk"${grupo.includes(m.id) ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="Incluir ${esc(m.nome)} no consolidado"></label>
+      <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(m.norma)} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
+      ${ok ? `<span class="pill ${fl ? 'fail' : 'ok'}">${fl ? 'Pendente' : 'OK'}</span><span class="mem-exp"><button class="btn sm" type="button" data-exp="pdf" data-doc="${m.id}">PDF</button><button class="btn sm" type="button" data-exp="docx" data-doc="${m.id}">Word</button><button class="btn sm" type="button" data-exp="html" data-doc="${m.id}">HTML</button></span>` : ''}
+    </div>`; };
   $('#tab-memoria').innerHTML = `
-  ${true ? `<div class="ref-sel" role="group" aria-label="Documento">${[['memoria', 'Memória de cálculo (NBR 5410)'], ['energisa', 'Memorial de demanda (Energisa NDU 001/003)'], ['clima', 'Memorial de carga térmica (NBR 16401)'], ...(temL ? [['lumi', 'Relatório luminotécnico (NBR ISO/CIE 8995-1)']] : [])].map(([k, l]) => `<button class="btn sm" type="button" data-docsel="${k}" aria-pressed="${k === DOCSEL}">${l}</button>`).join('')}</div>` : ''}
-  <div class="mem-bar">
-    ${clim ? `<div><h2 class="tit">Memorial de cálculo de carga térmica</h2><p class="sub" style="margin:0">${PROJ.clima.amb.length} ambiente(s) climatizado(s) · NBR 16401-1:2024, 16401-2:2024 e 16401-3:2008.</p></div>` : ener ? `<div><h2 class="tit">Memorial de cálculo de demanda</h2><p class="sub" style="margin:0">${PROJ.energisa.ucs.length} unidade(s) consumidora(s) · ${MODOS_E[PROJ.energisa.modo]} · para anexar ao pedido de ligação na ${ENERGISA_UN[PROJ.energisa.un]}.</p></div>` : lumi ? `<div><h2 class="tit">Relatório luminotécnico</h2><p class="sub" style="margin:0">${PROJ.lumi.length} ambientes${nfl ? ` · <b style="color:var(--fail)">${nfl} com pendência</b>` : ' · todos atendem'} · luminárias com desenhos, planta de locação cotada e mapa de iluminância.</p></div>` : `<div><h2 class="tit">Memória de cálculo</h2><p class="sub" style="margin:0">${PROJ.circuitos.length} circuitos${nf ? ` · <b style="color:var(--fail)">${nf} com pendência</b>` : ' · todos atendem'} · documento gerado a partir dos dados atuais.</p></div>`}
+  <div class="mem-bar"><div><h2 class="tit">Memórias de cálculo</h2><p class="sub" style="margin:0">Emita cada memória separadamente ou marque as que devem compor o relatório consolidado, com sumário, partes A, B, C… e uma única assinatura.</p></div></div>
+  <div class="mem-lista" role="list">${MEMORIAS.map(linha).join('')}</div>
+  <div class="mem-cons">
+    <div><b>Relatório consolidado</b><span class="mini"> · ${grupo.length} de ${disp.length} memória(s) marcada(s)</span></div>
     <div class="mem-bt">
-      <button class="btn pri" type="button" data-exp="pdf">Baixar PDF</button>
-      <button class="btn" type="button" data-exp="docx">Baixar Word (.docx)</button>
-      <button class="btn" type="button" data-exp="html">Baixar HTML</button>
+      <button class="btn${MEMSEL === 'consolidado' ? ' pri' : ''}" type="button" data-memsel="consolidado">Visualizar</button>
+      <button class="btn pri" type="button" data-exp="pdf" data-doc="consolidado"${grupo.length ? '' : ' disabled'}>PDF</button>
+      <button class="btn" type="button" data-exp="docx" data-doc="consolidado"${grupo.length ? '' : ' disabled'}>Word</button>
+      <button class="btn" type="button" data-exp="html" data-doc="consolidado"${grupo.length ? '' : ' disabled'}>HTML</button>
       <button class="btn" type="button" data-exp="xlsx">Quadro de cargas (Excel)</button>
       ${EMOLDURA ? '' : '<button class="btn" type="button" id="bt-print">Imprimir</button>'}
     </div>
   </div>
-  <div class="mem-opc" data-scope="memopt"${lumi || ener || clim ? ' hidden' : ''}>
-    ${fChk('m', 'metodologia', 'Critérios e fórmulas', MEMOPT.metodologia, { struct: true })}
+  <div class="mem-opc" data-scope="memopt">
+    ${fChk('m', 'metodologia', 'Critérios e fórmulas (NBR 5410)', MEMOPT.metodologia, { struct: true })}
     ${fChk('m', 'detalhe', 'Memória detalhada por circuito', MEMOPT.detalhe, { struct: true })}
-    ${fChk('m', 'eletrodutos', 'Eletrodutos', MEMOPT.eletrodutos, { struct: true })}
-    ${Object.keys(CALC.calhas).length ? fChk('m', 'calhas', 'Eletrocalhas', MEMOPT.calhas, { struct: true }) : ''}
-    ${fChk('m', 'quadro', 'Quadros de carga', MEMOPT.quadro, { struct: true })}
-    ${(PROJ.lumi || []).length ? fChk('m', 'lumi', 'Luminotécnica', MEMOPT.lumi, { struct: true }) : ''}
     ${fChk('m', 'anexo33', 'Anexo com esquemas da Tabela 33', MEMOPT.anexo33, { struct: true })}
     ${fChk('m', 'assinatura', 'Campo de assinatura', MEMOPT.assinatura, { struct: true })}
   </div>
-  <p class="aviso-prev">Pré-visualização. No PDF e no Word o documento sai em A4, com cabeçalho, rodapé e numeração de páginas.</p>
-  <article class="folha doc" id="folha">${renderHTMLDoc(blocos)}</article>`;
+  <p class="aviso-prev">Pré-visualização: <b>${MEMSEL === 'consolidado' ? 'relatório consolidado' : esc(sel.titulo)}</b>. No PDF e no Word o documento sai em A4, com cabeçalho, rodapé e numeração de páginas.</p>
+  <article class="folha doc" id="folha">${grupo.length || MEMSEL !== 'consolidado' ? renderHTMLDoc(blocos) : '<p>Marque ao menos uma memória para compor o relatório consolidado.</p>'}</article>`;
 }
 
 /* ---------- TABELAS DA NORMA ---------- */
@@ -865,8 +862,10 @@ document.addEventListener('click', ev => {
   if (el.matches('[role=tab]')) return irPara(el.dataset.tab);
   if (el.dataset.sel) { SEL = el.dataset.sel; renderLista(); renderEditor(); if (window.innerWidth < 900) $('#editor').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.ir) { SEL = el.dataset.ir; irPara('circuitos'); return; }
-  if (el.dataset.exp) return exportar(el.dataset.exp, el, el.dataset.doc || (TAB === 'memoria' ? DOCSEL : 'memoria'));
-  if (el.dataset.docsel) { DOCSEL = el.dataset.docsel; renderMemoria(); return; }
+  if (el.dataset.exp) return exportar(el.dataset.exp, el, el.dataset.doc || (TAB === 'memoria' ? MEMSEL : 'circuitos'));
+  if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
+  if (el.dataset.asel) { ASEL = el.dataset.asel; renderArrLista(); renderArrEditor(); if (window.innerWidth < 900) $('#a-ed').scrollIntoView({ block: 'start' }); return; }
+  if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
   if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); return; }
   if (el.dataset.mat) { REFMAT = el.dataset.mat; renderTabelas(); return; }
@@ -898,6 +897,13 @@ document.addEventListener('click', ev => {
     case 'bt-add-eq': { const a = ambCSel(); if (!a) return; const t = EQ_TIPICOS[+$('#k-eq-novo').value]; a.equip.push({ desc: t[0], qtd: 1, W: t[1], WL: t[2] }); mudou(true); return; }
     case 'bt-add-cons': PROJ.clima.cons.push({ id: 'u' + uid(), nome: 'Novo componente', tipo: 'parede', cam: [{ mat: 'reboco', e: 2.5 }, { mat: 'blocoCer', e: 9 }, { mat: 'reboco', e: 2.5 }] }); CCONS_ABERTO = true; mudou(true); return;
     case 'bt-circ-clima': return criarCircuitosClima();
+    case 'bt-add-med': { const M = PROJ.aterr.solo.med, u = M[M.length - 1]; M.push({ dir: u ? u.dir : 'A', a: u ? +u.a * 2 : 1, R: null }); mudou(true); return; }
+    case 'bt-med-serie': { const M = PROJ.aterr.solo.med, dir = String.fromCharCode(65 + new Set(M.map(m => m.dir)).size); [1, 2, 4, 8, 16].forEach(a => M.push({ dir, a, R: null })); mudou(true); return; }
+    case 'bt-add-arr': { const t = $('#a-novo-tipo').value, a = arrPadrao(t, t === 'malha' ? 'subestacao' : 'massas'); PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true); return; }
+    case 'bt-arr-ndu': return criarArranjoNDU();
+    case 'bt-dup-arr': { const a = arrSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = a.nome + ' (cópia)'; PROJ.aterr.arr.splice(PROJ.aterr.arr.indexOf(a) + 1, 0, n); ASEL = n.id; mudou(true); return; }
+    case 'bt-exc-arr': return confirmar2(el, 'Confirmar exclusão', () => { const A = PROJ.aterr.arr, i = A.findIndex(a => a.id === ASEL); if (i < 0) return; const [rm] = A.splice(i, 1); ASEL = (A[i] || A[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluído.`); });
+    case 'bt-aplicar-ra': { const a = arrSel(); if (!a) return; PROJ.params.RA = +CALC.aterr.arr[a.id].R.toFixed(2); mudou(true); toast(`RA = ${nfmt(PROJ.params.RA, 2)} Ω aplicado ao esquema TT (verificação RA × IΔn nos circuitos).`); return; }
     case 'bt-add-uc': { const E = PROJ.energisa; const u = ucPadrao(E.ucs.length + 1); E.ucs.push(u); USEL = u.id; mudou(true); return; }
     case 'bt-dup-uc': { const u = ucSel(); if (!u) return; const n = JSON.parse(JSON.stringify(u)); n.id = uid(); n.nome = (u.nome || 'UC') + ' (cópia)'; PROJ.energisa.ucs.splice(PROJ.energisa.ucs.indexOf(u) + 1, 0, n); USEL = n.id; mudou(true); return; }
     case 'bt-exc-uc': return confirmar2(el, 'Confirmar exclusão', () => { const E = PROJ.energisa; if (E.ucs.length <= 1) { toast('O memorial precisa de ao menos uma UC.'); return; } const i = E.ucs.findIndex(u => u.id === USEL); const [rm] = E.ucs.splice(i, 1); USEL = (E.ucs[i] || E.ucs[i - 1]).id; mudou(true); toast(`${rm.nome} excluída.`); });

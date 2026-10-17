@@ -16,8 +16,10 @@ const LOCAL = LIBS && {
   'docx@8.5.0': 'docx-8.5.0/package/build/index.umd.js',
   'exceljs@4.4.0': 'exceljs/package/dist/exceljs.min.js'
 };
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'memoria', 'tabelas'];
-const DOCS = [['memoria', null, ['pdf', 'docx', 'xlsx']], ['lumi', 'lumi', ['pdf', 'docx', 'html']], ['energisa', 'energisa', ['pdf', 'docx']], ['clima', 'clima', ['pdf', 'docx', 'html']]];
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'memoria', 'tabelas'];
+// memórias separadas (PDF e Word), relatório consolidado (PDF, Word e HTML) e quadro de cargas (Excel), todos pela aba Memória de cálculo
+const SEPARADAS = ['circuitos', 'eletrodutos', 'calhas', 'quadros', 'lumi', 'energisa', 'clima', 'aterr'];
+const DOCS = [...SEPARADAS.map(d => ['memoria', d, ['pdf', 'docx']]), ['memoria', 'consolidado', ['pdf', 'docx', 'html']], ['memoria', null, ['xlsx']]];
 
 (async () => {
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});

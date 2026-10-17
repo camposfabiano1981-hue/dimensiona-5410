@@ -152,6 +152,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 .tbl th{font:600 11px/1.2 var(--f-display);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;background:var(--sunk);position:sticky;top:0}
 .tbl th,.tbl td{padding:6px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
 .tbl td.r,.tbl th.r{text-align:right}
+.tbl.nt th{text-transform:none;letter-spacing:.02em;font-size:12px}
 .tbl td.wrap{white-space:normal;min-width:180px}
 .tbl tr.tot td{font-weight:600;background:var(--sunk)}
 .tbl tbody tr.clic{cursor:pointer}.tbl tbody tr.clic:hover td{background:var(--accent-soft)}
@@ -200,6 +201,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 .mem-bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:14px}
 .mem-opc{display:flex;flex-wrap:wrap;gap:4px 16px}
 .mem-bt{display:flex;flex-wrap:wrap;gap:8px}
+.mem-lista{display:grid;border:1px solid var(--line);border-radius:var(--r);background:var(--sheet);margin-bottom:12px}
+.mem-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px 12px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
+.mem-item:first-child{border-top:0}
+.mem-item.on{background:var(--accent-soft)}
+.mem-item.vazio{opacity:.55}
+.mem-item .chk{padding:0}
+.mem-nome{background:none;border:0;padding:2px 0;text-align:left;cursor:pointer;display:grid;gap:1px;min-width:0}
+.mem-nome:disabled{cursor:default}
+.mem-nome b{font-weight:600;font-size:13.5px}
+.mem-nome span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.mem-nome:hover:not(:disabled) b{color:var(--accent)}
+.mem-exp{display:flex;gap:4px}
+.mem-cons{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--sunk);padding:10px 12px;margin-bottom:12px}
 .folha{background:var(--doc-bg);color:var(--doc-ink);max-width:840px;margin:0 auto;padding:44px 52px;border:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .aviso-prev{max-width:840px;margin:0 auto 10px;font-size:12px;color:var(--muted)}
 
@@ -215,7 +229,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 @media (max-width:900px){.bancada{grid-template-columns:minmax(0,1fr)}.lista{position:static;max-height:340px}}
 @media (max-width:700px){.met-bloco{grid-template-columns:minmax(0,1fr)}.met-fig{max-width:260px}}
 @media (max-width:700px){.planta{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:600px){.trecho-corpo.calha{grid-template-columns:minmax(0,1fr)}.folha{padding:22px 16px}.trecho-corpo{grid-template-columns:minmax(0,1fr)}.campo.w2{grid-column:auto}.abas button{padding:9px 9px 7px;font-size:13.5px}.marca h1{font-size:22px}.bar{grid-template-columns:44px minmax(0,1fr) 92px}}
+@media (max-width:600px){.trecho-corpo.calha{grid-template-columns:minmax(0,1fr)}.folha{padding:22px 16px}.trecho-corpo{grid-template-columns:minmax(0,1fr)}.campo.w2{grid-column:auto}.abas button{padding:9px 9px 7px;font-size:13.5px}.marca h1{font-size:22px}.bar{grid-template-columns:44px minmax(0,1fr) 92px}.mem-item{grid-template-columns:auto minmax(0,1fr) auto}.mem-exp{grid-column:2/4}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -231,7 +245,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
         <circle cx="29" cy="27.5" r="6" fill="var(--c-neutro)" stroke="var(--ink)" stroke-width=".8"/><circle cx="29" cy="27.5" r="2.4" fill="var(--copper)"/>
         <circle cx="23" cy="17" r="6" fill="var(--c-pe)" stroke="var(--c-pe2)" stroke-width="1.6"/><circle cx="23" cy="17" r="2.4" fill="var(--copper)"/>
       </svg>
-      <div><h1>Dimensiona <b>5410</b></h1><p>Condutores, proteção, eletrodutos, eletrocalhas, demanda Energisa, luminotécnica e carga térmica · memória de cálculo</p></div>
+      <div><h1>Dimensiona <b>5410</b></h1><p>Condutores, proteção, eletrodutos, eletrocalhas, demanda Energisa, luminotécnica, carga térmica e aterramento · memórias de cálculo</p></div>
     </div>
     <div class="carimbo" id="carimbo" aria-label="Identificação do projeto"></div>
     <div class="acoes">
@@ -253,6 +267,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <button role="tab" data-tab="energisa" id="tab-b-energisa">Demanda Energisa</button>
     <button role="tab" data-tab="lumi" id="tab-b-lumi">Luminotécnica</button>
     <button role="tab" data-tab="clima" id="tab-b-clima">Climatização</button>
+    <button role="tab" data-tab="aterr" id="tab-b-aterr">Aterramento</button>
     <button role="tab" data-tab="memoria" id="tab-b-memoria">Memória de cálculo</button>
     <button role="tab" data-tab="tabelas" id="tab-b-tabelas">Tabelas da norma</button>
   </nav>
@@ -265,6 +280,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <section class="painel" id="tab-energisa" role="tabpanel" hidden></section>
     <section class="painel" id="tab-lumi" role="tabpanel" hidden></section>
     <section class="painel" id="tab-clima" role="tabpanel" hidden></section>
+    <section class="painel" id="tab-aterr" role="tabpanel" hidden></section>
     <section class="painel" id="tab-memoria" role="tabpanel" hidden></section>
     <section class="painel" id="tab-tabelas" role="tabpanel" hidden></section>
   </main>
@@ -1981,6 +1997,240 @@ function calcClima(proj, calc) {
 }
 
 /* ================================================================
+   ATERRAMENTO — resistividade do solo, hastes, cabos e malhas
+   ABNT NBR 7117-1:2020 (resistividade pelo método de Wenner e modelo do solo)
+   ABNT NBR 5410:2004 (6.4 — aterramento; 5.1.2.2.4 — esquema TT)
+   ABNT NBR 15751:2013 e IEEE Std 80-2013 (malhas: resistência, toque, passo, condutor)
+   Energisa NDU 001 v7.0, 8.10 (R ≤ 20 Ω; hastes de 2,40 m espaçadas de 2,40 m)
+   Kindermann & Campagnolo, Aterramento Elétrico (haste e resistência mútua entre hastes)
+   ================================================================ */
+const TIPOS_ATERR = {
+  haste: 'Haste única', linha: 'Hastes alinhadas', triangulo: 'Hastes em triângulo', quadVazio: 'Hastes em quadrado vazio',
+  quadCheio: 'Hastes em quadrado cheio', circ: 'Hastes em circunferência', cabo: 'Cabo horizontal enterrado (contrapeso)', malha: 'Malha de aterramento'
+};
+const TIPOS_HASTES = ['haste', 'linha', 'triangulo', 'quadVazio', 'quadCheio', 'circ'];
+const FUNC_ATERR = {
+  entrada: { nome: 'Padrão de entrada — neutro da concessionária', rmax: 20, ref: 'Energisa NDU 001 v7.0, 8.10: R ≤ 20 Ω em qualquer época do ano' },
+  massas: { nome: 'Aterramento das massas / BEP', rmax: 10, ref: 'critério do projetista (NBR 5410, 6.4); no esquema TT, RA × IΔn ≤ 50 V' },
+  spda: { nome: 'SPDA — subsistema de aterramento', rmax: 10, ref: 'NBR 5419-3: recomenda-se resistência da ordem de 10 Ω' },
+  subestacao: { nome: 'Subestação / malha de terra', rmax: 10, ref: 'critério do projetista; segurança verificada por toque e passo (NBR 15751)' },
+  outro: { nome: 'Outro', rmax: 10, ref: 'critério do projetista' }
+};
+const HASTES_COM = [
+  ['h34-240', '3/4" × 2,40 m — aço cobreado (NDU 001)', 2.4, 17.3], ['h58-240', '5/8" × 2,40 m — aço cobreado', 2.4, 15.9],
+  ['h58-300', '5/8" × 3,00 m — aço cobreado', 3.0, 15.9], ['h12-240', '1/2" × 2,40 m — aço cobreado', 2.4, 12.7]
+];
+/* diâmetro externo aproximado de cabos nus de cobre, classe 2 (mm) */
+const DIAM_NU = { 16: 5.1, 25: 6.4, 35: 7.6, 50: 9.0, 70: 10.7, 95: 12.6, 120: 14.2, 150: 15.8, 185: 17.6, 240: 20.1, 300: 22.6 };
+const SECOES_NU = Object.keys(DIAM_NU).map(Number);
+/* constantes dos materiais — IEEE Std 80-2013, Tabela 1 (Ta = 40 °C) */
+const MAT_TERRA = {
+  cu: { nome: 'Cobre nu recozido (100 % IACS)', ar: 0.00393, K0: 234, Tm: 1083, rr: 1.72, tcap: 3.42 },
+  cuDuro: { nome: 'Cobre nu meio-duro (97 % IACS)', ar: 0.00381, K0: 242, Tm: 1084, rr: 1.78, tcap: 3.42 },
+  cuAco40: { nome: 'Aço cobreado 40 % IACS', ar: 0.00378, K0: 245, Tm: 1084, rr: 4.40, tcap: 3.85 },
+  cuAco30: { nome: 'Aço cobreado 30 % IACS', ar: 0.00378, K0: 245, Tm: 1084, rr: 5.86, tcap: 3.85 },
+  acoZn: { nome: 'Aço zincado', ar: 0.00320, K0: 293, Tm: 419, rr: 20.10, tcap: 3.93 }
+};
+const CONEXAO_TERRA = { solda: 'Solda exotérmica (temperatura de fusão do material)', compressao: 'Conector de compressão ou aparafusado (250 °C)' };
+const POS_HASTES_MALHA = { nenhuma: 'Sem hastes', cantos: 'Nos 4 cantos', perimetro: 'Em todos os cruzamentos do perímetro', todos: 'Em todos os cruzamentos' };
+
+function soloPadrao() {
+  return { modo: 'wenner', rho: 300, p: 0.20, media: 'geo', descartar: true, modelo: 'homog', fs: 1.0, local: '', data: '', equip: '', med: [] };
+}
+function arrPadrao(tipo = 'linha', funcao = 'massas') {
+  return {
+    id: uid(), nome: TIPOS_ATERR[tipo], tipo, funcao, rmax: FUNC_ATERR[funcao].rmax, haste: 'h34-240', L: 2.4, d: 17.3, n: 3, e: 2.4, m: 3, raio: 3,
+    Lc: 20, hc: 0.5, S: 50, mat: 'cu', Lx: 20, Ly: 15, Nx: 4, Ny: 5, posH: 'perimetro', Lh: 2.4, dh: 17.3,
+    seg: tipo === 'malha', I3I0: 1500, sf: 100, xr: 5, tf: 0.5, tc: 1.0, brita: true, rhoS: 3000, hs: 0.10, peso: 50, conexao: 'solda', Smin: 50, rhoMan: null, obs: ''
+  };
+}
+function aterrPadrao() { return { solo: soloPadrao(), arr: [] }; }
+
+/* ---------- solo (NBR 7117-1) ---------- */
+function rhoWenner(a, R, p) { const t = 1 + 2 * a / Math.sqrt(a * a + 4 * p * p) - a / Math.sqrt(a * a + p * p); return 4 * Math.PI * a * R / t; }
+const mediaAr = v => v.reduce((s, x) => s + x, 0) / v.length;
+const mediaGeo = v => Math.exp(v.reduce((s, x) => s + Math.log(x), 0) / v.length);
+function rhoApar2c(a, r1, r2, h) {
+  const K = (r2 - r1) / (r2 + r1); let s = 0;
+  for (let n = 1; n <= 2000; n++) { const Kn = Math.pow(K, n); if (Math.abs(Kn) < 1e-7) break; const x = 2 * n * h / a; s += Kn / Math.sqrt(1 + x * x) - Kn / Math.sqrt(4 + x * x); }
+  return r1 * (1 + 4 * s);
+}
+function nelderMead(f, x0, passo, it = 600) {
+  const n = x0.length; let S = [x0, ...x0.map((_, i) => x0.map((v, j) => v + (i === j ? passo[j] : 0)))].map(x => ({ x, f: f(x) }));
+  for (let k = 0; k < it; k++) {
+    S.sort((a, b) => a.f - b.f);
+    if (Math.abs(S[n].f - S[0].f) < 1e-10) break;
+    const c = S.slice(0, n).reduce((acc, p) => acc.map((v, j) => v + p.x[j] / n), Array(n).fill(0));
+    const mv = (t) => c.map((v, j) => v + t * (S[n].x[j] - v));
+    const xr = mv(-1), fr = f(xr);
+    if (fr < S[0].f) { const xe = mv(-2), fe = f(xe); S[n] = fe < fr ? { x: xe, f: fe } : { x: xr, f: fr }; }
+    else if (fr < S[n - 1].f) S[n] = { x: xr, f: fr };
+    else { const xc = mv(0.5), fc = f(xc); if (fc < S[n].f) S[n] = { x: xc, f: fc }; else S = S.map((p, i) => i ? { x: p.x.map((v, j) => S[0].x[j] + 0.5 * (v - S[0].x[j])), f: 0 } : p).map((p, i) => i ? { x: p.x, f: f(p.x) } : p); }
+  }
+  S.sort((a, b) => a.f - b.f); return S[0];
+}
+function calcSolo(S) {
+  const r = { modo: S.modo, fs: +S.fs > 0 ? +S.fs : 1, avisos: [], falhas: [], linhas: [], porA: [] };
+  if (S.modo === 'direto') {
+    r.rhoBase = +S.rho || 0; r.modelo = 'homog'; r.rho = r.rhoBase * r.fs;
+    if (!(r.rhoBase > 0)) r.falhas.push('Informe a resistividade do solo.');
+    return r;
+  }
+  const med = S.media === 'ar' ? mediaAr : mediaGeo, p = +S.p || 0;
+  r.linhas = (S.med || []).filter(m => +m.a > 0 && +m.R > 0).map(m => ({ dir: m.dir || '', a: +m.a, R: +m.R, rho: rhoWenner(+m.a, +m.R, p) }));
+  const grupos = {}; r.linhas.forEach(l => { (grupos[l.a.toFixed(3)] = grupos[l.a.toFixed(3)] || []).push(l); });
+  r.porA = Object.values(grupos).sort((x, y) => x[0].a - y[0].a).map(g => {
+    const m0 = med(g.map(l => l.rho));
+    g.forEach(l => { l.desvio = (l.rho - m0) / m0; l.desc = !!S.descartar && Math.abs(l.desvio) > 0.5; });
+    const ok = g.filter(l => !l.desc), v = ok.length ? ok : g;
+    return { a: g[0].a, n: g.length, nDesc: g.length - ok.length, rho: med(v.map(l => l.rho)), min: Math.min(...g.map(l => l.rho)), max: Math.max(...g.map(l => l.rho)) };
+  });
+  if (!r.porA.length) { r.falhas.push('Informe as medições de Wenner (espaçamento e resistência lida) ou use a resistividade informada.'); r.rho = 0; r.modelo = 'homog'; return r; }
+  const nd = r.linhas.filter(l => l.desc).length; if (nd) r.avisos.push(`${nd} medição(ões) com desvio superior a 50 % da média do espaçamento foram descartadas.`);
+  r.rhoMed = med(r.porA.map(x => x.rho));
+  r.rhoMinMax = (Math.min(...r.porA.map(x => x.rho)) + Math.max(...r.porA.map(x => x.rho))) / 2;
+  r.modelo = S.modelo === '2c' && r.porA.length >= 3 ? '2c' : 'homog';
+  if (S.modelo === '2c' && r.porA.length < 3) r.avisos.push('O modelo de duas camadas exige medições em pelo menos 3 espaçamentos; adotado solo homogêneo.');
+  if (r.modelo === '2c') {
+    const A = r.porA, amin = A[0].a, amax = A[A.length - 1].a;
+    const erro = x => { const [r1, r2, h] = x.map(Math.exp); if (h < 0.05 || h > 3 * amax) return 1e9; return A.reduce((s, q) => { const d = Math.log(rhoApar2c(q.a, r1, r2, h) / q.rho); return s + d * d; }, 0); };
+    let best = null;
+    for (const hf of [0.5, 1, 2]) { const s = nelderMead(erro, [Math.log(A[0].rho), Math.log(A[A.length - 1].rho), Math.log(Math.sqrt(amin * amax) * hf)], [0.3, 0.3, 0.4]); if (!best || s.f < best.f) best = s; }
+    const [r1, r2, h] = best.x.map(Math.exp);
+    r.m2 = { rho1: r1, rho2: r2, h, K: (r2 - r1) / (r2 + r1), erro: 100 * Math.sqrt(best.f / A.length) };
+    r.porA.forEach(q => { q.modelo = rhoApar2c(q.a, r1, r2, h); });
+    if (r.m2.erro > 15) r.avisos.push(`Ajuste do modelo de duas camadas com desvio médio de ${nfmt(r.m2.erro, 1)} %: o solo pode exigir modelo com mais camadas (software de estratificação).`);
+    r.rho = r.rhoMed * r.fs;
+  } else r.rho = r.rhoMed * r.fs;
+  return r;
+}
+/* resistividade equivalente vista por um eletrodo que alcança a profundidade d (Hummel — camadas em paralelo) */
+function rhoHummel(m2, d) { return d <= m2.h ? m2.rho1 : d / (m2.h / m2.rho1 + (d - m2.h) / m2.rho2); }
+function rhoArranjo(a, rs) {
+  if (+a.rhoMan > 0) return { rho: +a.rhoMan, txt: 'resistividade informada para o arranjo' };
+  if (!rs.m2 || rs.modelo !== '2c') return { rho: rs.rho, txt: rs.modo === 'direto' ? 'resistividade informada (solo homogêneo)' : `solo homogêneo — média ${rs.modo === 'wenner' ? 'das medições de Wenner' : ''}`.trim() + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') };
+  const m = rs.m2; let d, base;
+  if (TIPOS_HASTES.includes(a.tipo)) { d = +a.L; base = `Hummel até a profundidade da haste (${nfmt(d, 2)} m)`; }
+  else if (a.tipo === 'cabo') { const rho = (+a.hc <= m.h ? m.rho1 : m.rho2); return { rho: rho * rs.fs, txt: `camada onde o cabo está enterrado (${+a.hc <= m.h ? '1ª' : '2ª'} camada)${rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : ''}` }; }
+  else { d = Math.max(Math.sqrt((+a.Lx * +a.Ly) / Math.PI), a.posH !== 'nenhuma' ? +a.hc + +a.Lh : 0); base = `Hummel até a profundidade de influência da malha (${nfmt(d, 2)} m = maior entre o raio equivalente √(A/π) e a ponta das hastes)`; }
+  return { rho: rhoHummel(m, d) * rs.fs, txt: base + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : ''), d };
+}
+
+/* ---------- eletrodos ---------- */
+const rHaste = (rho, L, d) => rho / (2 * Math.PI * L) * Math.log(4 * L / d);
+function rMutua(rho, L, e) { const b = Math.sqrt(L * L + e * e); return rho / (4 * Math.PI * L) * Math.log(((b + L) ** 2 - e * e) / (e * e - (b - L) ** 2)); }
+function posHastes(a) {
+  const e = +a.e, n = Math.max(1, Math.round(+a.n || 1)), m = Math.max(2, Math.round(+a.m || 2));
+  switch (a.tipo) {
+    case 'haste': return [[0, 0]];
+    case 'linha': return Array.from({ length: n }, (_, i) => [i * e, 0]);
+    case 'triangulo': return [[0, 0], [e, 0], [e / 2, e * Math.sqrt(3) / 2]];
+    case 'quadVazio': { const p = []; for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) if (i === 0 || j === 0 || i === m - 1 || j === m - 1) p.push([i * e, j * e]); return p; }
+    case 'quadCheio': { const p = []; for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) p.push([i * e, j * e]); return p; }
+    case 'circ': { const R = +a.raio; return Array.from({ length: n }, (_, i) => [R * Math.cos(2 * Math.PI * i / n), R * Math.sin(2 * Math.PI * i / n)]); }
+  }
+  return [];
+}
+function reqHastes(rho, L, d, pos) {
+  const R1 = rHaste(rho, L, d);
+  const Rh = pos.map((p, h) => pos.reduce((s, q, m) => s + (m === h ? R1 : rMutua(rho, L, Math.hypot(p[0] - q[0], p[1] - q[1]))), 0));
+  return { R1, Rh, Req: 1 / Rh.reduce((s, x) => s + 1 / x, 0) };
+}
+const rCabo = (rho, L, d, h) => rho / (Math.PI * L) * (Math.log(2 * L / Math.sqrt(2 * (d / 2) * h)) - 1);
+function secaoTermica(I_kA, tc, mat, conexao) {
+  const M = MAT_TERRA[mat] || MAT_TERRA.cu, Tm = conexao === 'compressao' ? 250 : M.Tm;
+  const fator = Math.sqrt((M.tcap * 1e-4) / (tc * M.ar * M.rr) * Math.log((M.K0 + Tm) / (M.K0 + 40)));
+  return { A: I_kA / fator, Tm, fator };
+}
+function k12(x, hr) {
+  const P = [[0, -0.04 * x + 1.41, 0.15 * x + 5.50], [0.1, -0.05 * x + 1.20, 0.10 * x + 4.68], [1 / 6, -0.05 * x + 1.13, -0.05 * x + 4.40]];
+  if (hr <= 0) return [P[0][1], P[0][2]];
+  for (let i = 1; i < P.length; i++) if (hr <= P[i][0]) { const t = (hr - P[i - 1][0]) / (P[i][0] - P[i - 1][0]); return [P[i - 1][1] + t * (P[i][1] - P[i - 1][1]), P[i - 1][2] + t * (P[i][2] - P[i - 1][2])]; }
+  return [P[2][1], P[2][2]];
+}
+function posHastesMalha(a, Dx, Dy, Nx, Ny) {
+  const p = [], cols = Ny, rows = Nx;
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const borda = i === 0 || j === 0 || i === cols - 1 || j === rows - 1, canto = (i === 0 || i === cols - 1) && (j === 0 || j === rows - 1);
+    if (a.posH === 'todos' || (a.posH === 'perimetro' && borda) || (a.posH === 'cantos' && canto)) p.push([i * Dx, j * Dy]);
+  }
+  return p;
+}
+function calcMalha(a, rho, r) {
+  const Lx = +a.Lx, Ly = +a.Ly, Nx = Math.max(2, Math.round(+a.Nx)), Ny = Math.max(2, Math.round(+a.Ny)), h = +a.hc;
+  const Dy = Ly / (Nx - 1), Dx = Lx / (Ny - 1), D = Math.max(Dx, Dy), d = (DIAM_NU[+a.S] || Math.sqrt(4 * +a.S / Math.PI) * 1.13) / 1000;
+  const LC = Nx * Lx + Ny * Ly, A = Lx * Ly, Lp = 2 * (Lx + Ly), pos = posHastesMalha(a, Dx, Dy, Nx, Ny), nR = pos.length, Lr = +a.Lh, LR = nR * Lr, b = +a.dh / 2000;
+  Object.assign(r, { Lx, Ly, Nx, Ny, Dx, Dy, D, d, LC, A, Lp, pos, nR, Lr, LR, h, LT: LC + LR });
+  r.Rsverak = rho * (1 / (LC + LR) + 1 / Math.sqrt(20 * A) * (1 + 1 / (1 + h * Math.sqrt(20 / A))));
+  const x = Math.max(Lx, Ly) / Math.min(Lx, Ly), [k1, k2] = k12(x, h / Math.sqrt(A)), aP = Math.sqrt((d / 2) * 2 * h);
+  r.sch = { x, k1, k2, aP };
+  r.sch.R1 = rho / (Math.PI * LC) * (Math.log(2 * LC / aP) + k1 * LC / Math.sqrt(A) - k2);
+  if (nR) {
+    r.sch.R2 = rho / (2 * Math.PI * nR * Lr) * (Math.log(4 * Lr / b) - 1 + 2 * k1 * Lr / Math.sqrt(A) * (Math.sqrt(nR) - 1) ** 2);
+    r.sch.Rm = rho / (Math.PI * LC) * (Math.log(2 * LC / Lr) + k1 * LC / Math.sqrt(A) - k2 + 1);
+    r.sch.Rg = (r.sch.R1 * r.sch.R2 - r.sch.Rm ** 2) / (r.sch.R1 + r.sch.R2 - 2 * r.sch.Rm);
+  } else r.sch.Rg = r.sch.R1;
+  r.metodoR = nR && r.sch.Rg > 0 ? 'Schwarz' : 'Sverak';
+  r.R = r.metodoR === 'Schwarz' ? r.sch.Rg : r.Rsverak;
+  if (h < 0.25 || h > 2.5) r.avisos.push('Profundidade da malha fora da faixa de validade das equações da IEEE 80 (0,25 m a 2,5 m).');
+  if (!a.seg) return;
+  // segurança — NBR 15751:2013 / IEEE Std 80-2013
+  const ts = +a.tf, kc = +a.peso === 70 ? 0.157 : 0.116, Ta = (+a.xr || 0) / (2 * Math.PI * 60);
+  r.Df = Ta > 0 ? Math.sqrt(1 + Ta / ts * (1 - Math.exp(-2 * ts / Ta))) : 1;
+  r.IG = r.Df * (+a.sf / 100) * +a.I3I0; r.GPR = r.IG * r.R;
+  const rhoS = a.brita ? +a.rhoS : rho; r.Cs = a.brita ? 1 - 0.09 * (1 - rho / rhoS) / (2 * +a.hs + 0.09) : 1; r.rhoS = rhoS; r.kc = kc;
+  r.Etoque = (1000 + 1.5 * r.Cs * rhoS) * kc / Math.sqrt(ts); r.Epasso = (1000 + 6 * r.Cs * rhoS) * kc / Math.sqrt(ts);
+  const na = 2 * LC / Lp, nb = Math.sqrt(Lp / (4 * Math.sqrt(A))), n = na * nb, hastesBorda = nR > 0 && a.posH !== 'nenhuma';
+  const Kii = hastesBorda ? 1 : 1 / Math.pow(2 * n, 2 / n), Kh = Math.sqrt(1 + h / 1);
+  const Km = 1 / (2 * Math.PI) * (Math.log(D * D / (16 * h * d) + (D + 2 * h) ** 2 / (8 * D * d) - h / (4 * d)) + Kii / Kh * Math.log(8 / (Math.PI * (2 * n - 1))));
+  const Ki = 0.644 + 0.148 * n, LM = hastesBorda ? LC + (1.55 + 1.22 * (Lr / Math.sqrt(Lx * Lx + Ly * Ly))) * LR : LC + LR;
+  const Ks = 1 / Math.PI * (1 / (2 * h) + 1 / (D + h) + 1 / D * (1 - Math.pow(0.5, n - 2))), LS = 0.75 * LC + 0.85 * LR;
+  Object.assign(r, { na, nb, n, Kii, Kh, Km, Ki, LM, Ks, LS, Em: rho * Km * Ki * r.IG / LM, Es: rho * Ks * Ki * r.IG / LS });
+  r.okGPR = r.GPR <= r.Etoque; r.okToque = r.Em <= r.Etoque; r.okPasso = r.Es <= r.Epasso;
+  if (n > 25 || D < 2.5 || d > 0.25 * h) r.avisos.push('Geometria fora dos limites das equações simplificadas da IEEE 80 (n ≤ 25, D ≥ 2,5 m, d < 0,25 h): confirme com software de malha.');
+  if (Math.max(Dx, Dy) / Math.min(Dx, Dy) > 1.5) r.avisos.push(`Espaçamentos diferentes nas duas direções (${nfmt(Dx, 2)} m × ${nfmt(Dy, 2)} m): adotado o maior (D = ${nfmt(D, 2)} m), a favor da segurança.`);
+  const IF = r.Df * +a.I3I0 / 1000, sec = secaoTermica(IF, +a.tc, a.mat, a.conexao);
+  r.cond = { IF, ...sec, Smin: +a.Smin || 0 }; r.cond.Sreq = Math.max(sec.A, r.cond.Smin); r.cond.ok = +a.S >= r.cond.Sreq;
+  if (!r.okToque) r.falhas.push(`Tensão de toque de malha Em = ${nfmt(r.Em, 0)} V acima da admissível (${nfmt(r.Etoque, 0)} V): reduza o espaçamento, aumente a malha, acrescente hastes no perímetro ou use camada de brita mais resistiva.`);
+  if (!r.okPasso) r.falhas.push(`Tensão de passo Es = ${nfmt(r.Es, 0)} V acima da admissível (${nfmt(r.Epasso, 0)} V).`);
+  if (!r.cond.ok) r.falhas.push(`Condutor de ${a.S} mm² abaixo da seção exigida (${nfmt(r.cond.Sreq, 1)} mm²).`);
+}
+function calcArranjo(a, rs, proj, calc) {
+  const r = { avisos: [], falhas: [], tipo: a.tipo, funcao: a.funcao };
+  const ra = rhoArranjo(a, rs); r.rho = ra.rho; r.rhoTxt = ra.txt;
+  if (!(r.rho > 0)) { r.falhas.push('Resistividade do solo não definida.'); r.status = 'fail'; r.R = NaN; return r; }
+  if (TIPOS_HASTES.includes(a.tipo)) {
+    const L = +a.L, d = +a.d / 1000; r.pos = posHastes(a); r.nH = r.pos.length;
+    Object.assign(r, reqHastes(r.rho, L, d, r.pos)); r.R = r.Req; r.K = r.Req / r.R1;
+    if (r.nH > 1) { const e = Math.min(...r.pos.flatMap((p, i) => r.pos.slice(i + 1).map(q => Math.hypot(p[0] - q[0], p[1] - q[1])))); r.eMin = e; if (e < L - 1e-6) r.avisos.push(`Espaçamento entre hastes (${nfmt(e, 2)} m) menor que o comprimento da haste (${nfmt(L, 2)} m): as zonas de influência se sobrepõem e o ganho com hastes adicionais é pequeno.`); }
+    if (+a.rmax > 0) { r.nMin = null; for (let k = 1; k <= 60; k++) { const q = reqHastes(r.rho, L, d, Array.from({ length: k }, (_, i) => [i * (+a.e || L), 0])); if (q.Req <= +a.rmax) { r.nMin = k; r.nMinR = q.Req; break; } } }
+  } else if (a.tipo === 'cabo') {
+    r.dCabo = (DIAM_NU[+a.S] || Math.sqrt(4 * +a.S / Math.PI) * 1.13) / 1000; r.R = rCabo(r.rho, +a.Lc, r.dCabo, +a.hc);
+  } else calcMalha(a, r.rho, r);
+  r.rmax = +a.rmax || 0;
+  if (a.funcao === 'massas' && proj.params.aterramento === 'TT') {
+    const idn = Math.max(0, ...proj.circuitos.map(c => calc.res[c.id]).filter(x => x && x.drUsado).map(x => +x.idn || 0));
+    if (idn > 0) { r.tt = { idn, RAmax: 50 / (idn / 1000) }; if (r.R * idn / 1000 > 50) r.falhas.push(`Esquema TT: RA × IΔn = ${nfmt(r.R * idn / 1000, 1)} V > 50 V.`); }
+  }
+  if (a.funcao === 'entrada') {
+    const ce = calc.energisa && Object.values(calc.energisa.ucs || {})[0], cat = ce && ce.cat;
+    if (cat) { r.ndu = { hastes: cat.hastes, aterr: cat.aterr, cat: cat.cat }; if (TIPOS_HASTES.includes(a.tipo) && r.nH < cat.hastes) r.falhas.push(`A NDU 001 exige no mínimo ${cat.hastes} haste(s) para a categoria ${cat.cat}.`); }
+    if (TIPOS_HASTES.includes(a.tipo) && r.nH > 1 && r.eMin < 2.4 - 1e-6) r.avisos.push('A NDU 001 (8.10) pede hastes distanciadas entre si de 2,40 m.');
+  }
+  r.okR = !(r.rmax > 0) || r.R <= r.rmax;
+  if (!r.okR) r.falhas.push(`Resistência calculada ${nfmt(r.R, 2)} Ω acima do limite de ${nfmt(r.rmax, 1)} Ω${r.nMin ? ` — com hastes alinhadas espaçadas de ${nfmt(+a.e || +a.L, 2)} m seriam necessárias ${r.nMin} hastes (${nfmt(r.nMinR, 2)} Ω)` : ''}.`);
+  r.status = r.falhas.length ? 'fail' : (r.avisos.length ? 'warn' : 'ok');
+  return r;
+}
+function calcAterramento(proj, calc) {
+  const T = proj.aterr || aterrPadrao();
+  const solo = calcSolo(T.solo || soloPadrao()), arr = {};
+  (T.arr || []).forEach(a => { arr[a.id] = calcArranjo(a, solo, proj, calc); });
+  const lista = Object.values(arr);
+  return { solo, arr, status: solo.falhas.length || lista.some(x => x.status === 'fail') ? 'fail' : (lista.some(x => x.status === 'warn') || solo.avisos.length ? 'warn' : 'ok') };
+}
+
+/* ================================================================
    ESQUEMAS ILUSTRATIVOS — TABELA 33 (desenhos próprios, esquemáticos)
    pictograma(id, paleta) → SVG 160 × 100
    ================================================================ */
@@ -2137,7 +2387,8 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao()
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(),
+    memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }
 function projetoExemplo() {
@@ -2191,6 +2442,15 @@ function projetoExemplo() {
       cg('aquec', 'Chuveiro elétrico 220 V — banheiro social (circ. 6)', { W: 5500 }), cg('aquec', 'Chuveiro elétrico 220 V — suíte (circ. 7)', { W: 7500 }),
       cg('arj', 'Ar-condicionado split 12.000 BTU/h (circ. 8)', { btu: 12000, tipoAr: 'split' }), cg('fogao', 'Forno elétrico (circ. 9)', { W: 1800 }),
       cg('secad', 'Forno de micro-ondas 25 L', { W: 1398 }), cg('mot1', 'Bomba d’água 1/2 cv (circ. 10)', { cv: 0.5 })] });
+  const T = proj.aterr;
+  Object.assign(T.solo, { modo: 'wenner', p: 0.2, media: 'geo', descartar: true, modelo: '2c', fs: 1, local: 'terreno da obra — direções A (frente) e B (lateral)', equip: 'terrômetro digital de 4 terminais',
+    med: [['A', 1, 26.57], ['A', 2, 11.05], ['A', 4, 4.53], ['A', 8, 1.85], ['A', 16, 0.92], ['B', 1, 24.53], ['B', 2, 11.74], ['B', 4, 4.18], ['B', 8, 1.96], ['B', 16, 0.88]].map(([dir, a, R]) => ({ dir, a, R })) });
+  const arK = (tipo, funcao, o) => Object.assign(arrPadrao(tipo, funcao), o);
+  T.arr = [
+    arK('linha', 'entrada', { nome: 'Padrão de entrada — categoria T3 (NDU 001)', n: 4, e: 2.4, haste: 'h34-240', L: 2.4, d: 17.3, rmax: 20 }),
+    arK('malha', 'spda', { nome: 'SPDA — anel de aterramento com 4 hastes', Lx: 14, Ly: 11, Nx: 2, Ny: 2, hc: 0.5, S: 50, posH: 'cantos', Lh: 2.4, dh: 17.3, seg: false, rmax: 10 }),
+    arK('malha', 'subestacao', { nome: 'Malha de terra — verificação de toque e passo (ilustrativo)', Lx: 16, Ly: 12, Nx: 5, Ny: 7, hc: 0.6, S: 50, posH: 'perimetro', Lh: 2.4, dh: 17.3, seg: true, I3I0: 1000, sf: 50, xr: 5, tf: 0.5, tc: 1.0, brita: true, rhoS: 3000, hs: 0.10, peso: 50, rmax: 10 })
+  ];
   return proj;
 }
 if (typeof module !== 'undefined') module.exports = { projetoExemplo, projetoVazio };
@@ -2234,14 +2494,21 @@ function potTxt(c, r) {
   return `${f0(r.S)} VA — ${f0(r.P)} W`;
 }
 
+/* A memória da NBR 5410 é emitida em partes independentes, que podem ser agrupadas no relatório consolidado */
+const PARTES_5410 = {
+  circuitos: { text: 'Memória de cálculo — condutores e proteção', sub: 'Dimensionamento dos condutores e dos dispositivos de proteção contra sobrecorrentes e choques elétricos dos circuitos de baixa tensão' },
+  eletrodutos: { text: 'Memória de cálculo — eletrodutos', sub: 'Dimensionamento dos eletrodutos pela taxa máxima de ocupação (NBR 5410, 6.2.11.1)' },
+  calhas: { text: 'Memória de cálculo — eletrocalhas', sub: 'Dimensionamento de eletrocalhas, perfilados, bandejas e leitos para cabos' },
+  quadros: { text: 'Memória de cálculo — quadros de carga', sub: 'Quadros de distribuição: cargas por circuito, equilíbrio de fases e demanda dos alimentadores' }
+};
+const trechosEletroduto = calc => Object.values(calc.trechos).filter(t => !(calc.calhas || {})[t.key]);
 function construirMemorial(proj, calc, opt = {}) {
-  const o = Object.assign({ metodologia: true, detalhe: true, eletrodutos: true, calhas: true, quadro: true, lumi: true, anexo33: true, assinatura: true }, opt);
+  const o = Object.assign({ parte: 'circuitos', metodologia: true, detalhe: true, anexo33: true, assinatura: true }, opt), pt = PARTES_5410[o.parte] ? o.parte : 'circuitos';
+  const pc = pt === 'circuitos', pe = pt === 'eletrodutos', pk = pt === 'calhas', pq = pt === 'quadros';
   const P = proj.params, I = proj.info, C = proj.circuitos, R = calc.res; const B = [];
   const nOK = C.filter(c => R[c.id].status !== 'fail').length;
-  const K = Object.values(calc.calhas || {}), temK = o.calhas && K.length > 0;
-  const A = proj.lumi || [], temL = o.lumi && A.length > 0;
-  const TE = Object.values(calc.trechos).filter(t => !(calc.calhas || {})[t.key]);
-  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 — Instalações elétricas de baixa tensão', text: 'Memória de cálculo', sub: `Dimensionamento de condutores, dispositivos de proteção, eletrodutos${K.length ? ' e eletrocalhas' : ''} dos circuitos elétricos${temL ? ' e cálculo luminotécnico (ABNT NBR ISO/CIE 8995-1)' : ''}` });
+  const K = Object.values(calc.calhas || {}), TE = trechosEletroduto(calc), Q = Object.values(calc.quadros);
+  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 — Instalações elétricas de baixa tensão', text: PARTES_5410[pt].text, sub: PARTES_5410[pt].sub });
   B.push({ t: 'meta', rows: [
     ['Obra', I.obra || '—'], ['Proprietário / cliente', I.cliente || '—'],
     ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'],
@@ -2252,25 +2519,26 @@ function construirMemorial(proj, calc, opt = {}) {
   const temAl = C.some(c => c.material === 'Al');
 
   sec('Objetivo');
-  B.push({ t: 'p', text: `Este documento apresenta a memória de cálculo do dimensionamento dos condutores, dos dispositivos de proteção contra sobrecorrentes e choques elétricos e dos eletrodutos dos ${C.length} circuitos de baixa tensão da obra acima identificada, segundo os critérios da ABNT NBR 5410:2004 (versão corrigida 2008). Conforme 6.2.6.1.2, a seção adotada para cada circuito é a maior entre as exigidas pelos critérios de seção mínima, capacidade de condução de corrente, queda de tensão, sobrecarga, curto-circuito e proteção contra choques elétricos.` });
+  if (pc) B.push({ t: 'p', text: `Este documento apresenta a memória de cálculo do dimensionamento dos condutores e dos dispositivos de proteção contra sobrecorrentes e choques elétricos dos ${C.length} circuitos de baixa tensão da obra acima identificada, segundo os critérios da ABNT NBR 5410:2004 (versão corrigida 2008). Conforme 6.2.6.1.2, a seção adotada para cada circuito é a maior entre as exigidas pelos critérios de seção mínima, capacidade de condução de corrente, queda de tensão, sobrecarga, curto-circuito e proteção contra choques elétricos.` });
+  if (pe) B.push({ t: 'p', text: `Este documento apresenta o dimensionamento dos ${TE.length} trechos de eletroduto da obra acima identificada pela taxa máxima de ocupação de 6.2.11.1.6 da ABNT NBR 5410:2004, a partir dos condutores dimensionados na memória de cálculo dos circuitos e dos diâmetros externos de catálogo.` });
+  if (pk) B.push({ t: 'p', text: `Este documento apresenta o dimensionamento dos ${K.length} trechos de eletrocalhas, perfilados, bandejas e leitos para cabos da obra acima identificada: ocupação da seção útil, largura e altura comerciais e verificação da carga dos cabos, considerando a maneira de instalar da Tabela 33 da ABNT NBR 5410:2004 adotada para cada circuito.` });
+  if (pq) B.push({ t: 'p', text: `Este documento apresenta os ${Q.length} quadros de distribuição da obra acima identificada: relação das cargas por circuito, distribuição entre fases, desequilíbrio e demanda adotada para o dimensionamento dos alimentadores, segundo a ABNT NBR 5410:2004.` });
 
   sec('Normas e documentos de referência');
   B.push({ t: 'list', items: [
     'ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão.',
-    'ABNT NBR NM 60898 — Disjuntores para proteção de sobrecorrentes para instalações domésticas e similares.',
-    'ABNT NBR IEC 60947-2 — Dispositivos de manobra e comando de baixa tensão — Disjuntores.',
-    'ABNT NBR NM 61008 / NBR NM 61009 — Interruptores e disjuntores a corrente diferencial-residual.',
-    'ABNT NBR NM 247-3 e ABNT NBR 13248 — Condutores isolados 450/750 V (PVC e não halogenados).',
-    'ABNT NBR 7288, NBR 7286 e NBR 7287 — Cabos de potência 0,6/1 kV com isolação de PVC, EPR/HEPR e XLPE.',
-    'ABNT NBR NM 280 — Condutores de cabos isolados (resistência elétrica).',
-    'ABNT NBR 15465 e ABNT NBR 5598 — Eletrodutos plásticos e de aço-carbono.',
-    ...(K.length ? ['ABNT NBR IEC 61537 — Encaminhamento de cabos — Sistemas de eletrocalhas e de leitos para cabos.'] : []),
-    ...(A.length ? ['ABNT NBR ISO/CIE 8995-1:2013 — Iluminação de ambientes de trabalho — Parte 1: Interior.', 'CIE 97:2005 — Guia de manutenção de sistemas de iluminação elétrica de interiores.'] : []),
-    'IEC 60364-5-52:2009 e IEC 60287-1-1 — Capacidade de condução, agrupamento e cálculo de resistência e reatância.',
-    'Guia de Dimensionamento de Cabos para Baixa Tensão — Prysmian, Rev. 9 (2020).',
-    ...(I.concessionaria ? [I.concessionaria + '.'] : [])
+    ...(pc || pq ? ['ABNT NBR NM 60898 — Disjuntores para proteção de sobrecorrentes para instalações domésticas e similares.', 'ABNT NBR IEC 60947-2 — Dispositivos de manobra e comando de baixa tensão — Disjuntores.'] : []),
+    ...(pc ? ['ABNT NBR NM 61008 / NBR NM 61009 — Interruptores e disjuntores a corrente diferencial-residual.'] : []),
+    ...(pc || pe || pk ? ['ABNT NBR NM 247-3 e ABNT NBR 13248 — Condutores isolados 450/750 V (PVC e não halogenados).', 'ABNT NBR 7288, NBR 7286 e NBR 7287 — Cabos de potência 0,6/1 kV com isolação de PVC, EPR/HEPR e XLPE.'] : []),
+    ...(pc ? ['ABNT NBR NM 280 — Condutores de cabos isolados (resistência elétrica).'] : []),
+    ...(pe ? ['ABNT NBR 15465 e ABNT NBR 5598 — Eletrodutos plásticos e de aço-carbono.'] : []),
+    ...(pk ? ['ABNT NBR IEC 61537 — Encaminhamento de cabos — Sistemas de eletrocalhas e de leitos para cabos.'] : []),
+    ...(pq ? ['ABNT NBR IEC 61439-1 e NBR IEC 61439-3 — Conjuntos de manobra e comando de baixa tensão — Quadros de distribuição.'] : []),
+    ...(pc || pk ? ['IEC 60364-5-52:2009 e IEC 60287-1-1 — Capacidade de condução, agrupamento e cálculo de resistência e reatância.', 'Guia de Dimensionamento de Cabos para Baixa Tensão — Prysmian, Rev. 9 (2020).'] : []),
+    ...(I.concessionaria && (pc || pq) ? [I.concessionaria + '.'] : [])
   ] });
 
+  if (pc || pq) {
   sec('Dados do sistema e premissas');
   const aterr = { 'TN-S': 'TN-S (neutro e proteção separados)', 'TN-C-S': 'TN-C-S', 'TT': 'TT (massas ligadas a eletrodo próprio)' }[P.aterramento] || P.aterramento;
   const orig = { entrega: 'ponto de entrega em tensão secundária de distribuição', trafo: 'terminais secundários do transformador MT/BT', gerador: 'terminais do grupo gerador próprio' }[P.origem];
@@ -2288,6 +2556,8 @@ function construirMemorial(proj, calc, opt = {}) {
     ['Verificação ao curto-circuito', P.verifCC ? (P.classe3 ? `disjuntores até 32 A: classe 3 de limitação de energia; demais: t = ${f3(P.tCC)} s` : `t = ${f3(P.tCC)} s`) + (P.verifPE ? '; inclui o condutor de proteção' : '') : 'não realizada'],
     ['Condutores em paralelo', `automático acima de ${fS(P.secMaxPar)} mm² por condutor, quando o circuito não definir outro valor`]
   ] });
+  }
+  if (pc) {
   B.push({ t: 'p', text: 'Premissas:' });
   B.push({ t: 'list', items: [
     'As potências dos circuitos são as informadas pelo projetista a partir da previsão de cargas (NBR 5410, 9.5.2, quando aplicável).',
@@ -2300,8 +2570,9 @@ function construirMemorial(proj, calc, opt = {}) {
     'Diâmetros externos de condutores e internos de eletrodutos: valores típicos de catálogo, a confirmar com o fabricante especificado.',
     ...(temAl ? ['Condutores de alumínio usados somente nas condições de 6.2.3.8 (instalações industriais e comerciais, nunca em residências).'] : [])
   ] });
+  }
 
-  if (o.metodologia) {
+  if (o.metodologia && pc) {
     const s = sec('Critérios de dimensionamento');
     B.push({ t: 'h3', text: `${s}.1 Corrente de projeto (IB)` });
     B.push({ t: 'eq', lines: ['F+N:    IB = S / U0            F+F:  IB = S / U', 'F+F+N:  IB = S / (2 × U0)      F+F+F e F+F+F+N:  IB = S / (√3 × U)', 'Motores: S = Peixo / (η × cosφ);  IB = In,motor × FS (fator de serviço)'] });
@@ -2321,21 +2592,24 @@ function construirMemorial(proj, calc, opt = {}) {
     B.push({ t: 'p', text: 'Seção mínima (6.2.6.1, Tabela 47): cobre 1,5 mm² em iluminação, 2,5 mm² em força e 0,5 mm² em sinalização e controle; alumínio 16 mm² (50 mm² em instalações comerciais). Neutro (6.2.6.2): igual à fase em circuitos monofásicos e bifásicos; redução pela Tabela 48 apenas em circuitos trifásicos equilibrados, com 3ª harmônica até 15 %. Condutor de proteção (Tabela 58): SPE = S até 16 mm²; 16 mm² de 16 a 35 mm²; S/2 acima de 35 mm².' });
     B.push({ t: 'h3', text: `${s}.7 Dispositivo DR (5.1.3.2.2)` });
     B.push({ t: 'p', text: 'Proteção complementar por DR de alta sensibilidade (IΔn ≤ 30 mA) nos circuitos que atendem locais com banheira ou chuveiro, tomadas em áreas externas, tomadas internas que possam alimentar equipamentos no exterior e, em locais de habitação, cozinhas, copas-cozinhas, lavanderias, áreas de serviço, garagens e demais dependências molhadas ou sujeitas a lavagens.' });
-    B.push({ t: 'h3', text: `${s}.8 Eletrodutos (6.2.11.1)` });
-    B.push({ t: 'eq', lines: ['Taxa máxima de ocupação: 53 % (1 condutor) · 31 % (2 condutores) · 40 % (3 ou mais)', 'Ai,mín = Σ(π × d² / 4) / taxa   →   Di ≥ √(4 × Ai,mín / π)'] });
-    B.push({ t: 'p', text: 'Trechos contínuos sem caixa de passagem: até 15 m em áreas internas e 30 m em áreas externas, reduzidos de 3 m por curva de 90°, com no máximo três curvas entre caixas.' });
-    if (K.length) {
-      B.push({ t: 'h3', text: `${s}.9 Eletrocalhas, perfilados, bandejas e leitos` });
-      B.push({ t: 'eq', lines: ['Wmín = ΣA × (1 + reserva) / (taxa × H)          (largura mínima para a altura útil H)', 'Camada única (suportes abertos, Tabela 42 ref. 2 a 5):  Σd × (1 + reserva) ≤ W', 'Peso dos cabos ≤ carga admissível do fabricante para o vão entre suportes'] });
-      B.push({ t: 'p', text: 'A NBR 5410 não fixa taxa de ocupação para condutos de seção não circular; adota-se como critério de projeto 40 % da seção útil, por analogia com 6.2.11.1.6, acrescida de reserva para ampliação. A capacidade de condução dos circuitos já considera a maneira de instalar da Tabela 33 e o agrupamento das Tabelas 42 e 43. Eletrocalhas e leitos metálicos devem ter continuidade elétrica e ser ligados à equipotencialização (6.4).' });
-    }
-    if (temL) {
-      B.push({ t: 'h3', text: `${s}.${K.length ? 10 : 9} Iluminação de interiores (NBR ISO/CIE 8995-1)` });
-      B.push({ t: 'eq', lines: ['K = L × W / [hm × (L + W)]          (índice do local; hm = altura da luminária ao plano de trabalho)', 'N = Em × A / (Φ × UF × FM)          Eméd = N × Φ × UF × FM / A', 'FM = LLMF × LSF × LMF × RSMF (CIE 97) ≥ 0,70;   Uo = Emín / Eméd ≥ 0,70 na área da tarefa', 'E(P) = Σ I(θ) × cos θ / d² + E refletida;   I(θ) = I0 × cosⁿθ'] });
-      B.push({ t: 'p', text: 'O fator de utilização (UF) é calculado pelo método da radiosidade em três superfícies (plano de trabalho, paredes e teto), com a distribuição de intensidade da luminária aproximada por cosⁿθ a partir da abertura do facho e com os fatores de forma entre o plano de trabalho e o teto; quando o fabricante fornece a tabela de UF, o valor tabelado é usado. A uniformidade é verificada ponto a ponto numa malha no plano de trabalho, excluída uma faixa de até 0,5 m junto às paredes.' });
-    }
+  }
+  if (o.metodologia && pe) {
+    const s = sec('Critérios de dimensionamento');
+    B.push({ t: 'eq', lines: ['Taxa máxima de ocupação (6.2.11.1.6): 53 % (1 condutor) · 31 % (2 condutores) · 40 % (3 ou mais)', 'Ai,mín = Σ(π × d² / 4) / taxa   →   Di ≥ √(4 × Ai,mín / π)'] });
+    B.push({ t: 'p', text: 'd é o diâmetro externo de cada condutor ou cabo contido no trecho. Trechos contínuos sem caixa de passagem: até 15 m em áreas internas e 30 m em áreas externas, reduzidos de 3 m por curva de 90°, com no máximo três curvas entre caixas (6.2.11.1.7 e 6.2.11.1.8). Eletrodutos de aço devem conter todos os condutores do circuito.' });
+  }
+  if (o.metodologia && pk) {
+    sec('Critérios de dimensionamento');
+    B.push({ t: 'eq', lines: ['Wmín = ΣA × (1 + reserva) / (taxa × H)          (largura mínima para a altura útil H)', 'Camada única (suportes abertos, Tabela 42 ref. 2 a 5):  Σd × (1 + reserva) ≤ W', 'Peso dos cabos ≤ carga admissível do fabricante para o vão entre suportes'] });
+    B.push({ t: 'p', text: 'A NBR 5410 não fixa taxa de ocupação para condutos de seção não circular; adota-se como critério de projeto 40 % da seção útil, por analogia com 6.2.11.1.6, acrescida de reserva para ampliação. A capacidade de condução dos circuitos já considera a maneira de instalar da Tabela 33 e o agrupamento das Tabelas 42 e 43. Eletrocalhas e leitos metálicos devem ter continuidade elétrica e ser ligados à equipotencialização (6.4).' });
+  }
+  if (o.metodologia && pq) {
+    sec('Critérios de dimensionamento');
+    B.push({ t: 'eq', lines: ['Demanda do quadro:  D = FD × ΣS(circuitos terminais) + Σ D(quadros a jusante)', 'Corrente de demanda:  Id = D / U0 (monofásico) · D / (2 × U0) (bifásico) · D / (√3 × U) (trifásico)', 'Desequilíbrio entre fases = (Smáx − Smín) / Smáx × 100'] });
+    B.push({ t: 'p', text: 'O fator de demanda (FD) é definido pelo projetista para cada quadro (100 % quando não informado, isto é, toda a carga instalada). As cargas são distribuídas pelas fases de acordo com a ligação de cada circuito, buscando o menor desequilíbrio. A demanda calculada é a corrente de projeto do circuito alimentador do quadro.' });
   }
 
+  if (pc) {
   const sR = sec('Quadro-resumo dos circuitos');
   B.push({ t: 'h3', text: `${sR}.1 Cargas e correntes` });
   B.push({ t: 'table', small: true, head: ['Circ.', 'Descrição', 'Quadro', 'Ligação', 'Fases', 'U (V)', 'P (W)', 'FP', 'S (VA)', 'IB (A)', 'L (m)'], widths: [6, 26, 8, 11, 7, 6, 8, 6, 8, 7, 7], align: 'lllllrrrrrr',
@@ -2345,20 +2619,31 @@ function construirMemorial(proj, calc, opt = {}) {
     rows: C.map(c => { const r = R[c.id]; const t = r.trecho; const k = r.nPar > 1 ? `${r.nPar}×` : ''; return [c.num, `${r.met.id}/${r.ref}`, f2(r.fTot), [k + fS(r.Sf), r.hasN ? k + fS(r.SN) : '—', r.SPE ? k + fS(r.SPE) : '—'].join(' / ') + (c.material === 'Al' ? ' Al' : ''), f1(r.Iz), protecaoCurta(c, r) + (c.dispositivo !== 'fus_gG' ? ` ${r.polos}P` : ''), r.drUsado ? `${r.drIn ?? '?'} A/${r.idn} mA` : '—', `${f2(r.dv)} / ${f2(r.dvTotal)}`, r.calha ? (r.calha.esc ? `${r.calha.esc.W}×${r.calha.esc.H} mm` : '—') : (t && t.esc ? `DN ${t.esc.dn} (${t.esc.pol})` : (t && !t.aplica ? 'n/a' : '—')), statusTxt(r.status)]; }) });
 
   if (o.detalhe) { const sD = sec('Memória detalhada por circuito'); C.forEach((c, i) => memCircuito(B, c, R[c.id], proj, calc, `${sD}.${i + 1}`)); }
-  if (o.eletrodutos && TE.length) { const sE = sec('Dimensionamento dos eletrodutos'); TE.forEach((t, i) => memTrecho(B, t, `${sE}.${i + 1}`)); }
-  if (temK) { const sK = sec('Dimensionamento das eletrocalhas, bandejas e leitos'); K.forEach((t, i) => memCalha(B, t, `${sK}.${i + 1}`)); }
-  if (o.quadro) { const sQ = sec('Quadros de carga e equilíbrio de fases'); Object.values(calc.quadros).forEach((q, i) => memQuadro(B, q, proj, calc, `${sQ}.${i + 1}`)); }
-  if (temL) memLumi(B, proj, calc, sec('Cálculo luminotécnico'));
+  }
+  if (pe) {
+    const sE = sec('Dimensionamento dos eletrodutos');
+    B.push({ t: 'h3', text: `${sE}.1 Quadro-resumo` });
+    B.push({ t: 'table', head: ['Trecho', 'Circuitos', 'Condutores', 'Ocupação', 'Eletroduto', 'Situação'], widths: [16, 24, 12, 14, 22, 12], align: 'lllrll',
+      rows: TE.map(t => [t.exclusivo ? 'Exclusivo' : t.key, t.circuitos.map(c => c.num).join(', '), t.aplica ? String(t.n) : '—', t.aplica && t.esc ? `${f1(t.esc.ocup)} %` : '—', t.aplica ? (t.esc ? `DN ${t.esc.dn} (${t.esc.pol})` : 'não dimensionado') : 'não se aplica', t.aplica ? (t.falhas.length ? 'Não atende' : 'Atende') : '—']) });
+    TE.forEach((t, i) => memTrecho(B, t, `${sE}.${i + 2}`));
+  }
+  if (pk) { const sK = sec('Dimensionamento das eletrocalhas, bandejas e leitos'); K.forEach((t, i) => memCalha(B, t, `${sK}.${i + 1}`)); }
+  if (pq) { const sQ = sec('Quadros de carga e equilíbrio de fases'); Q.forEach((q, i) => memQuadro(B, q, proj, calc, `${sQ}.${i + 1}`)); }
 
   sec('Conclusão');
-  const falhas = C.filter(c => R[c.id].status === 'fail'), obs = C.filter(c => R[c.id].status === 'warn');
-  if (!falhas.length) B.push({ t: 'p', text: `Os ${C.length} circuitos dimensionados atendem aos critérios da ABNT NBR 5410:2004 aplicados nesta memória.${obs.length ? ` Os circuitos ${obs.map(c => c.num).join(', ')} possuem observações, relacionadas na memória detalhada, que devem ser consideradas na execução.` : ''}` });
-  else { B.push({ t: 'p', text: `${nOK} de ${C.length} circuitos atendem aos critérios aplicados. Os circuitos abaixo apresentam pendências que devem ser resolvidas antes da emissão final:` }); B.push({ t: 'list', items: falhas.map(c => `Circuito ${c.num} — ${R[c.id].falhas.join(' ')}`) }); }
-  B.push({ t: 'p', text: 'Os dispositivos, condutores e eletrodutos especificados devem possuir certificação de conformidade e ser instalados conforme as prescrições da NBR 5410 e as recomendações dos fabricantes. Após a execução, a instalação deve ser submetida à verificação final (inspeção visual e ensaios) prevista na seção 7 da NBR 5410.' });
-  if (I.obs) B.push({ t: 'note', text: I.obs });
+  if (pc) {
+    const falhas = C.filter(c => R[c.id].status === 'fail'), obs = C.filter(c => R[c.id].status === 'warn');
+    if (!falhas.length) B.push({ t: 'p', text: `Os ${C.length} circuitos dimensionados atendem aos critérios da ABNT NBR 5410:2004 aplicados nesta memória.${obs.length ? ` Os circuitos ${obs.map(c => c.num).join(', ')} possuem observações, relacionadas na memória detalhada, que devem ser consideradas na execução.` : ''}` });
+    else { B.push({ t: 'p', text: `${nOK} de ${C.length} circuitos atendem aos critérios aplicados. Os circuitos abaixo apresentam pendências que devem ser resolvidas antes da emissão final:` }); B.push({ t: 'list', items: falhas.map(c => `Circuito ${c.num} — ${R[c.id].falhas.join(' ')}`) }); }
+    B.push({ t: 'p', text: 'Os dispositivos e condutores especificados devem possuir certificação de conformidade e ser instalados conforme as prescrições da NBR 5410 e as recomendações dos fabricantes. Após a execução, a instalação deve ser submetida à verificação final (inspeção visual e ensaios) prevista na seção 7 da NBR 5410.' });
+  }
+  if (pe) { const nf = TE.filter(t => t.aplica && !t.esc).length; B.push({ t: 'p', text: nf ? `${nf} trecho(s) sem eletroduto comercial que atenda à taxa de ocupação: divida os circuitos em mais de um eletroduto ou adote diâmetro maior.` : 'Todos os trechos de eletroduto atendem à taxa máxima de ocupação de 6.2.11.1.6. Os eletrodutos devem ser instalados com caixas de passagem nos limites de comprimento e de curvas indicados nos critérios.' }); }
+  if (pk) { const nf = K.filter(t => t.status === 'fail').length; B.push({ t: 'p', text: nf ? `${nf} trecho(s) de eletrocalha com pendência, relacionada no cálculo do trecho.` : 'Todos os trechos de eletrocalhas, perfilados, bandejas e leitos atendem aos critérios de ocupação e de carga adotados. Os condutos metálicos devem ter continuidade elétrica e ser ligados à equipotencialização.' }); }
+  if (pq) B.push({ t: 'p', text: 'As demandas acima são a base do dimensionamento dos circuitos alimentadores (memória de cálculo dos circuitos) e do padrão de entrada. Recomenda-se manter o desequilíbrio entre fases abaixo de cerca de 10 % e prever espaço de reserva nos quadros, conforme 6.5.4.7 da NBR 5410.' });
+  if (I.obs && pc) B.push({ t: 'note', text: I.obs });
   if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: I.registro || '' });
 
-  if (o.anexo33) {
+  if (o.anexo33 && pc) {
     const usados = [...new Set(C.map(c => c.metodo))].map(id => MET[id]).filter(Boolean);
     B.push({ t: 'break' });
     B.push({ t: 'h1', text: 'Anexo A — Maneiras de instalar adotadas (Tabela 33)' });
@@ -2540,16 +2825,6 @@ function memCalha(B, t, num) {
 }
 function arDe(svg) { const m = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/.exec(svg); return m ? +m[4] / +m[3] : 0.625; }
 function safeKey(k) { return String(k).replace(/[^a-zA-Z0-9]/g, ''); }
-
-function memLumi(B, proj, calc, s) {
-  const A = proj.lumi, R = calc.lumi, refs = refsLuminarias(proj, calc);
-  B.push({ t: 'p', text: `Cálculo da iluminação geral dos ${A.length} ambientes pelo método dos lúmens, com verificação ponto a ponto da uniformidade, segundo os requisitos da ABNT NBR ISO/CIE 8995-1:2013. Os dados das luminárias são os de catálogo dos fabricantes indicados e devem ser confirmados na ficha técnica do produto especificado.` });
-  B.push({ t: 'h3', text: `${s}.1 Resumo` });
-  B.push({ t: 'table', small: true, head: ['Ambiente', 'Área (m²)', 'Em (lx)', 'Luminária', 'N', 'Eméd (lx)', 'Uo', 'P (W)', 'W/m²', 'Circ.', 'Situação'], widths: [17, 7, 7, 21, 5, 8, 6, 7, 7, 6, 9], align: 'lrrlrrrrrll',
-    rows: A.map(a => { const r = R[a.id]; const c = proj.circuitos.find(x => x.id === a.circuito); return [a.nome, f2(r.A), String(r.Em), `${r.prod.fab !== '—' ? r.prod.fab + ' ' : ''}${r.prod.mod}`, String(r.N), f0(r.Emed), f2(r.Uo), f0(r.P), f1(r.dens), c ? c.num : '—', statusTxt(r.status)]; })
-      .concat([['Total', f2(A.reduce((x, a) => x + R[a.id].A, 0)), '', '', String(A.reduce((x, a) => x + R[a.id].N, 0)), '', '', f0(A.reduce((x, a) => x + R[a.id].P, 0)), '', '', '']]), lastBold: true });
-  A.forEach((a, i) => memLumiAmbiente(B, a, R[a.id], proj, `${s}.${i + 2}`, refs));
-}
 
 /* ================================================================
    LUMINOTÉCNICA — desenhos (luminárias, locação, mapa de iluminância)
@@ -2902,7 +3177,7 @@ function construirMemorialDemanda(proj, calc, ce) {
   R.forEach(r => B.push({ t: 'p', text: `${r.u.nome}${r.u.titular ? ' — ' + r.u.titular : ''}: declaro, para fins de solicitação de fornecimento de energia elétrica à ${ENERGISA_UN[E.un] || 'distribuidora'}, que a carga instalada da unidade consumidora é de **${f2(r.C)} kW**, com demanda provável de **${f2(r.D)} kVA**, conforme a relação de cargas e o cálculo apresentados neste memorial, e que as instalações internas seguem a ABNT NBR 5410.` }));
   if (E.obs) B.push({ t: 'note', text: E.obs });
   const local = [E.municipio || I.cidade, dataExtenso(I.data)].filter(Boolean).join(', ');
-  B.push({ t: 'sign', place: local, name: R.length === 1 && R[0].u.titular ? R[0].u.titular : 'Titular / interessado', reg: R.length === 1 && R[0].u.doc ? `CPF/CNPJ ${R[0].u.doc}` : '' });
+  B.push({ t: 'sign', titular: true, place: local, name: R.length === 1 && R[0].u.titular ? R[0].u.titular : 'Titular / interessado', reg: R.length === 1 && R[0].u.doc ? `CPF/CNPJ ${R[0].u.doc}` : '' });
   B.push({ t: 'sign', place: '', name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
   return B;
 }
@@ -3076,6 +3351,323 @@ function memAmbClima(B, a, r, C, cc, proj, num) {
 }
 
 /* ================================================================
+   ATERRAMENTO — desenhos (planta, corte, curva do solo) e memorial
+   ================================================================ */
+function corAterr(doc) {
+  return doc ? { ink: '#1b1f23', mut: '#6a737b', line: '#b9c3cb', grid: '#e1e6ea', acc: '#0b5a70', cu: '#b5652c', solo1: '#efe4d2', solo2: '#e2d2b8', brita: '#d9dcdf', bg: '#ffffff', warn: '#c0782a' }
+    : { ink: 'var(--ink)', mut: 'var(--muted)', line: 'var(--line-strong)', grid: 'var(--line)', acc: 'var(--accent)', cu: 'var(--copper)', solo1: 'var(--sunk)', solo2: 'var(--line)', brita: 'var(--line)', bg: 'var(--sheet)', warn: 'var(--warn)' };
+}
+const txtA = (C, x, y, s, o = {}) => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${o.fs || 10}" fill="${o.cor || C.ink}" font-family="Arial"${o.anc ? ` text-anchor="${o.anc}"` : ''}${o.b ? ' font-weight="700"' : ''}${o.rot ? ` transform="rotate(${o.rot} ${(+x).toFixed(1)} ${(+y).toFixed(1)})"` : ''}>${s}</text>`;
+function cotaA(C, x1, y1, x2, y2, rot, off = 0) {
+  const vert = Math.abs(x1 - x2) < 0.5, mx = (x1 + x2) / 2, my = (y1 + y2) / 2, t = 4;
+  const tick = (x, y) => vert ? `<line x1="${x - t}" y1="${y}" x2="${x + t}" y2="${y}" stroke="${C.mut}"/>` : `<line x1="${x}" y1="${y - t}" x2="${x}" y2="${y + t}" stroke="${C.mut}"/>`;
+  return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${C.mut}" stroke-width="0.8"/>${tick(x1, y1)}${tick(x2, y2)}` +
+    (vert ? txtA(C, mx - 6 - off, my, rot, { fs: 9.5, anc: 'middle', cor: C.mut, rot: -90 }) : txtA(C, mx, my - 5 - off, rot, { fs: 9.5, anc: 'middle', cor: C.mut }));
+}
+const hasteP = (C, x, y, k) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${C.cu}" stroke="${C.ink}" stroke-width="0.8"/><line x1="${(x - 3.5).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x + 3.5).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C.bg}" stroke-width="1"/><line x1="${x.toFixed(1)}" y1="${(y - 3.5).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y + 3.5).toFixed(1)}" stroke="${C.bg}" stroke-width="1"/>` + (k ? txtA(C, x + 7, y - 7, k, { fs: 8.5, cor: C.mut }) : '');
+
+/* planta do arranjo (vista superior) */
+function arranjoSVG(a, r, doc = true) {
+  const C = corAterr(doc), W = 480, H = 260, f2 = v => nfmt(v, 2);
+  let g = '';
+  if (a.tipo === 'malha') {
+    const sc = Math.min(380 / r.Lx, 190 / r.Ly), w = r.Lx * sc, h = r.Ly * sc, x0 = (W - w) / 2 + 14, y0 = (H - h) / 2 - 6;
+    for (let j = 0; j < r.Nx; j++) { const y = y0 + j * r.Dy * sc; g += `<line x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x0 + w).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C.cu}" stroke-width="1.6"/>`; }
+    for (let i = 0; i < r.Ny; i++) { const x = x0 + i * r.Dx * sc; g += `<line x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y0 + h).toFixed(1)}" stroke="${C.cu}" stroke-width="1.6"/>`; }
+    r.pos.forEach(p => { g += hasteP(C, x0 + p[0] * sc, y0 + p[1] * sc); });
+    g += cotaA(C, x0, y0 + h + 16, x0 + w, y0 + h + 16, `Lx = ${f2(r.Lx)} m`) + cotaA(C, x0 - 16, y0, x0 - 16, y0 + h, `Ly = ${f2(r.Ly)} m`);
+    if (r.Ny > 1) g += cotaA(C, x0, y0 - 10, x0 + r.Dx * sc, y0 - 10, `${f2(r.Dx)} m`);
+    if (r.Nx > 1) g += cotaA(C, x0 + w + 12, y0, x0 + w + 12, y0 + r.Dy * sc, `${f2(r.Dy)} m`, -14);
+    g += txtA(C, 10, H - 8, `${r.Nx} × ${r.Ny} condutores de ${a.S} mm² · ${r.nR} haste(s) · enterrada a ${f2(r.h)} m`, { fs: 9, cor: C.mut });
+  } else if (a.tipo === 'cabo') {
+    const x0 = 50, x1 = W - 50, y = H / 2;
+    g += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${C.cu}" stroke-width="3"/><circle cx="${x0}" cy="${y}" r="4" fill="${C.ink}"/>` + txtA(C, x0, y - 12, 'conexão', { fs: 9, cor: C.mut, anc: 'middle' });
+    g += cotaA(C, x0, y + 26, x1, y + 26, `L = ${f2(+a.Lc)} m — cabo de ${a.S} mm² a ${f2(+a.hc)} m de profundidade`);
+  } else {
+    const pos = r.pos, xs = pos.map(p => p[0]), ys = pos.map(p => p[1]), minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+    const sx = maxx - minx, sy = maxy - miny, sc = Math.min(sx > 0 ? 360 / sx : 1e9, sy > 0 ? 170 / sy : 1e9, 60);
+    const cx = W / 2 - (minx + sx / 2) * sc, cy = H / 2 - 4 - (miny + sy / 2) * sc, X = p => cx + p[0] * sc, Y = p => cy + p[1] * sc;
+    const lig = (p, q) => `<line x1="${X(p).toFixed(1)}" y1="${Y(p).toFixed(1)}" x2="${X(q).toFixed(1)}" y2="${Y(q).toFixed(1)}" stroke="${C.cu}" stroke-width="1.4" stroke-dasharray="5 3"/>`;
+    if (a.tipo === 'linha') for (let i = 1; i < pos.length; i++) g += lig(pos[i - 1], pos[i]);
+    if (a.tipo === 'triangulo' || a.tipo === 'circ') pos.forEach((p, i) => { g += lig(p, pos[(i + 1) % pos.length]); });
+    if (a.tipo === 'quadVazio' || a.tipo === 'quadCheio') { const e = +a.e, m = Math.round(+a.m); for (let i = 0; i < m; i++) { if (a.tipo === 'quadCheio' || i === 0 || i === m - 1) { g += lig([i * e, 0], [i * e, (m - 1) * e]) + lig([0, i * e], [(m - 1) * e, i * e]); } } if (a.tipo === 'quadVazio') g += lig([0, 0], [(m - 1) * e, 0]) + lig([0, (m - 1) * e], [(m - 1) * e, (m - 1) * e]) + lig([0, 0], [0, (m - 1) * e]) + lig([(m - 1) * e, 0], [(m - 1) * e, (m - 1) * e]); }
+    pos.forEach((p, i) => { g += hasteP(C, X(p), Y(p), pos.length <= 12 ? 'H' + (i + 1) : ''); });
+    if (a.tipo === 'circ') g += `<line x1="${X([0, 0]).toFixed(1)}" y1="${Y([0, 0]).toFixed(1)}" x2="${X(pos[0]).toFixed(1)}" y2="${Y(pos[0]).toFixed(1)}" stroke="${C.mut}" stroke-width="0.8"/>` + txtA(C, (X([0, 0]) + X(pos[0])) / 2, Y([0, 0]) - 6, `r = ${f2(+a.raio)} m`, { fs: 9.5, anc: 'middle', cor: C.mut });
+    else if (pos.length > 1) { const p = pos[0], q = pos[1]; g += Math.abs(p[1] - q[1]) < 1e-9 ? cotaA(C, X(p), Y(p) + 22, X(q), Y(q) + 22, `e = ${f2(+a.e)} m`) : cotaA(C, X(p) - 22, Y(p), X(q) - 22, Y(q), `e = ${f2(+a.e)} m`); }
+    g += txtA(C, 10, H - 8, `${pos.length} haste(s) de ${f2(+a.L)} m × Ø ${nfmt(+a.d, 1)} mm${pos.length > 1 ? ' interligadas por cabo nu (tracejado)' : ''}`, { fs: 9, cor: C.mut });
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Planta do arranjo de aterramento"><rect width="${W}" height="${H}" fill="${C.bg}"/>${txtA(C, 10, 16, 'PLANTA', { fs: 9, b: true, cor: C.mut })}${g}</svg>`;
+}
+
+/* corte (vista lateral) com camadas do solo */
+function corteAterrSVG(a, r, rs, doc = true) {
+  const C = corAterr(doc), W = 480, H = 210, y0 = 46, f2 = v => nfmt(v, 2), m2 = rs.modelo === '2c' ? rs.m2 : null;
+  const hastes = TIPOS_HASTES.includes(a.tipo) || (a.tipo === 'malha' && r.nR > 0), Lh = a.tipo === 'malha' ? +a.Lh : +a.L;
+  const prof = Math.max(hastes ? Lh + (a.tipo === 'malha' ? +a.hc : 0) : 0, (a.tipo !== 'haste' && !TIPOS_HASTES.includes(a.tipo)) ? +a.hc * 2.5 : 0, m2 ? m2.h * 1.25 : 0, 1);
+  const sc = (H - y0 - 20) / prof, Y = z => y0 + z * sc;
+  let g = `<rect x="0" y="${y0}" width="${W}" height="${H - y0}" fill="${C.solo1}"/>`;
+  if (m2 && m2.h < prof) g += `<rect x="0" y="${Y(m2.h).toFixed(1)}" width="${W}" height="${(H - Y(m2.h)).toFixed(1)}" fill="${C.solo2}"/><line x1="0" y1="${Y(m2.h).toFixed(1)}" x2="${W}" y2="${Y(m2.h).toFixed(1)}" stroke="${C.mut}" stroke-dasharray="6 4"/>` + txtA(C, W - 8, Y(m2.h) - 6, `h₁ = ${f2(m2.h)} m`, { fs: 9.5, anc: 'end', cor: C.mut }) + txtA(C, W - 8, Y(m2.h) + 14, `ρ₂ = ${nfmt(m2.rho2, 0)} Ω·m`, { fs: 9.5, anc: 'end', cor: C.mut });
+  g += txtA(C, W - 8, y0 + 14, m2 ? `ρ₁ = ${nfmt(m2.rho1, 0)} Ω·m` : `ρ = ${nfmt(r.rho, 0)} Ω·m`, { fs: 9.5, anc: 'end', cor: C.mut });
+  const brita = a.tipo === 'malha' && a.brita;
+  if (brita) g += `<rect x="0" y="${y0 - 10}" width="${W}" height="10" fill="${C.brita}" stroke="${C.mut}" stroke-width="0.5"/>` + txtA(C, W - 8, y0 - 14, `brita ${f2(+a.hs)} m — ρs = ${nfmt(+a.rhoS, 0)} Ω·m`, { fs: 9, cor: C.mut, anc: 'end' });
+  g += `<line x1="0" y1="${y0}" x2="${W}" y2="${y0}" stroke="${C.ink}" stroke-width="1.4"/>` + txtA(C, 8, y0 - (brita ? 14 : 6), 'superfície do solo', { fs: 9, cor: C.mut });
+  const rod = (x, ztop, L) => `<rect x="${(x - 2.5).toFixed(1)}" y="${Y(ztop).toFixed(1)}" width="5" height="${(L * sc).toFixed(1)}" fill="${C.cu}" stroke="${C.ink}" stroke-width="0.6"/>`;
+  if (TIPOS_HASTES.includes(a.tipo)) {
+    const n = Math.min(r.nH, 4), xs = Array.from({ length: n }, (_, i) => 90 + i * Math.min(110, 260 / Math.max(n - 1, 1)));
+    xs.forEach(x => { g += rod(x, 0, +a.L); });
+    if (n > 1) g += `<line x1="${xs[0]}" y1="${Y(0.15).toFixed(1)}" x2="${xs[n - 1]}" y2="${Y(0.15).toFixed(1)}" stroke="${C.cu}" stroke-width="2"/>` + cotaA(C, xs[0], y0 - 14, xs[1], y0 - 14, `e = ${f2(+a.e)} m`);
+    g += cotaA(C, xs[0] - 22, Y(0), xs[0] - 22, Y(+a.L), `L = ${f2(+a.L)} m`) + txtA(C, xs[0] + 8, Y(+a.L) - 4, `Ø ${nfmt(+a.d, 1)} mm`, { fs: 9, cor: C.mut });
+  } else if (a.tipo === 'cabo') {
+    g += `<line x1="40" y1="${Y(+a.hc).toFixed(1)}" x2="${W - 40}" y2="${Y(+a.hc).toFixed(1)}" stroke="${C.cu}" stroke-width="3"/>` + cotaA(C, 60, Y(0), 60, Y(+a.hc), `h = ${f2(+a.hc)} m`);
+  } else {
+    const n = Math.min(r.Ny, 6), xs = Array.from({ length: n }, (_, i) => 70 + i * (300 / Math.max(n - 1, 1)));
+    g += `<line x1="${xs[0]}" y1="${Y(+a.hc).toFixed(1)}" x2="${xs[n - 1]}" y2="${Y(+a.hc).toFixed(1)}" stroke="${C.cu}" stroke-width="2.2"/>`;
+    xs.forEach(x => { g += `<circle cx="${x.toFixed(1)}" cy="${Y(+a.hc).toFixed(1)}" r="3" fill="${C.cu}"/>`; });
+    if (r.nR) { g += rod(xs[0], +a.hc, Lh) + rod(xs[n - 1], +a.hc, Lh); g += cotaA(C, xs[n - 1] + 22, Y(+a.hc), xs[n - 1] + 22, Y(+a.hc + Lh), `${f2(Lh)} m`, -14); }
+    g += cotaA(C, xs[0] - 22, Y(0), xs[0] - 22, Y(+a.hc), `h = ${f2(+a.hc)} m`);
+    if (n > 1) g += cotaA(C, xs[0], Y(+a.hc) + 18, xs[1], Y(+a.hc) + 18, `D = ${f2(r.D)} m (fora de escala)`);
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Corte do sistema de aterramento"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}${txtA(C, 10, 16, 'CORTE (escala vertical)', { fs: 9, b: true, cor: C.mut })}</svg>`;
+}
+
+/* curva de resistividade aparente × espaçamento (Wenner) */
+function soloSVG(rs, doc = true) {
+  const C = corAterr(doc), W = 480, H = 240, ml = 52, mr = 16, mt = 26, mb = 34, pw = W - ml - mr, ph = H - mt - mb;
+  const A = rs.porA; if (!A.length) return '';
+  const amin = Math.min(...A.map(q => q.a)), amax = Math.max(...A.map(q => q.a)), lmin = Math.log10(amin) - 0.12, lmax = Math.max(Math.log10(amax) + 0.12, lmin + 0.6);
+  const vals = [...rs.linhas.map(l => l.rho), ...A.map(q => q.modelo || q.rho), rs.rhoMed], ymax = Math.max(...vals) * 1.12;
+  const step = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000].find(s => ymax / s <= 6) || 20000;
+  const X = a => ml + (Math.log10(a) - lmin) / (lmax - lmin) * pw, Yv = v => mt + ph - v / ymax * ph;
+  let g = '';
+  for (let v = 0; v <= ymax; v += step) g += `<line x1="${ml}" y1="${Yv(v).toFixed(1)}" x2="${W - mr}" y2="${Yv(v).toFixed(1)}" stroke="${C.grid}"/>` + txtA(C, ml - 5, Yv(v) + 3, nfmt(v, 0), { fs: 9, anc: 'end', cor: C.mut });
+  for (let e = Math.floor(lmin); e <= Math.ceil(lmax); e++) for (const m of [1, 2, 5]) { const a = m * 10 ** e; if (Math.log10(a) > lmax + 1e-9 || Math.log10(a) < lmin - 1e-9) continue; g += `<line x1="${X(a).toFixed(1)}" y1="${mt}" x2="${X(a).toFixed(1)}" y2="${mt + ph}" stroke="${C.grid}"/>` + txtA(C, X(a), H - mb + 13, nfmt(a, a < 1 ? 1 : 0), { fs: 9, anc: 'middle', cor: C.mut }); }
+  g += `<line x1="${ml}" y1="${mt + ph}" x2="${W - mr}" y2="${mt + ph}" stroke="${C.ink}"/><line x1="${ml}" y1="${mt}" x2="${ml}" y2="${mt + ph}" stroke="${C.ink}"/>`;
+  rs.linhas.forEach(l => { g += l.desc ? `<path d="M${X(l.a) - 3} ${Yv(l.rho) - 3} l6 6 M${X(l.a) - 3} ${Yv(l.rho) + 3} l6 -6" stroke="${C.warn}" stroke-width="1.2"/>` : `<circle cx="${X(l.a).toFixed(1)}" cy="${Yv(l.rho).toFixed(1)}" r="2.6" fill="none" stroke="${C.mut}"/>`; });
+  g += `<line x1="${ml}" y1="${Yv(rs.rhoMed).toFixed(1)}" x2="${W - mr}" y2="${Yv(rs.rhoMed).toFixed(1)}" stroke="${C.warn}" stroke-width="1.2" stroke-dasharray="6 4"/>`;
+  if (rs.m2) { let d = ''; for (let i = 0; i <= 60; i++) { const a = 10 ** (lmin + (lmax - lmin) * i / 60); d += `${i ? 'L' : 'M'}${X(a).toFixed(1)} ${Yv(rhoApar2c(a, rs.m2.rho1, rs.m2.rho2, rs.m2.h)).toFixed(1)} `; } g += `<path d="${d}" fill="none" stroke="${C.acc}" stroke-width="2"/>`; }
+  A.forEach(q => { g += `<circle cx="${X(q.a).toFixed(1)}" cy="${Yv(q.rho).toFixed(1)}" r="4" fill="${C.acc}"/>`; });
+  const leg = [[C.acc, 'média por espaçamento', 'pt'], ...(rs.m2 ? [[C.acc, 'modelo de duas camadas', 'ln']] : []), [C.warn, `média ${nfmt(rs.rhoMed, 0)} Ω·m`, 'dash']];
+  leg.forEach(([c, t, k], i) => { const x = ml + 6 + i * 150; g += (k === 'pt' ? `<circle cx="${x + 6}" cy="12" r="4" fill="${c}"/>` : `<line x1="${x}" y1="12" x2="${x + 14}" y2="12" stroke="${c}" stroke-width="2"${k === 'dash' ? ' stroke-dasharray="5 3"' : ''}/>`) + txtA(C, x + 18, 15, t, { fs: 9 }); });
+  g += txtA(C, ml + pw / 2, H - 4, 'espaçamento a (m) — escala logarítmica', { fs: 9, anc: 'middle', cor: C.mut }) + txtA(C, 12, mt + ph / 2, 'ρa (Ω·m)', { fs: 9, anc: 'middle', cor: C.mut, rot: -90 });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Curva de resistividade aparente do solo"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}</svg>`;
+}
+
+/* ---------- memorial ---------- */
+function geomArranjoTxt(a, r) {
+  const f2 = v => nfmt(v, 2);
+  if (a.tipo === 'haste') return `1 haste de ${f2(+a.L)} m, Ø ${nfmt(+a.d, 1)} mm`;
+  if (a.tipo === 'linha') return `${r.nH} hastes de ${f2(+a.L)} m alinhadas, espaçadas de ${f2(+a.e)} m`;
+  if (a.tipo === 'triangulo') return `3 hastes de ${f2(+a.L)} m nos vértices de um triângulo equilátero de lado ${f2(+a.e)} m`;
+  if (a.tipo === 'quadVazio') return `${r.nH} hastes de ${f2(+a.L)} m no perímetro de um quadrado de lado ${f2((+a.m - 1) * +a.e)} m (espaçamento ${f2(+a.e)} m)`;
+  if (a.tipo === 'quadCheio') return `${r.nH} hastes de ${f2(+a.L)} m em quadrado cheio ${a.m} × ${a.m}, espaçamento ${f2(+a.e)} m`;
+  if (a.tipo === 'circ') return `${r.nH} hastes de ${f2(+a.L)} m em circunferência de raio ${f2(+a.raio)} m`;
+  if (a.tipo === 'cabo') return `cabo de ${a.S} mm² com ${f2(+a.Lc)} m, enterrado a ${f2(+a.hc)} m`;
+  return `malha de ${f2(r.Lx)} × ${f2(r.Ly)} m com ${r.Nx} × ${r.Ny} condutores de ${a.S} mm² a ${f2(r.h)} m; ${r.nR} haste(s) de ${f2(r.Lr)} m (${POS_HASTES_MALHA[a.posH].toLowerCase()})`;
+}
+function construirMemorialAterramento(proj, calc, ca) {
+  const T = proj.aterr, I = proj.info, S = T.solo, rs = ca.solo, B = [], A = T.arr;
+  const f0 = v => nfmt(v, 0), f1 = v => nfmt(v, 1), f2 = v => nfmt(v, 2), f3 = v => nfmt(v, 3);
+  const temMalha = A.some(a => a.tipo === 'malha'), temSeg = A.some(a => a.tipo === 'malha' && a.seg);
+  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 7117-1:2020 · NBR 15751:2013 · IEEE Std 80-2013', text: 'Memorial de cálculo de aterramento', sub: 'Resistividade do solo, resistência de aterramento de hastes, cabos e malhas' + (temSeg ? ' e verificação das tensões de toque e de passo' : '') });
+  B.push({ t: 'meta', rows: [['Obra', I.obra || '—'], ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'], ['Esquema de aterramento da instalação', proj.params.aterramento],
+    ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
+  let n = 0; const sec = t => { n++; B.push({ t: 'h1', text: `${n}. ${t}` }); return n; };
+  sec('Objetivo');
+  B.push({ t: 'p', text: `Determinar a resistividade do solo e calcular a resistência de aterramento ${A.length === 1 ? 'do sistema de aterramento' : `dos ${A.length} sistemas de aterramento`} da obra, verificando os limites aplicáveis${temSeg ? ' e a segurança das pessoas quanto às tensões de toque e de passo' : ''}, segundo a ABNT NBR 5410:2004, a ABNT NBR 7117-1:2020${temMalha ? ', a ABNT NBR 15751:2013 e a IEEE Std 80-2013' : ''}.` });
+  sec('Normas e documentos de referência');
+  B.push({ t: 'list', items: [
+    'ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão (6.4 — aterramento e equipotencialização).',
+    'ABNT NBR 7117-1:2020 — Parâmetros do solo para projetos de aterramentos elétricos — Parte 1: Medição da resistividade e modelagem geoelétrica.',
+    'ABNT NBR 15749:2009 — Medição de resistência de aterramento e de potenciais na superfície do solo em sistemas de aterramento.',
+    ...(temMalha ? ['ABNT NBR 15751:2013 — Sistemas de aterramento de subestações — Requisitos.', 'IEEE Std 80-2013 — Guide for Safety in AC Substation Grounding.'] : []),
+    'ABNT NBR 13571 — Haste de aterramento aço-cobreada e acessórios.',
+    ...(A.some(a => a.funcao === 'spda') ? ['ABNT NBR 5419-3:2015 — Proteção contra descargas atmosféricas — Parte 3: Danos físicos a estruturas e perigos à vida.'] : []),
+    ...(A.some(a => a.funcao === 'entrada') ? ['Energisa NDU 001 v7.0 — Fornecimento de energia elétrica em tensão secundária (8.10 — Aterramento).'] : []),
+    'KINDERMANN, G.; CAMPAGNOLO, J. M. Aterramento Elétrico. Porto Alegre: Sagra Luzzatto — resistência de hastes e resistência mútua.'
+  ] });
+
+  const s3 = sec('Resistividade do solo');
+  if (rs.modo === 'direto') {
+    B.push({ t: 'p', text: `Resistividade adotada: ρ = ${f0(rs.rhoBase)} Ω·m${rs.fs !== 1 ? `, multiplicada pelo fator sazonal ${f2(rs.fs)} (ρ = ${f0(rs.rho)} Ω·m)` : ''}, considerada solo homogêneo.${S.local ? ` Origem do dado: ${S.local}.` : ''}` });
+    B.push({ t: 'note', text: 'Recomenda-se confirmar a resistividade por medição em campo pelo método de Wenner (NBR 7117-1), em época seca, antes da execução.' });
+  } else {
+    B.push({ t: 'p', text: `Medição pelo método de Wenner (quatro eletrodos igualmente espaçados), conforme a ABNT NBR 7117-1:2020${S.local ? `, em ${S.local}` : ''}${S.data ? `, em ${dataCurta(S.data)}` : ''}${S.equip ? `, com ${S.equip}` : ''}. Profundidade dos eletrodos de medição p = ${f2(+S.p)} m.` });
+    B.push({ t: 'eq', lines: ['ρa = 4π·a·R / [1 + 2a/√(a² + 4p²) − a/√(a² + p²)]          (≈ 2π·a·R quando p ≤ a/10)', `Média por espaçamento: ${S.media === 'ar' ? 'aritmética' : 'geométrica (distribuição log-normal das resistividades, NBR 7117-1:2020)'}${S.descartar ? '; descartadas as leituras com desvio superior a 50 % da média do espaçamento' : ''}`] });
+    B.push({ t: 'h3', text: `${s3}.1 Medições` });
+    B.push({ t: 'table', small: true, head: ['Direção', 'a (m)', 'R (Ω)', 'ρa (Ω·m)', 'Desvio', 'Situação'], widths: [16, 14, 14, 18, 14, 24], align: 'lrrrrl',
+      rows: rs.linhas.map(l => [l.dir || '—', f2(l.a), f2(l.R), f0(l.rho), (l.desvio >= 0 ? '+' : '') + f0(l.desvio * 100) + ' %', l.desc ? 'descartada' : 'considerada']) });
+    B.push({ t: 'h3', text: `${s3}.2 Resistividade aparente por espaçamento` });
+    B.push({ t: 'table', head: ['a (m)', 'Leituras', 'ρa médio (Ω·m)', 'Mín. – máx.', ...(rs.m2 ? ['Modelo (Ω·m)'] : [])], widths: rs.m2 ? [14, 14, 22, 28, 22] : [18, 18, 28, 36], align: 'rrrrr',
+      rows: rs.porA.map(q => [f2(q.a), `${q.n - q.nDesc}/${q.n}`, f0(q.rho), `${f0(q.min)} – ${f0(q.max)}`, ...(rs.m2 ? [f0(q.modelo)] : [])]) });
+    B.push({ t: 'h3', text: `${s3}.3 Modelo do solo` });
+    if (rs.m2) {
+      B.push({ t: 'p', text: 'Solo estratificado em duas camadas horizontais, com os parâmetros ajustados às médias medidas pelo método dos mínimos quadrados (curva teórica de Wenner para duas camadas):' });
+      B.push({ t: 'eq', lines: ['ρa(a) = ρ₁ · {1 + 4 Σ [Kⁿ/√(1 + (2nh/a)²) − Kⁿ/√(4 + (2nh/a)²)]},   K = (ρ₂ − ρ₁)/(ρ₂ + ρ₁)', `ρ₁ = ${f0(rs.m2.rho1)} Ω·m   ρ₂ = ${f0(rs.m2.rho2)} Ω·m   h₁ = ${f2(rs.m2.h)} m   K = ${f3(rs.m2.K)}   desvio médio = ${f1(rs.m2.erro)} %`, `Média das resistividades aparentes: ${f0(rs.rhoMed)} Ω·m${rs.fs !== 1 ? `;  fator sazonal ${f2(rs.fs)}` : ''}`] });
+    } else B.push({ t: 'p', text: `Solo considerado homogêneo, com a resistividade igual à média das resistividades aparentes por espaçamento: ρ = ${f0(rs.rhoMed)} Ω·m${rs.fs !== 1 ? `; com o fator sazonal ${f2(rs.fs)}, ρ = ${f0(rs.rho)} Ω·m` : ''}. Para comparação, (ρmáx + ρmín)/2 = ${f0(rs.rhoMinMax)} Ω·m (IEEE 80, eq. 50).` });
+    const svg = soloSVG(rs, true); if (svg) B.push({ t: 'fig', svg: svgDoc(svg, 480, 240), ar: 0.5, w: 110, caption: 'Curva de resistividade aparente medida (pontos), média por espaçamento' + (rs.m2 ? ' e modelo de duas camadas ajustado.' : '.') });
+  }
+  rs.avisos.forEach(x => B.push({ t: 'note', text: x }));
+
+  sec('Critérios de projeto');
+  B.push({ t: 'table', head: ['Sistema', 'Função', 'Limite de resistência', 'Referência'], widths: [26, 26, 16, 32], align: 'llrl',
+    rows: A.map(a => { const r = ca.arr[a.id]; return [a.nome, FUNC_ATERR[a.funcao].nome, r.rmax > 0 ? `${f1(r.rmax)} Ω` : '—', FUNC_ATERR[a.funcao].ref]; }) });
+  if (proj.params.aterramento === 'TT') B.push({ t: 'p', text: 'Esquema TT (NBR 5410, 5.1.2.2.4.3): a resistência do eletrodo das massas deve atender RA × IΔn ≤ 50 V, com IΔn a maior corrente diferencial-residual nominal dos dispositivos DR que protegem as massas ligadas ao eletrodo.' });
+  else B.push({ t: 'p', text: `Esquema ${proj.params.aterramento}: o seccionamento automático é garantido pelos dispositivos de proteção contra sobrecorrentes e DR (memória dos circuitos); o aterramento deve ter a menor resistência praticável e todas as massas e elementos condutivos devem ser ligados ao barramento de equipotencialização principal (BEP), conforme 6.4.2.` });
+
+  const s5 = sec('Metodologia de cálculo');
+  const L5 = ['Haste vertical:            R₁ = ρ/(2πL) · ln(4L/d)', 'Resistência mútua (hastes h e m a e metros):  Rhm = ρ/(4πL) · ln{[(b + L)² − e²] / [e² − (b − L)²]},   b = √(L² + e²)',
+    'Resistência de cada haste no conjunto:  Rh = R₁ + Σ Rhm;      Req = 1 / Σ (1/Rh);      índice de redução K = Req/R₁',
+    'Cabo horizontal enterrado:  R = ρ/(πL) · [ln(2L/√(2·r·h)) − 1]   (r = raio do condutor; h = profundidade)'];
+  if (temMalha) L5.push('Malha (Sverak):  Rg = ρ · [1/LT + 1/√(20A) · (1 + 1/(1 + h·√(20/A)))]', 'Malha com hastes (Schwarz):  Rg = (R₁R₂ − Rm²)/(R₁ + R₂ − 2Rm)   — R₁ condutores, R₂ hastes, Rm mútua (k₁, k₂ da IEEE 80)');
+  B.push({ t: 'eq', lines: L5 });
+  B.push({ t: 'p', text: 'As hastes de um conjunto são consideradas interligadas e equipotenciais; a contribuição do cabo de interligação é desprezada, a favor da segurança. ' + (rs.m2 ? 'Em solo de duas camadas, a resistividade vista pelo eletrodo é a equivalente de Hummel até a profundidade alcançada (camadas em paralelo): ρeq = d / (h₁/ρ₁ + (d − h₁)/ρ₂).' : '') });
+  if (temSeg) {
+    B.push({ t: 'eq', lines: ['Tensões admissíveis (NBR 15751 / IEEE 80, pessoa de 50 kg: 0,116; 70 kg: 0,157):', '  Etoque = (1000 + 1,5·Cs·ρs) · k/√ts        Epasso = (1000 + 6·Cs·ρs) · k/√ts', '  Cs = 1 − 0,09·(1 − ρ/ρs)/(2hs + 0,09)', 'Corrente de malha: IG = Df · Sf · 3I₀;   Df = √[1 + (Ta/tf)·(1 − e^(−2tf/Ta))];   Ta = X/(ωR);   GPR = IG · Rg',
+      'Tensão de malha: Em = ρ·Km·Ki·IG/LM;   tensão de passo: Es = ρ·Ks·Ki·IG/LS', 'Condutor (IEEE 80, eq. 37):  A = I / √[(TCAP·10⁻⁴)/(tc·αr·ρr) · ln((K₀ + Tm)/(K₀ + Ta))]'] });
+  }
+
+  const s6 = sec('Cálculo dos sistemas de aterramento');
+  A.forEach((a, i) => memArranjo(B, a, ca.arr[a.id], rs, proj, `${s6}.${i + 1}`));
+
+  sec('Resumo');
+  B.push({ t: 'table', head: ['Sistema', 'Configuração', 'ρ de cálculo (Ω·m)', 'R (Ω)', 'Limite (Ω)', 'Situação'], widths: [20, 34, 13, 10, 10, 13], align: 'llrrrl',
+    rows: A.map(a => { const r = ca.arr[a.id]; return [a.nome, geomArranjoTxt(a, r), f0(r.rho), f2(r.R), r.rmax > 0 ? f1(r.rmax) : '—', statusTxt(r.status)]; }) });
+
+  sec('Execução, medição e manutenção');
+  B.push({ t: 'list', items: [
+    'Medir a resistência de aterramento após a execução pelo método da queda de potencial (ABNT NBR 15749), com o eletrodo de potencial a cerca de 62 % da distância ao eletrodo de corrente, de preferência em época seca; registrar o resultado no relatório de comissionamento.',
+    'Se o valor medido superar o limite, acrescentar hastes interligadas (espaçamento mínimo igual ao comprimento da haste) ou ampliar o cabo contrapeso/malha, e repetir a medição.',
+    'Conexões cabo–haste por solda exotérmica ou conector apropriado, acessíveis em caixa de inspeção; condutor de aterramento contínuo, sem emendas e protegido mecanicamente nos trechos expostos.',
+    'Interligar o eletrodo ao barramento de equipotencialização principal (BEP) e equipotencializar as tubulações metálicas, estruturas e demais elementos condutivos (NBR 5410, 6.4.2).',
+    'Inspecionar as conexões e medir a resistência periodicamente, conforme o plano de manutenção da instalação.'
+  ] });
+  B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
+  return B;
+}
+function memArranjo(B, a, r, rs, proj, num) {
+  const f0 = v => nfmt(v, 0), f1 = v => nfmt(v, 1), f2 = v => nfmt(v, 2), f3 = v => nfmt(v, 3);
+  B.push({ t: 'h2', text: `${num} ${a.nome}` });
+  B.push({ t: 'kv4', rows: [['Tipo', TIPOS_ATERR[a.tipo], 'Função', FUNC_ATERR[a.funcao].nome], ['Configuração', geomArranjoTxt(a, r), 'ρ de cálculo', `${f0(r.rho)} Ω·m — ${r.rhoTxt}`]] });
+  if (!(r.rho > 0)) { r.falhas.forEach(x => B.push({ t: 'ver', ok: false, text: x })); return; }
+  B.push({ t: 'fig', svg: svgDoc(arranjoSVG(a, r, true), 480, 260), ar: 260 / 480, w: 100, caption: `Planta — ${a.nome}.` });
+  B.push({ t: 'fig', svg: svgDoc(corteAterrSVG(a, r, rs, true), 480, 210), ar: 210 / 480, w: 100, caption: 'Corte esquemático com as camadas do solo consideradas (escala vertical; distâncias horizontais fora de escala).' });
+  if (TIPOS_HASTES.includes(a.tipo)) {
+    const L = +a.L, d = +a.d / 1000, Lin = [`R₁ = ${f0(r.rho)} / (2π × ${f2(L)}) × ln(4 × ${f2(L)} / ${nfmt(d, 4)}) = ${f2(r.R1)} Ω`];
+    if (r.nH > 1) {
+      const e = r.eMin, b = Math.sqrt(L * L + e * e);
+      Lin.push(`Mútua entre hastes vizinhas (e = ${f2(e)} m):  b = ${f3(b)} m;   Rhm = ${f2(rMutua(r.rho, L, e))} Ω`);
+      Lin.push(`Req = 1 / Σ(1/Rh) = ${f2(r.Req)} Ω;    K = ${f2(r.Req)} / ${f2(r.R1)} = ${f3(r.K)}`);
+    }
+    B.push({ t: 'eq', lines: Lin });
+    if (r.nH > 1 && r.nH <= 16) B.push({ t: 'table', small: true, head: ['Haste', ...r.Rh.map((_, i) => 'H' + (i + 1))], widths: [16, ...r.Rh.map(() => 84 / r.Rh.length)], align: 'l' + 'r'.repeat(r.Rh.length), rows: [['Rh (Ω)', ...r.Rh.map(f2)]] });
+  } else if (a.tipo === 'cabo') {
+    B.push({ t: 'eq', lines: [`R = ${f0(r.rho)} / (π × ${f2(+a.Lc)}) × [ln(2 × ${f2(+a.Lc)} / √(2 × ${nfmt(r.dCabo / 2, 4)} × ${f2(+a.hc)})) − 1] = ${f2(r.R)} Ω`] });
+  } else {
+    B.push({ t: 'table', head: ['Grandeza', 'Valor', 'Grandeza', 'Valor'], widths: [30, 20, 30, 20], align: 'lrlr', rows: [
+      ['Área A', `${f1(r.A)} m²`, 'Comprimento dos condutores LC', `${f1(r.LC)} m`], ['Espaçamento Dx × Dy', `${f2(r.Dx)} × ${f2(r.Dy)} m`, 'Hastes nR × Lr', `${r.nR} × ${f2(r.Lr)} m`],
+      ['Diâmetro do condutor d', `${nfmt(r.d * 1000, 1)} mm`, 'Comprimento total LT', `${f1(r.LT)} m`]] });
+    const L = [`Sverak:  Rg = ${f0(r.rho)} × [1/${f1(r.LT)} + 1/√(20 × ${f1(r.A)}) × (1 + 1/(1 + ${f2(r.h)} × √(20/${f1(r.A)})))] = ${f3(r.Rsverak)} Ω`];
+    if (r.nR) L.push(`Schwarz:  k₁ = ${f3(r.sch.k1)}, k₂ = ${f3(r.sch.k2)};  R₁ = ${f3(r.sch.R1)} Ω;  R₂ = ${f3(r.sch.R2)} Ω;  Rm = ${f3(r.sch.Rm)} Ω  →  Rg = ${f3(r.sch.Rg)} Ω`);
+    L.push(`Adotado: Rg = ${f3(r.R)} Ω (${r.metodoR})`);
+    B.push({ t: 'eq', lines: L });
+    if (a.seg && r.IG != null) {
+      B.push({ t: 'p', text: `Verificação de segurança com corrente de falta fase-terra 3I₀ = ${f0(+a.I3I0)} A, fator de divisão Sf = ${f0(+a.sf)} %, X/R = ${f1(+a.xr)}, tempo de eliminação tf = ${f2(+a.tf)} s, pessoa de ${a.peso} kg${a.brita ? `, camada de brita de ${f2(+a.hs)} m com ρs = ${f0(+a.rhoS)} Ω·m` : ', sem camada superficial'}.` });
+      B.push({ t: 'eq', lines: [`Df = ${f3(r.Df)};   IG = ${f3(r.Df)} × ${f2(+a.sf / 100)} × ${f0(+a.I3I0)} = ${f0(r.IG)} A;   GPR = ${f0(r.IG)} × ${f3(r.R)} = ${f0(r.GPR)} V`,
+        `Cs = ${f3(r.Cs)};   Etoque = ${f0(r.Etoque)} V;   Epasso = ${f0(r.Epasso)} V`,
+        `n = ${f2(r.n)};  Kii = ${f3(r.Kii)};  Kh = ${f3(r.Kh)};  Km = ${f3(r.Km)};  Ki = ${f3(r.Ki)};  LM = ${f1(r.LM)} m  →  Em = ${f0(r.Em)} V`,
+        `Ks = ${f3(r.Ks)};  LS = ${f1(r.LS)} m  →  Es = ${f0(r.Es)} V`,
+        `Condutor: IF = Df × 3I₀ = ${f2(r.cond.IF)} kA;  tc = ${f2(+a.tc)} s;  Tm = ${f0(r.cond.Tm)} °C (${MAT_TERRA[a.mat].nome})  →  A = ${f1(r.cond.A)} mm²;  mínimo adotado ${f0(r.cond.Smin)} mm²`] });
+      B.push({ t: 'table', head: ['Verificação', 'Calculado', 'Admissível', 'Situação'], widths: [40, 20, 20, 20], align: 'lrrl', rows: [
+        ['Elevação de potencial (GPR) × toque', `${f0(r.GPR)} V`, `${f0(r.Etoque)} V`, r.okGPR ? 'dispensa Em/Es' : 'verificar Em/Es'],
+        ['Tensão de toque de malha Em', `${f0(r.Em)} V`, `${f0(r.Etoque)} V`, r.okToque ? 'Atende' : 'Não atende'],
+        ['Tensão de passo Es', `${f0(r.Es)} V`, `${f0(r.Epasso)} V`, r.okPasso ? 'Atende' : 'Não atende'],
+        ['Seção do condutor', `${a.S} mm²`, `≥ ${f1(r.cond.Sreq)} mm²`, r.cond.ok ? 'Atende' : 'Não atende']] });
+    }
+  }
+  if (r.rmax > 0) B.push({ t: 'ver', ok: r.okR, text: `Resistência de aterramento R = ${f2(r.R)} Ω ${r.okR ? '≤' : '>'} ${f1(r.rmax)} Ω (${FUNC_ATERR[a.funcao].ref})` });
+  if (r.tt) B.push({ t: 'ver', ok: r.R * r.tt.idn / 1000 <= 50, text: `Esquema TT: RA × IΔn = ${f2(r.R)} × ${f3(r.tt.idn / 1000)} = ${f1(r.R * r.tt.idn / 1000)} V ≤ 50 V (RA máx. ${f0(r.tt.RAmax)} Ω)` });
+  if (r.ndu) B.push({ t: 'ver', ok: !TIPOS_HASTES.includes(a.tipo) || r.nH >= r.ndu.hastes, text: `Padrão de entrada categoria ${r.ndu.cat} (NDU 001): mínimo de ${r.ndu.hastes} haste(s) e condutor de aterramento de ${r.ndu.aterr} mm²` });
+  if (a.tipo === 'malha' && a.seg && r.IG != null) { B.push({ t: 'ver', ok: r.okToque, text: `Tensão de toque: Em = ${f0(r.Em)} V ${r.okToque ? '≤' : '>'} ${f0(r.Etoque)} V` }); B.push({ t: 'ver', ok: r.okPasso, text: `Tensão de passo: Es = ${f0(r.Es)} V ${r.okPasso ? '≤' : '>'} ${f0(r.Epasso)} V` }); }
+  if (r.nMin && !r.okR) B.push({ t: 'note', text: `Para atingir ${f1(r.rmax)} Ω com hastes alinhadas espaçadas de ${f2(+a.e || +a.L)} m seriam necessárias ${r.nMin} hastes (Req = ${f2(r.nMinR)} Ω).` });
+  r.avisos.forEach(x => B.push({ t: 'note', text: x }));
+  if (a.obs) B.push({ t: 'note', text: a.obs });
+}
+
+/* ================================================================
+   MEMÓRIAS DE CÁLCULO — documentos separados e relatório consolidado
+   Cada memória é emitida sozinha ou agrupada, em partes A, B, C…,
+   num único relatório com sumário e uma assinatura final.
+   ================================================================ */
+const MEMORIAS = [
+  { id: 'circuitos', nome: 'Condutores e proteção dos circuitos', norma: 'ABNT NBR 5410:2004', arq: 'memoria-circuitos', titulo: 'Memória de cálculo — condutores e proteção', rodape: 'Memória de cálculo conforme ABNT NBR 5410:2004',
+    tem: p => p.circuitos.length > 0, resumo: (p, k) => { const nf = p.circuitos.filter(c => k.res[c.id].status === 'fail').length; return `${p.circuitos.length} circuitos${nf ? ` · ${nf} com pendência` : ''}`; },
+    falha: (p, k) => p.circuitos.some(c => k.res[c.id].status === 'fail'), build: (p, k, o) => construirMemorial(p, k, { ...o, parte: 'circuitos' }) },
+  { id: 'eletrodutos', nome: 'Eletrodutos', norma: 'ABNT NBR 5410:2004 — 6.2.11', arq: 'memoria-eletrodutos', titulo: 'Memória de cálculo — eletrodutos', rodape: 'Dimensionamento de eletrodutos conforme ABNT NBR 5410:2004',
+    tem: (p, k) => trechosEletroduto(k).length > 0, resumo: (p, k) => `${trechosEletroduto(k).length} trecho(s)`,
+    falha: (p, k) => trechosEletroduto(k).some(t => t.aplica && t.falhas.length), build: (p, k, o) => construirMemorial(p, k, { ...o, parte: 'eletrodutos' }) },
+  { id: 'calhas', nome: 'Eletrocalhas, perfilados, bandejas e leitos', norma: 'ABNT NBR 5410:2004 · NBR IEC 61537', arq: 'memoria-eletrocalhas', titulo: 'Memória de cálculo — eletrocalhas', rodape: 'Dimensionamento de eletrocalhas conforme ABNT NBR 5410:2004 e NBR IEC 61537',
+    tem: (p, k) => Object.keys(k.calhas || {}).length > 0, resumo: (p, k) => `${Object.keys(k.calhas || {}).length} trecho(s)`,
+    falha: (p, k) => Object.values(k.calhas || {}).some(t => t.status === 'fail'), build: (p, k, o) => construirMemorial(p, k, { ...o, parte: 'calhas' }) },
+  { id: 'quadros', nome: 'Quadros de carga e demanda', norma: 'ABNT NBR 5410:2004', arq: 'memoria-quadros', titulo: 'Memória de cálculo — quadros de carga', rodape: 'Quadros de carga conforme ABNT NBR 5410:2004',
+    tem: (p, k) => Object.values(k.quadros).some(q => q.cs.length), resumo: (p, k) => `${Object.keys(k.quadros).length} quadro(s)`, falha: () => false,
+    build: (p, k, o) => construirMemorial(p, k, { ...o, parte: 'quadros' }) },
+  { id: 'lumi', nome: 'Cálculo luminotécnico', norma: 'ABNT NBR ISO/CIE 8995-1:2013', arq: 'relatorio-luminotecnico', titulo: 'Relatório luminotécnico', rodape: 'Relatório luminotécnico conforme ABNT NBR ISO/CIE 8995-1:2013',
+    tem: p => (p.lumi || []).length > 0, resumo: (p, k) => { const nf = p.lumi.filter(a => k.lumi[a.id].status === 'fail').length; return `${p.lumi.length} ambiente(s)${nf ? ` · ${nf} com pendência` : ''}`; },
+    falha: (p, k) => (p.lumi || []).some(a => k.lumi[a.id].status === 'fail'), build: (p, k) => construirRelatorioLumi(p, k) },
+  { id: 'energisa', nome: 'Demanda do padrão de entrada', norma: 'Energisa NDU 001 v7.0 / NDU 003 v8.1', arq: 'memorial-demanda-energisa', titulo: 'Memorial de cálculo de demanda',
+    rodape: p => `Cálculo de demanda conforme Energisa ${p.energisa.modo === 'individual' ? 'NDU 001 v7.0' : 'NDU 001 v7.0 e NDU 003 v8.1'}`,
+    tem: p => (p.energisa.ucs || []).length > 0, resumo: p => `${p.energisa.ucs.length} UC · ${MODOS_E[p.energisa.modo]}`, falha: (p, k) => k.energisa.status === 'fail',
+    build: (p, k) => construirMemorialDemanda(p, k, k.energisa) },
+  { id: 'clima', nome: 'Carga térmica de climatização', norma: 'ABNT NBR 16401-1:2024 · 16401-2:2024 · 16401-3:2008', arq: 'memorial-carga-termica', titulo: 'Memorial de cálculo de carga térmica', rodape: 'Carga térmica conforme ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008',
+    tem: p => (p.clima.amb || []).length > 0, resumo: p => `${p.clima.amb.length} ambiente(s)`, falha: (p, k) => Object.values(k.clima.amb).some(r => r.status === 'fail'),
+    build: (p, k) => construirMemorialClima(p, k, k.clima) },
+  { id: 'aterr', nome: 'Aterramento', norma: 'ABNT NBR 5410 · NBR 7117-1 · NBR 15751 · IEEE 80', arq: 'memorial-aterramento', titulo: 'Memorial de cálculo de aterramento', rodape: 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013',
+    tem: p => (p.aterr.arr || []).length > 0, resumo: (p, k) => { const nf = p.aterr.arr.filter(a => k.aterr.arr[a.id].status === 'fail').length; return `${p.aterr.arr.length} sistema(s)${nf ? ` · ${nf} com pendência` : ''}`; },
+    falha: (p, k) => k.aterr.status === 'fail', build: (p, k) => construirMemorialAterramento(p, k, k.aterr) }
+];
+const MEMO = Object.fromEntries(MEMORIAS.map(m => [m.id, m]));
+const assinaturaRT = I => ({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
+const prefixoParte = (t, L) => /^\d/.test(t) ? `${L}.${t}` : `${L} — ${t}`;
+
+function construirConsolidado(proj, calc, ids, opt = {}) {
+  const I = proj.info, B = [], partes = MEMORIAS.filter(m => ids.includes(m.id) && m.tem(proj, calc));
+  const nomes = partes.map(p => p.nome.toLowerCase());
+  B.push({ t: 'title', kicker: 'Projeto de instalações elétricas — memórias de cálculo', text: 'Memorial de cálculo consolidado',
+    sub: nomes.length ? (nomes.length > 1 ? nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1] : nomes[0]).replace(/^./, c => c.toUpperCase()) : 'Nenhuma memória selecionada' });
+  B.push({ t: 'meta', rows: [['Obra', I.obra || '—'], ['Proprietário / cliente', I.cliente || '—'], ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'],
+    ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
+  B.push({ t: 'h1', text: 'Sumário' });
+  B.push({ t: 'table', head: ['Parte', 'Memória de cálculo', 'Referência normativa', 'Conteúdo'], widths: [9, 33, 34, 24], align: 'llll',
+    rows: partes.map((p, i) => [String.fromCharCode(65 + i), p.nome, p.norma, p.resumo(proj, calc)]) });
+  B.push({ t: 'p', text: 'Cada parte reúne a memória de cálculo completa da respectiva disciplina, com numeração própria precedida da letra da parte. As partes também podem ser emitidas separadamente.' });
+  partes.forEach((p, i) => {
+    const L = String.fromCharCode(65 + i);
+    B.push({ t: 'break' });
+    B.push({ t: 'parte', letra: L, text: p.nome, sub: p.norma });
+    p.build(proj, calc, { ...opt, assinatura: false }).forEach(b => {
+      if (b.t === 'title' || b.t === 'meta' || (b.t === 'sign' && !b.titular)) return;
+      B.push(b.t === 'h1' || b.t === 'h2' || b.t === 'h3' ? { ...b, text: prefixoParte(b.text, L) } : b);
+    });
+  });
+  if (opt.assinatura !== false) { B.push({ t: 'h1', text: 'Responsabilidade técnica' }); B.push({ t: 'p', text: `Declaro que as memórias de cálculo das partes ${partes.map((_, i) => String.fromCharCode(65 + i)).join(', ')} deste documento foram elaboradas sob minha responsabilidade técnica.` }); B.push(assinaturaRT(I)); }
+  return B;
+}
+function metaMemoria(proj, id) {
+  const I = proj.info, m = MEMO[id], t = m ? m.titulo : 'Memorial de cálculo consolidado';
+  const rod = m ? (typeof m.rodape === 'function' ? m.rodape(proj) : m.rodape) : 'Memorial de cálculo consolidado';
+  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`, rodape: rod + ' — gerado com Dimensiona 5410', assunto: m ? `${t} — ${m.norma}` : t };
+}
+function docMemoria(proj, calc, id, opt = {}, grupo) {
+  const rev = (proj.info.revisao || 'R00').toLowerCase(), sl = slugTxt(proj.info.obra);
+  if (id === 'consolidado') return { blocos: construirConsolidado(proj, calc, grupo || MEMORIAS.map(m => m.id), opt), nome: `memorial-consolidado-${sl}-${rev}`, meta: metaMemoria(proj, id) };
+  const m = MEMO[id] || MEMO.circuitos;
+  let blocos = m.build(proj, calc, opt);
+  if (opt.assinatura === false) blocos = blocos.filter(b => b.t !== 'sign' || b.titular);
+  return { blocos, nome: `${m.arq}-${sl}-${rev}`, meta: metaMemoria(proj, m.id) };
+}
+function slugTxt(t) { return (t || 'projeto').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 50) || 'projeto'; }
+
+/* ================================================================
    RENDERIZADORES DA MEMÓRIA: HTML (prévia e arquivo), PDF, DOCX
    ================================================================ */
 const JSPDF_URL = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
@@ -3094,6 +3686,9 @@ const DOC_CSS = `
 .doc .d-kicker{font:600 8.5pt/1.2 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--doc-accent)}
 .doc .d-title h2{font:700 21pt/1.1 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;margin:6px 0 4px;text-transform:uppercase;letter-spacing:.02em}
 .doc .d-title p{margin:0;color:var(--doc-muted)}
+.doc .d-parte{background:var(--doc-head);border-left:4px solid var(--doc-accent);padding:14px 18px 12px;margin:6px 0 8px}
+.doc .d-parte h2{font:700 17pt/1.15 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;margin:4px 0 2px;text-transform:uppercase;letter-spacing:.02em}
+.doc .d-parte p{margin:0;color:var(--doc-muted)}
 .doc .d-meta{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:9.5pt}
 .doc .d-meta th,.doc .d-meta td{border:1px solid var(--doc-ink);border-top:0;padding:5px 8px;text-align:left;vertical-align:top}
 .doc .d-meta th{width:28%;font:600 8pt/1.3 'Barlow Semi Condensed','Arial Narrow',Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--doc-muted)}
@@ -3136,6 +3731,7 @@ function renderHTMLDoc(blocks) {
   return blocks.map(b => {
     switch (b.t) {
       case 'title': return `<header class="d-title"><div class="d-kicker">${escH(b.kicker)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
+      case 'parte': return `<header class="d-parte"><div class="d-kicker">Parte ${escH(b.letra)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
       case 'meta': return `<table class="d-meta"><tbody>${b.rows.map(r => `<tr><th scope="row">${escH(r[0])}</th><td>${escH(r[1])}</td></tr>`).join('')}</tbody></table>`;
       case 'h1': return `<h3 class="d-h1">${escH(b.text)}</h3>`;
       case 'h2': return `<h4 class="d-h2">${escH(b.text)}</h4>`;
@@ -3225,12 +3821,13 @@ async function gerarPDF(blocks, meta) {
   }
   function tabela(head, rows, { small = false, widths = null, align = '', lastBold = false, noHead = false, colStyles = null } = {}) {
     const fs = small ? 7.2 : 8.4;
+    ensure(Math.min(rows.length, 2) * 6 + (noHead ? 0 : 9));   // não deixa o cabeçalho sozinho no pé da página
     const columnStyles = {};
     (widths || []).forEach((p, i) => { columnStyles[i] = { cellWidth: W * p / 100 }; });
     [...align].forEach((a, i) => { columnStyles[i] = { ...(columnStyles[i] || {}), halign: a === 'r' ? 'right' : 'left' }; });
     if (colStyles) Object.entries(colStyles).forEach(([i, s]) => { columnStyles[i] = { ...(columnStyles[i] || {}), ...s }; });
     doc.autoTable({
-      startY: y, head: noHead ? undefined : [head], body: rows, theme: 'grid', margin: { left: M.l, right: M.r, top: M.t, bottom: M.b },
+      startY: y, head: noHead ? undefined : [head], body: rows, theme: 'grid', rowPageBreak: 'avoid', margin: { left: M.l, right: M.r, top: M.t, bottom: M.b },
       styles: { font: 'DejaVu', fontSize: fs, cellPadding: small ? 1 : 1.4, lineColor: C.line, lineWidth: 0.15, textColor: C.ink, overflow: 'linebreak', valign: 'top' },
       headStyles: { fillColor: C.head, textColor: C.ink, fontStyle: 'bold' }, columnStyles,
       didParseCell: d => { if (lastBold && d.section === 'body' && d.row.index === rows.length - 1) { d.cell.styles.fontStyle = 'bold'; d.cell.styles.fillColor = C.eq; } }
@@ -3241,12 +3838,21 @@ async function gerarPDF(blocks, meta) {
     const b = blocks[i];
     switch (b.t) {
       case 'title': {
-        const h = 30; doc.setDrawColor(...C.ink); doc.setLineWidth(0.5); doc.rect(M.l, y, W, h);
+        font(false, 9); const subL = doc.splitTextToSize(b.sub, W - 10), h = Math.max(30, 22 + subL.length * lh(9) + 2.5);
+        doc.setDrawColor(...C.ink); doc.setLineWidth(0.5); doc.rect(M.l, y, W, h);
         font(true, 7.5, C.acc); doc.text(b.kicker.toUpperCase(), M.l + 5, y + 7);
         let ft = 19; font(true, ft, C.ink); while (doc.getTextWidth(b.text.toUpperCase()) > W - 10 && ft > 13) { ft -= 0.5; doc.setFontSize(ft); }
         doc.text(b.text.toUpperCase(), M.l + 5, y + 16);
-        font(false, 9, C.muted); doc.text(doc.splitTextToSize(b.sub, W - 10), M.l + 5, y + 22.5);
+        font(false, 9, C.muted); doc.text(subL, M.l + 5, y + 22.5);
         y += h; break;
+      }
+      case 'parte': {
+        const h = 24; ensure(h + 40); doc.setFillColor(...C.head); doc.rect(M.l, y, W, h, 'F'); doc.setFillColor(...C.acc); doc.rect(M.l, y, 1.6, h, 'F');
+        font(true, 8, C.acc); doc.text(`PARTE ${b.letra}`, M.l + 6, y + 6.5);
+        let ft = 15; font(true, ft, C.ink); while (doc.getTextWidth(b.text.toUpperCase()) > W - 12 && ft > 11) { ft -= 0.5; doc.setFontSize(ft); }
+        doc.text(b.text.toUpperCase(), M.l + 6, y + 13.5);
+        font(false, 8.6, C.muted); doc.text(doc.splitTextToSize(b.sub, W - 12)[0], M.l + 6, y + 19.5);
+        y += h + 4; break;
       }
       case 'meta': {
         doc.autoTable({ startY: y, body: b.rows, theme: 'grid', margin: { left: M.l, right: M.r },
@@ -3360,6 +3966,13 @@ async function gerarDOCX(blocks, meta) {
         out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows: b.rows.map(r => new D.TableRow({ children: [cell(r[0].toUpperCase(), { w: 28, size: 15, bold: true, color: MUT, borders: bordas('1B1F23') }), cell(r[1], { w: 72, size: 19, borders: bordas('1B1F23') })] })) }));
         out.push(P('', { after: 120 })); break;
       case 'h1': out.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, keepNext: true, spacing: { before: 320, after: 140 }, border: { bottom: borda() }, children: [new D.TextRun({ text: b.text.toUpperCase(), bold: true, size: 26, color: ACC, font: FONT })] })); break;
+      case 'parte': {
+        const band = { shading: { fill: HEAD, type: D.ShadingType.CLEAR, color: 'auto' }, border: { left: { style: D.BorderStyle.SINGLE, size: 36, color: ACC } }, keepNext: true };
+        out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' PARTE ' + b.letra, bold: true, size: 16, color: ACC, font: FONT })] }));
+        out.push(new D.Paragraph({ ...band, heading: D.HeadingLevel.HEADING_1, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' ' + b.text.toUpperCase(), bold: true, size: 32, color: '1B1F23', font: FONT })] }));
+        out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 240 }, children: [new D.TextRun({ text: ' ' + b.sub, size: 18, color: MUT, font: FONT })] }));
+        break;
+      }
       case 'h2': out.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_2, keepNext: true, spacing: { before: 280, after: 120 }, shading: { fill: HEAD, type: D.ShadingType.CLEAR, color: 'auto' }, border: { left: { style: D.BorderStyle.SINGLE, size: 18, color: ACC } }, children: [new D.TextRun({ text: ' ' + b.text, bold: true, size: 22, color: '1B1F23', font: FONT })] })); break;
       case 'h3': out.push(P(b.text, { bold: true, size: 20, before: 140, after: 60, keepNext: true })); break;
       case 'p': out.push(P(b.text)); break;
@@ -3838,12 +4451,146 @@ function criarCircuitosClima() {
 }
 
 /* ================================================================
+   INTERFACE — aba Aterramento
+   ================================================================ */
+function arrSel() { return (PROJ.aterr.arr || []).find(a => a.id === ASEL) || null; }
+function normalizarAterr(t) {
+  const base = aterrPadrao(), out = { ...base, ...(t || {}) };
+  out.solo = { ...soloPadrao(), ...((t && t.solo) || {}) }; out.solo.med = Array.isArray(out.solo.med) ? out.solo.med : [];
+  out.arr = (Array.isArray(out.arr) ? out.arr : []).map(a => ({ ...arrPadrao(a.tipo || 'linha', FUNC_ATERR[a.funcao] ? a.funcao : 'massas'), ...a }));
+  return out;
+}
+function renderAterr() {
+  const T = PROJ.aterr, S = T.solo, ca = CALC.aterr;
+  if (!arrSel()) ASEL = T.arr[0]?.id || null;
+  $('#tab-aterr').innerHTML = `
+  <div class="mem-bar"><div><h2 class="tit">Aterramento</h2><p class="sub" style="margin:0">Resistividade do solo pelo método de Wenner (NBR 7117-1:2020), resistência de hastes, cabos e malhas, e verificação das tensões de toque e de passo (NBR 15751:2013 / IEEE Std 80-2013).</p></div>
+  <div class="mem-bt"><span class="mini" style="align-self:center">Memorial de aterramento:</span><button class="btn pri" type="button" data-exp="pdf" data-doc="aterr">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="aterr">Word</button><button class="btn" type="button" data-exp="html" data-doc="aterr">HTML</button></div></div>
+  <fieldset data-scope="asolo"><legend>Resistividade do solo (NBR 7117-1:2020)</legend><div class="grade">
+    ${fSel('as', 'modo', 'Origem do dado', S.modo, [['wenner', 'Medições pelo método de Wenner'], ['direto', 'Resistividade informada']], { struct: true })}
+    ${S.modo === 'direto' ? fNum('as', 'rho', 'Resistividade do solo', S.rho, { u: 'Ω·m' }) + fTxt('as', 'local', 'Origem do dado', S.local, { cls: 'w2', ph: 'ex.: sondagem, obra vizinha, estimativa' })
+      : `${fNum('as', 'p', 'Profundidade dos eletrodos de medição', S.p, { u: 'm' })}
+         ${fSel('as', 'media', 'Média por espaçamento', S.media, [['geo', 'Geométrica (log-normal, NBR 7117-1:2020)'], ['ar', 'Aritmética']])}
+         ${fSel('as', 'modelo', 'Modelo do solo', S.modelo, [['homog', 'Homogêneo (média)'], ['2c', 'Duas camadas (ajuste)']], { struct: true })}
+         ${fChk('as', 'descartar', 'Descartar leituras com desvio > 50 % da média', S.descartar)}
+         ${fTxt('as', 'local', 'Local da medição', S.local, { ph: 'ex.: terreno da obra, eixo A–B' })}${fTxt('as', 'data', 'Data da medição', S.data, { ph: 'aaaa-mm-dd' })}${fTxt('as', 'equip', 'Instrumento', S.equip, { ph: 'terrômetro, modelo' })}`}
+    ${fNum('as', 'fs', 'Fator sazonal (multiplica ρ)', S.fs, { dica: '1,0 se medido em época seca' })}
+  </div>
+  ${S.modo === 'wenner' ? `<div class="tw" style="margin-top:12px"><table class="tbl nt"><thead><tr><th>Direção</th><th>a (m)</th><th>R lida (Ω)</th><th class="r">ρa (Ω·m)</th><th class="r">Desvio</th><th></th></tr></thead><tbody>
+    ${S.med.map((m, i) => `<tr data-scope="amed" data-i="${i}"><td><input type="text" data-k="dir" value="${esc(m.dir || '')}" style="width:70px" aria-label="Direção"></td><td><input type="text" inputmode="decimal" data-k="a" data-type="num" value="${esc(showNum(m.a))}" style="width:64px" aria-label="Espaçamento"></td><td><input type="text" inputmode="decimal" data-k="R" data-type="num" value="${esc(showNum(m.R))}" style="width:74px" aria-label="Resistência lida"></td><td class="r" id="am-r-${i}">—</td><td class="r" id="am-d-${i}">—</td><td><button class="btn sm" type="button" data-delmed="${i}" aria-label="Remover leitura">×</button></td></tr>`).join('')}
+  </tbody></table></div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><button class="btn sm" type="button" id="bt-add-med">+ leitura</button><button class="btn sm" type="button" id="bt-med-serie">+ série 1, 2, 4, 8 e 16 m</button></div>` : ''}
+  <div id="a-solo-res" style="margin-top:12px"></div></fieldset>
+  <div class="bancada">
+    <aside class="lista" aria-label="Sistemas de aterramento">
+      <div class="lista-topo"><select id="a-novo-tipo" aria-label="Tipo de arranjo" style="flex:1 1 150px;width:auto">${opts(Object.entries(TIPOS_ATERR), 'linha')}</select><button class="btn pri" type="button" id="bt-add-arr">Adicionar</button></div>
+      <div class="lista-itens" id="a-itens"></div>
+      <div style="padding:10px;border-top:1px solid var(--line);display:grid;gap:6px"><button class="btn" type="button" id="bt-arr-ndu">Padrão de entrada (NDU 001)</button></div>
+    </aside>
+    <div class="editor" id="a-ed"></div>
+  </div>`;
+  renderAterrSolo(); renderArrLista(); renderArrEditor();
+}
+function renderAterrSolo() {
+  const box = $('#a-solo-res'); if (!box) return; const rs = CALC.aterr.solo, S = PROJ.aterr.solo;
+  (S.med || []).forEach((m, i) => { const l = rs.linhas.find(x => x.a === +m.a && x.R === +m.R && (x.dir || '') === (m.dir || '')); const r = $('#am-r-' + i), d = $('#am-d-' + i); if (r) r.textContent = l ? nfmt(l.rho, 0) : '—'; if (d) d.innerHTML = l ? `<span style="color:${l.desc ? 'var(--warn)' : 'inherit'}">${(l.desvio >= 0 ? '+' : '') + nfmt(l.desvio * 100, 0)} %${l.desc ? ' ✗' : ''}</span>` : '—'; });
+  const res = rs.modo === 'direto' ? `<p class="mini" style="margin:0">ρ de cálculo = <b>${nfmt(rs.rho, 0)} Ω·m</b> (solo homogêneo${rs.fs !== 1 ? `, com fator sazonal ${nfmt(rs.fs, 2)}` : ''}).</p>`
+    : !rs.porA.length ? '' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;align-items:start">
+      <div style="min-width:0">${soloSVG(rs, false)}</div>
+      <div style="min-width:0"><table class="tbl nt"><thead><tr><th>a (m)</th><th class="r">Leituras</th><th class="r">ρa médio</th>${rs.m2 ? '<th class="r">Modelo</th>' : ''}</tr></thead><tbody>${rs.porA.map(q => `<tr><td>${nfmt(q.a, 2)}</td><td class="r">${q.n - q.nDesc}/${q.n}</td><td class="r">${nfmt(q.rho, 0)}</td>${rs.m2 ? `<td class="r">${nfmt(q.modelo, 0)}</td>` : ''}</tr>`).join('')}</tbody></table>
+      <p class="mini" style="margin:8px 0 0">${rs.m2 ? `Duas camadas: ρ₁ = <b>${nfmt(rs.m2.rho1, 0)}</b> Ω·m, ρ₂ = <b>${nfmt(rs.m2.rho2, 0)}</b> Ω·m, h₁ = <b>${nfmt(rs.m2.h, 2)}</b> m (desvio ${nfmt(rs.m2.erro, 1)} %). ` : ''}Média: <b>${nfmt(rs.rhoMed, 0)} Ω·m</b>${rs.fs !== 1 ? ` · com fator sazonal: ${nfmt(rs.rho, 0)} Ω·m` : ''}.</p></div></div>`;
+  box.innerHTML = res + (rs.falhas.length || rs.avisos.length ? `<ul class="msgs" style="padding:8px 0 0">${rs.falhas.map(x => `<li class="fail">${esc(x)}</li>`).join('')}${rs.avisos.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : '');
+}
+function renderArrLista() {
+  const box = $('#a-itens'); if (!box) return; const A = PROJ.aterr.arr;
+  if (!A.length) { box.innerHTML = '<p class="mini" style="padding:12px">Nenhum sistema de aterramento. Escolha o tipo e clique em Adicionar, ou crie o padrão de entrada da NDU 001.</p>'; return; }
+  box.innerHTML = A.map((a, i) => { const r = CALC.aterr.arr[a.id]; return `<button type="button" class="item" data-asel="${a.id}" aria-current="${a.id === ASEL}"><span class="n">${i + 1}</span><span class="d">${esc(a.nome)}</span><span class="pill ${r.status}">${pillTxt(r.status)}</span><span class="e">${TIPOS_ATERR[a.tipo]} · ${nfmt(r.R, 2)} Ω${r.rmax > 0 ? ` / ${nfmt(r.rmax, 0)} Ω` : ''}</span></button>`; }).join('');
+}
+function renderArrEditor() {
+  const box = $('#a-ed'); if (!box) return; const a = arrSel();
+  if (!a) { box.innerHTML = '<div class="res" style="padding:24px"><h2 class="tit">Sem sistemas de aterramento</h2><p class="sub">Calcule desde uma haste única até uma malha completa: escolha o tipo na lista ao lado.</p></div>'; return; }
+  box.innerHTML = `<div class="ed-topo"><span class="mini">Sistema ${PROJ.aterr.arr.indexOf(a) + 1} de ${PROJ.aterr.arr.length}</span><span style="display:flex;gap:6px">${PROJ.params.aterramento === 'TT' && a.funcao === 'massas' ? '<button class="btn sm" type="button" id="bt-aplicar-ra">Usar R como RA do esquema TT</button>' : ''}<button class="btn sm" type="button" id="bt-dup-arr">Duplicar</button><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></span></div>
+    <section class="res" id="a-res" aria-live="polite"></section><div id="a-form"></div>`;
+  renderArrRes(); renderArrForm();
+}
+function renderArrRes() {
+  const box = $('#a-res'); const a = arrSel(); if (!box || !a) return; const r = CALC.aterr.arr[a.id], f2 = v => nfmt(v, 2), f0 = v => nfmt(v, 0);
+  const met = [['Resistência', `${f2(r.R)} Ω`], ['Limite', r.rmax > 0 ? `${nfmt(r.rmax, 1)} Ω` : '—'], ['Resistividade de cálculo', `${f0(r.rho)} Ω·m`]];
+  if (TIPOS_HASTES.includes(a.tipo)) met.push(['Hastes', String(r.nH)], ['R de uma haste', `${f2(r.R1)} Ω`], ['Índice de redução K', nfmt(r.K, 3)], ...(r.nMin && !r.okR ? [['Hastes alinhadas p/ limite', String(r.nMin)]] : []));
+  if (a.tipo === 'malha') { met.push(['Método', r.metodoR], ['Sverak', `${nfmt(r.Rsverak, 3)} Ω`], ['Condutores', `${f0(r.LC)} m`], ['Hastes', `${r.nR} × ${f2(r.Lr)} m`]); if (a.seg && r.IG != null) met.push(['GPR', `${f0(r.GPR)} V`], ['Toque Em / adm.', `${f0(r.Em)} / ${f0(r.Etoque)} V`], ['Passo Es / adm.', `${f0(r.Es)} / ${f0(r.Epasso)} V`], ['Condutor mínimo', `${nfmt(r.cond.Sreq, 1)} mm²`]); }
+  if (r.tt) met.push(['RA máx. (TT)', `${f0(r.tt.RAmax)} Ω`]);
+  box.innerHTML = `<div class="res-cab"><h3>${esc(a.nome)}</h3><span class="pill ${r.status}">${statusTxt(r.status)}</span></div>
+    <div class="metr num">${met.map(([x, y]) => `<div><small>${x}</small><span${(x === 'Resistência' && !r.okR) || (x.startsWith('Toque') && r.okToque === false) || (x.startsWith('Passo') && r.okPasso === false) ? ' class="bad"' : ''}>${y}</span></div>`).join('')}</div>
+    ${r.rho > 0 ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${corteAterrSVG(a, r, CALC.aterr.solo, false)}</div></div>` : ''}
+    <p class="mini" style="margin:0;padding:0 14px 10px">ρ: ${esc(r.rhoTxt || '')}</p>
+    ${r.falhas.length || r.avisos.length ? `<ul class="msgs">${r.falhas.map(x => `<li class="fail">${esc(x)}</li>`).join('')}${r.avisos.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : ''}`;
+}
+function renderArrForm() {
+  const box = $('#a-form'); const a = arrSel(); if (!box || !a) return; const r = CALC.aterr.arr[a.id];
+  const hastes = TIPOS_HASTES.includes(a.tipo), secs = SECOES_NU.map(s => [s, `${s} mm²`]);
+  let geo = '';
+  if (hastes) {
+    geo = `${fSel('aa', 'haste', 'Haste', a.haste, [...HASTES_COM.map(h => [h[0], h[1]]), ['custom', 'Outra (informar)']], { cls: 'w2', struct: true })}
+      ${fNum('aa', 'L', 'Comprimento da haste', a.L, { u: 'm' })}${fNum('aa', 'd', 'Diâmetro da haste', a.d, { u: 'mm' })}
+      ${a.tipo === 'linha' || a.tipo === 'circ' ? fNum('aa', 'n', 'Número de hastes', a.n) : ''}
+      ${a.tipo === 'quadVazio' || a.tipo === 'quadCheio' ? fNum('aa', 'm', 'Hastes por lado', a.m) : ''}
+      ${a.tipo === 'circ' ? fNum('aa', 'raio', 'Raio da circunferência', a.raio, { u: 'm' }) : ''}
+      ${a.tipo !== 'haste' && a.tipo !== 'circ' ? fNum('aa', 'e', 'Espaçamento entre hastes', a.e, { u: 'm' }) : (a.tipo === 'haste' ? fNum('aa', 'e', 'Espaçamento p/ hastes adicionais', a.e, { u: 'm', dica: 'usado na sugestão de nº de hastes' }) : '')}`;
+  } else if (a.tipo === 'cabo') {
+    geo = `${fNum('aa', 'Lc', 'Comprimento do cabo', a.Lc, { u: 'm' })}${fNum('aa', 'hc', 'Profundidade', a.hc, { u: 'm' })}${fSel('aa', 'S', 'Seção do cabo nu', a.S, secs, { type: 'numsel' })}`;
+  } else {
+    geo = `${fNum('aa', 'Lx', 'Comprimento Lx', a.Lx, { u: 'm' })}${fNum('aa', 'Ly', 'Largura Ly', a.Ly, { u: 'm' })}
+      ${fNum('aa', 'Nx', 'Condutores paralelos a Lx', a.Nx, { dica: r.Dy ? `espaçamento ${nfmt(r.Dy, 2)} m` : '' })}${fNum('aa', 'Ny', 'Condutores paralelos a Ly', a.Ny, { dica: r.Dx ? `espaçamento ${nfmt(r.Dx, 2)} m` : '' })}
+      ${fNum('aa', 'hc', 'Profundidade da malha', a.hc, { u: 'm' })}${fSel('aa', 'S', 'Seção do condutor', a.S, secs, { type: 'numsel' })}
+      ${fSel('aa', 'posH', 'Hastes', a.posH, Object.entries(POS_HASTES_MALHA), { struct: true })}
+      ${a.posH !== 'nenhuma' ? fNum('aa', 'Lh', 'Comprimento das hastes', a.Lh, { u: 'm' }) + fNum('aa', 'dh', 'Diâmetro das hastes', a.dh, { u: 'mm' }) : ''}
+      ${fChk('aa', 'seg', 'Verificar tensões de toque e de passo (NBR 15751)', a.seg, { cls: 'wide', struct: true })}`;
+  }
+  const seg = a.tipo === 'malha' && a.seg ? `<fieldset data-scope="aarr"><legend>Falta à terra e segurança (NBR 15751 / IEEE 80)</legend><div class="grade">
+      ${fNum('aa', 'I3I0', 'Corrente de falta fase-terra 3I₀', a.I3I0, { u: 'A' })}${fNum('aa', 'sf', 'Fator de divisão Sf', a.sf, { u: '%', dica: 'parcela que escoa pela malha' })}
+      ${fNum('aa', 'xr', 'Relação X/R no ponto de falta', a.xr)}${fNum('aa', 'tf', 'Tempo de eliminação da falta', a.tf, { u: 's' })}
+      ${fSel('aa', 'peso', 'Critério de peso corporal', a.peso, [[50, '50 kg (mais restritivo)'], [70, '70 kg']], { type: 'numsel' })}
+      ${fChk('aa', 'brita', 'Camada superficial de brita', a.brita, { struct: true })}
+      ${a.brita ? fNum('aa', 'rhoS', 'Resistividade da brita', a.rhoS, { u: 'Ω·m' }) + fNum('aa', 'hs', 'Espessura da brita', a.hs, { u: 'm' }) : ''}
+      ${fSel('aa', 'mat', 'Material do condutor', a.mat, Object.entries(MAT_TERRA).map(([k, v]) => [k, v.nome]))}
+      ${fSel('aa', 'conexao', 'Conexões', a.conexao, Object.entries(CONEXAO_TERRA))}
+      ${fNum('aa', 'tc', 'Duração para o condutor', a.tc, { u: 's', dica: 'tempo da proteção de retaguarda' })}${fNum('aa', 'Smin', 'Seção mínima adotada', a.Smin, { u: 'mm²' })}
+    </div></fieldset>` : '';
+  box.innerHTML = `
+  <fieldset data-scope="aarr"><legend>Sistema de aterramento</legend><div class="grade">
+    ${fTxt('aa', 'nome', 'Nome', a.nome, { cls: 'w2' })}
+    ${fSel('aa', 'tipo', 'Configuração', a.tipo, Object.entries(TIPOS_ATERR), { struct: true })}
+    ${fSel('aa', 'funcao', 'Função', a.funcao, Object.entries(FUNC_ATERR).map(([k, v]) => [k, v.nome]), { struct: true, cls: 'w2' })}
+    ${fNum('aa', 'rmax', 'Resistência máxima', a.rmax, { u: 'Ω', dica: FUNC_ATERR[a.funcao].ref })}
+    ${fNum('aa', 'rhoMan', 'ρ do arranjo (opcional)', a.rhoMan, { u: 'Ω·m', ph: Math.round(r.rho), dica: 'deixe vazio para usar o modelo do solo' })}
+  </div></fieldset>
+  <fieldset data-scope="aarr"><legend>Geometria</legend><div class="grade">${geo}</div></fieldset>
+  ${seg}
+  <fieldset data-scope="aarr"><legend>Observações</legend><div class="grade"><div class="campo wide"><label for="aa-obs">Texto incluído no memorial deste sistema</label><textarea id="aa-obs" data-k="obs">${esc(a.obs)}</textarea></div></div></fieldset>`;
+}
+function efeitosArranjo(a, k) {
+  if (k === 'haste') { const h = HASTES_COM.find(x => x[0] === a.haste); if (h) { a.L = h[2]; a.d = h[3]; } return true; }
+  if (k === 'funcao') { a.rmax = FUNC_ATERR[a.funcao].rmax; return true; }
+  if (k === 'tipo') { if (Object.values(TIPOS_ATERR).includes(a.nome)) a.nome = TIPOS_ATERR[a.tipo]; if (a.tipo === 'malha' && a.funcao === 'entrada') a.funcao = 'subestacao'; return true; }
+  if (k === 'L' || k === 'd') { const h = HASTES_COM.find(x => x[0] === a.haste); if (h && (+a.L !== h[2] || +a.d !== h[3])) a.haste = 'custom'; }
+  return false;
+}
+function atualizarAterrParcial() { renderAterrSolo(); renderArrLista(); renderArrRes(); }
+function criarArranjoNDU() {
+  const ce = CALC.energisa && Object.values(CALC.energisa.ucs || {})[0], cat = ce && ce.cat, n = cat ? cat.hastes : 3;
+  const a = arrPadrao('linha', 'entrada'); Object.assign(a, { nome: `Padrão de entrada${cat ? ` — categoria ${cat.cat}` : ''} (NDU 001)`, n: Math.max(1, n), haste: 'h34-240', L: 2.4, d: 17.3, e: 2.4, rmax: 20 });
+  if (n === 1) a.tipo = 'haste';
+  PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true);
+  toast(cat ? `Arranjo criado com ${n} haste(s) de 3/4" × 2,40 m, conforme a categoria ${cat.cat} da NDU 001.` : 'Arranjo criado com 3 hastes; calcule a demanda Energisa para ajustar ao mínimo da categoria.');
+}
+
+/* ================================================================
    INTERFACE
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'memoria', 'tabelas'];
-let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, CCONS_ABERTO = false, DOCSEL = 'memoria', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
-const MEMOPT = { metodologia: true, detalhe: true, eletrodutos: true, calhas: true, quadro: true, lumi: true, anexo33: true, assinatura: true };
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'memoria', 'tabelas'];
+let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, MEMSEL = 'consolidado', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
+const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = escH;
@@ -3903,6 +4650,8 @@ function normalizarProjeto(p) {
   out.catalogo = { ...(p.catalogo || {}) };
   out.energisa = normalizarEnergisa(p.energisa);
   out.clima = normalizarClima(p.clima);
+  out.aterr = normalizarAterr(p.aterr);
+  out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
   out.lumi = (Array.isArray(p.lumi) ? p.lumi : []).map((a, i) => { const n = { ...defaultsAmbiente(i + 1), ...a }; if (!AMB[n.amb]) n.amb = AMB_PADRAO; if (n.prod !== 'custom' && !CATL[n.prod]) n.prod = CAT_LUM[0].id; return n; });
   out.circuitos = (Array.isArray(p.circuitos) ? p.circuitos : []).map(c => { const d = defaultsCircuito(out.params, c.tipo || 'tug'); const n = { ...d, ...c, id: c.id || d.id }; if (!ISOL[n.isolacao]) n.isolacao = 'PVC'; if (!MET[n.metodo]) n.metodo = d.metodo; return n; });
   garantirQuadros(out);
@@ -3919,7 +4668,7 @@ function carregar() {
 }
 
 /* ---------- ciclo de atualização ---------- */
-function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); }
+function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); }
 function circSel() { return PROJ.circuitos.find(c => c.id === SEL) || null; }
 function ambSel() { return (PROJ.lumi || []).find(a => a.id === LSEL) || null; }
 function mudou(struct) { recalc(); salvarLocal(); renderCabecalho(); if (struct) renderAba(); else renderParcial(); }
@@ -3950,6 +4699,10 @@ function onCampo(ev, isChange) {
   else if (sc === 't003') { const row = PROJ.energisa.t003[box.dataset.tab][+box.dataset.i]; if (row) row[+k] = v; }
   else if (sc === 'amb') { const a = ambSel(); if (!a) return; a[k] = v; struct = efeitosAmbiente(a, k) || struct; }
   else if (sc === 'memopt') { MEMOPT[k] = v; struct = true; }
+  else if (sc === 'memgrupo') { const g = new Set(PROJ.memorias.grupo); if (v) g.add(k); else g.delete(k); PROJ.memorias.grupo = MEMORIAS.map(m => m.id).filter(id => g.has(id)); struct = true; }
+  else if (sc === 'asolo') { PROJ.aterr.solo[k] = v; }
+  else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
+  else if (sc === 'aarr') { const a = arrSel(); if (!a) return; a[k] = v; struct = efeitosArranjo(a, k) || struct; }
   else if (sc === 'cat') { if (v == null || !(v > 0)) delete PROJ.catalogo[k]; else PROJ.catalogo[k] = v; }
   mudou(struct);
 }
@@ -4012,19 +4765,7 @@ async function oferecerArquivo(nome, dados, mime) {
   toast(`${nome} gerado.`);
 }
 function slug() { return (PROJ.info.obra || 'projeto').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 50) || 'projeto'; }
-function metaDoc(doc) {
-  const I = PROJ.info, lumi = doc === 'lumi', ener = doc === 'energisa', clim = doc === 'clima', t = clim ? 'Memorial de cálculo de carga térmica' : ener ? 'Memorial de cálculo de demanda' : (lumi ? 'Relatório luminotécnico' : 'Memória de cálculo');
-  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`,
-    rodape: clim ? 'Carga térmica conforme ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008 — gerado com Dimensiona 5410' : ener ? `Cálculo de demanda conforme Energisa ${PROJ.energisa.modo === 'individual' ? 'NDU 001 v7.0' : 'NDU 001 v7.0 e NDU 003 v8.1'} — gerado com Dimensiona 5410` : lumi ? 'Relatório luminotécnico conforme ABNT NBR ISO/CIE 8995-1:2013 — gerado com Dimensiona 5410' : 'Memória de cálculo conforme ABNT NBR 5410:2004 — gerada com Dimensiona 5410',
-    assunto: clim ? 'Memorial de cálculo de carga térmica — NBR 16401' : ener ? 'Memorial de cálculo de demanda — Energisa NDU 001 / NDU 003' : lumi ? 'Relatório de cálculo luminotécnico — NBR ISO/CIE 8995-1' : 'Memória de cálculo — ABNT NBR 5410:2004' };
-}
-function docAtual(doc) {
-  const rev = (PROJ.info.revisao || 'R00').toLowerCase();
-  if (doc === 'clima') return { blocos: construirMemorialClima(PROJ, CALC, CALC.clima), nome: `memorial-carga-termica-${slug()}-${rev}`, meta: metaDoc('clima') };
-  if (doc === 'energisa') return { blocos: construirMemorialDemanda(PROJ, CALC, CALC.energisa), nome: `memorial-demanda-energisa-${slug()}-${rev}`, meta: metaDoc('energisa') };
-  if (doc === 'lumi' && (PROJ.lumi || []).length) return { blocos: construirRelatorioLumi(PROJ, CALC), nome: `relatorio-luminotecnico-${slug()}-${rev}`, meta: metaDoc('lumi') };
-  return { blocos: construirMemorial(PROJ, CALC, MEMOPT), nome: `memoria-calculo-${slug()}-${rev}`, meta: metaDoc() };
-}
+function docAtual(doc) { return docMemoria(PROJ, CALC, doc === 'memoria' ? 'consolidado' : doc, MEMOPT, PROJ.memorias.grupo); }
 async function exportar(tipo, bt, doc) {
   const txt = bt.textContent; bt.disabled = true; bt.textContent = 'Gerando…';
   try {
@@ -4070,7 +4811,7 @@ function irPara(tab) {
   ABAS.forEach(a => { $('#tab-' + a).hidden = a !== TAB; });
   renderCabecalho(); renderAba();
 }
-function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
+function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
 function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
@@ -4078,6 +4819,7 @@ function renderParcial() {
   else if (TAB === 'lumi') { renderLumiLista(); renderLumiRes(); }
   else if (TAB === 'energisa') atualizarEnergisaParcial();
   else if (TAB === 'clima') atualizarClimaParcial();
+  else if (TAB === 'aterr') atualizarAterrParcial();
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
   else if (TAB === 'quadros') Object.values(CALC.quadros).forEach(q => { const r = $('#q-' + safeId(q.q) + '-res'); if (r) r.innerHTML = quadroRes(q); });
 }
@@ -4573,35 +5315,37 @@ function renderLumiForm() {
 
 /* ---------- MEMÓRIA ---------- */
 function renderMemoria() {
-  const temL = (PROJ.lumi || []).length > 0; if (!temL && DOCSEL === 'lumi') DOCSEL = 'memoria';
-  const lumi = DOCSEL === 'lumi', ener = DOCSEL === 'energisa', clim = DOCSEL === 'clima';
-  const blocos = docAtual(DOCSEL).blocos;
-  const nf = PROJ.circuitos.filter(c => CALC.res[c.id].status === 'fail').length;
-  const nfl = (PROJ.lumi || []).filter(a => CALC.lumi[a.id].status === 'fail').length;
+  const disp = MEMORIAS.filter(m => m.tem(PROJ, CALC)), grupo = PROJ.memorias.grupo.filter(id => disp.some(m => m.id === id));
+  if (MEMSEL !== 'consolidado' && !disp.some(m => m.id === MEMSEL)) MEMSEL = 'consolidado';
+  const blocos = docAtual(MEMSEL).blocos, sel = MEMO[MEMSEL];
+  const linha = m => { const ok = disp.includes(m), fl = ok && m.falha(PROJ, CALC);
+    return `<div class="mem-item${MEMSEL === m.id ? ' on' : ''}${ok ? '' : ' vazio'}" data-scope="memgrupo">
+      <label class="chk" title="Incluir no relatório consolidado"><input type="checkbox" data-k="${m.id}" data-type="chk"${grupo.includes(m.id) ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="Incluir ${esc(m.nome)} no consolidado"></label>
+      <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(m.norma)} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
+      ${ok ? `<span class="pill ${fl ? 'fail' : 'ok'}">${fl ? 'Pendente' : 'OK'}</span><span class="mem-exp"><button class="btn sm" type="button" data-exp="pdf" data-doc="${m.id}">PDF</button><button class="btn sm" type="button" data-exp="docx" data-doc="${m.id}">Word</button><button class="btn sm" type="button" data-exp="html" data-doc="${m.id}">HTML</button></span>` : ''}
+    </div>`; };
   $('#tab-memoria').innerHTML = `
-  ${true ? `<div class="ref-sel" role="group" aria-label="Documento">${[['memoria', 'Memória de cálculo (NBR 5410)'], ['energisa', 'Memorial de demanda (Energisa NDU 001/003)'], ['clima', 'Memorial de carga térmica (NBR 16401)'], ...(temL ? [['lumi', 'Relatório luminotécnico (NBR ISO/CIE 8995-1)']] : [])].map(([k, l]) => `<button class="btn sm" type="button" data-docsel="${k}" aria-pressed="${k === DOCSEL}">${l}</button>`).join('')}</div>` : ''}
-  <div class="mem-bar">
-    ${clim ? `<div><h2 class="tit">Memorial de cálculo de carga térmica</h2><p class="sub" style="margin:0">${PROJ.clima.amb.length} ambiente(s) climatizado(s) · NBR 16401-1:2024, 16401-2:2024 e 16401-3:2008.</p></div>` : ener ? `<div><h2 class="tit">Memorial de cálculo de demanda</h2><p class="sub" style="margin:0">${PROJ.energisa.ucs.length} unidade(s) consumidora(s) · ${MODOS_E[PROJ.energisa.modo]} · para anexar ao pedido de ligação na ${ENERGISA_UN[PROJ.energisa.un]}.</p></div>` : lumi ? `<div><h2 class="tit">Relatório luminotécnico</h2><p class="sub" style="margin:0">${PROJ.lumi.length} ambientes${nfl ? ` · <b style="color:var(--fail)">${nfl} com pendência</b>` : ' · todos atendem'} · luminárias com desenhos, planta de locação cotada e mapa de iluminância.</p></div>` : `<div><h2 class="tit">Memória de cálculo</h2><p class="sub" style="margin:0">${PROJ.circuitos.length} circuitos${nf ? ` · <b style="color:var(--fail)">${nf} com pendência</b>` : ' · todos atendem'} · documento gerado a partir dos dados atuais.</p></div>`}
+  <div class="mem-bar"><div><h2 class="tit">Memórias de cálculo</h2><p class="sub" style="margin:0">Emita cada memória separadamente ou marque as que devem compor o relatório consolidado, com sumário, partes A, B, C… e uma única assinatura.</p></div></div>
+  <div class="mem-lista" role="list">${MEMORIAS.map(linha).join('')}</div>
+  <div class="mem-cons">
+    <div><b>Relatório consolidado</b><span class="mini"> · ${grupo.length} de ${disp.length} memória(s) marcada(s)</span></div>
     <div class="mem-bt">
-      <button class="btn pri" type="button" data-exp="pdf">Baixar PDF</button>
-      <button class="btn" type="button" data-exp="docx">Baixar Word (.docx)</button>
-      <button class="btn" type="button" data-exp="html">Baixar HTML</button>
+      <button class="btn${MEMSEL === 'consolidado' ? ' pri' : ''}" type="button" data-memsel="consolidado">Visualizar</button>
+      <button class="btn pri" type="button" data-exp="pdf" data-doc="consolidado"${grupo.length ? '' : ' disabled'}>PDF</button>
+      <button class="btn" type="button" data-exp="docx" data-doc="consolidado"${grupo.length ? '' : ' disabled'}>Word</button>
+      <button class="btn" type="button" data-exp="html" data-doc="consolidado"${grupo.length ? '' : ' disabled'}>HTML</button>
       <button class="btn" type="button" data-exp="xlsx">Quadro de cargas (Excel)</button>
       ${EMOLDURA ? '' : '<button class="btn" type="button" id="bt-print">Imprimir</button>'}
     </div>
   </div>
-  <div class="mem-opc" data-scope="memopt"${lumi || ener || clim ? ' hidden' : ''}>
-    ${fChk('m', 'metodologia', 'Critérios e fórmulas', MEMOPT.metodologia, { struct: true })}
+  <div class="mem-opc" data-scope="memopt">
+    ${fChk('m', 'metodologia', 'Critérios e fórmulas (NBR 5410)', MEMOPT.metodologia, { struct: true })}
     ${fChk('m', 'detalhe', 'Memória detalhada por circuito', MEMOPT.detalhe, { struct: true })}
-    ${fChk('m', 'eletrodutos', 'Eletrodutos', MEMOPT.eletrodutos, { struct: true })}
-    ${Object.keys(CALC.calhas).length ? fChk('m', 'calhas', 'Eletrocalhas', MEMOPT.calhas, { struct: true }) : ''}
-    ${fChk('m', 'quadro', 'Quadros de carga', MEMOPT.quadro, { struct: true })}
-    ${(PROJ.lumi || []).length ? fChk('m', 'lumi', 'Luminotécnica', MEMOPT.lumi, { struct: true }) : ''}
     ${fChk('m', 'anexo33', 'Anexo com esquemas da Tabela 33', MEMOPT.anexo33, { struct: true })}
     ${fChk('m', 'assinatura', 'Campo de assinatura', MEMOPT.assinatura, { struct: true })}
   </div>
-  <p class="aviso-prev">Pré-visualização. No PDF e no Word o documento sai em A4, com cabeçalho, rodapé e numeração de páginas.</p>
-  <article class="folha doc" id="folha">${renderHTMLDoc(blocos)}</article>`;
+  <p class="aviso-prev">Pré-visualização: <b>${MEMSEL === 'consolidado' ? 'relatório consolidado' : esc(sel.titulo)}</b>. No PDF e no Word o documento sai em A4, com cabeçalho, rodapé e numeração de páginas.</p>
+  <article class="folha doc" id="folha">${grupo.length || MEMSEL !== 'consolidado' ? renderHTMLDoc(blocos) : '<p>Marque ao menos uma memória para compor o relatório consolidado.</p>'}</article>`;
 }
 
 /* ---------- TABELAS DA NORMA ---------- */
@@ -4704,8 +5448,10 @@ document.addEventListener('click', ev => {
   if (el.matches('[role=tab]')) return irPara(el.dataset.tab);
   if (el.dataset.sel) { SEL = el.dataset.sel; renderLista(); renderEditor(); if (window.innerWidth < 900) $('#editor').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.ir) { SEL = el.dataset.ir; irPara('circuitos'); return; }
-  if (el.dataset.exp) return exportar(el.dataset.exp, el, el.dataset.doc || (TAB === 'memoria' ? DOCSEL : 'memoria'));
-  if (el.dataset.docsel) { DOCSEL = el.dataset.docsel; renderMemoria(); return; }
+  if (el.dataset.exp) return exportar(el.dataset.exp, el, el.dataset.doc || (TAB === 'memoria' ? MEMSEL : 'circuitos'));
+  if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
+  if (el.dataset.asel) { ASEL = el.dataset.asel; renderArrLista(); renderArrEditor(); if (window.innerWidth < 900) $('#a-ed').scrollIntoView({ block: 'start' }); return; }
+  if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
   if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); return; }
   if (el.dataset.mat) { REFMAT = el.dataset.mat; renderTabelas(); return; }
@@ -4737,6 +5483,13 @@ document.addEventListener('click', ev => {
     case 'bt-add-eq': { const a = ambCSel(); if (!a) return; const t = EQ_TIPICOS[+$('#k-eq-novo').value]; a.equip.push({ desc: t[0], qtd: 1, W: t[1], WL: t[2] }); mudou(true); return; }
     case 'bt-add-cons': PROJ.clima.cons.push({ id: 'u' + uid(), nome: 'Novo componente', tipo: 'parede', cam: [{ mat: 'reboco', e: 2.5 }, { mat: 'blocoCer', e: 9 }, { mat: 'reboco', e: 2.5 }] }); CCONS_ABERTO = true; mudou(true); return;
     case 'bt-circ-clima': return criarCircuitosClima();
+    case 'bt-add-med': { const M = PROJ.aterr.solo.med, u = M[M.length - 1]; M.push({ dir: u ? u.dir : 'A', a: u ? +u.a * 2 : 1, R: null }); mudou(true); return; }
+    case 'bt-med-serie': { const M = PROJ.aterr.solo.med, dir = String.fromCharCode(65 + new Set(M.map(m => m.dir)).size); [1, 2, 4, 8, 16].forEach(a => M.push({ dir, a, R: null })); mudou(true); return; }
+    case 'bt-add-arr': { const t = $('#a-novo-tipo').value, a = arrPadrao(t, t === 'malha' ? 'subestacao' : 'massas'); PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true); return; }
+    case 'bt-arr-ndu': return criarArranjoNDU();
+    case 'bt-dup-arr': { const a = arrSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = a.nome + ' (cópia)'; PROJ.aterr.arr.splice(PROJ.aterr.arr.indexOf(a) + 1, 0, n); ASEL = n.id; mudou(true); return; }
+    case 'bt-exc-arr': return confirmar2(el, 'Confirmar exclusão', () => { const A = PROJ.aterr.arr, i = A.findIndex(a => a.id === ASEL); if (i < 0) return; const [rm] = A.splice(i, 1); ASEL = (A[i] || A[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluído.`); });
+    case 'bt-aplicar-ra': { const a = arrSel(); if (!a) return; PROJ.params.RA = +CALC.aterr.arr[a.id].R.toFixed(2); mudou(true); toast(`RA = ${nfmt(PROJ.params.RA, 2)} Ω aplicado ao esquema TT (verificação RA × IΔn nos circuitos).`); return; }
     case 'bt-add-uc': { const E = PROJ.energisa; const u = ucPadrao(E.ucs.length + 1); E.ucs.push(u); USEL = u.id; mudou(true); return; }
     case 'bt-dup-uc': { const u = ucSel(); if (!u) return; const n = JSON.parse(JSON.stringify(u)); n.id = uid(); n.nome = (u.nome || 'UC') + ' (cópia)'; PROJ.energisa.ucs.splice(PROJ.energisa.ucs.indexOf(u) + 1, 0, n); USEL = n.id; mudou(true); return; }
     case 'bt-exc-uc': return confirmar2(el, 'Confirmar exclusão', () => { const E = PROJ.energisa; if (E.ucs.length <= 1) { toast('O memorial precisa de ao menos uma UC.'); return; } const i = E.ucs.findIndex(u => u.id === USEL); const [rm] = E.ucs.splice(i, 1); USEL = (E.ucs[i] || E.ucs[i - 1]).id; mudou(true); toast(`${rm.nome} excluída.`); });

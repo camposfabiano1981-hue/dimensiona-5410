@@ -12,7 +12,7 @@ src = root / 'src'
 out_dir = root
 
 shell = (src / 'shell.html').read_text(encoding='utf-8')
-ORDEM = ['tables.js', 'engine.js', 'calhas.js', 'lumi.js', 'energisa.js', 'clima.js', 'pictos.js', 'sample.js', 'memorial.js', 'lumidoc.js', 'energisadoc.js', 'climadoc.js', 'export.js', 'ui_energisa.js', 'ui_clima.js', 'ui.js']
+ORDEM = ['tables.js', 'engine.js', 'calhas.js', 'lumi.js', 'energisa.js', 'clima.js', 'aterr.js', 'pictos.js', 'sample.js', 'memorial.js', 'lumidoc.js', 'energisadoc.js', 'climadoc.js', 'aterrdoc.js', 'memorias.js', 'export.js', 'ui_energisa.js', 'ui_clima.js', 'ui_aterr.js', 'ui.js']
 js = '\n'.join((src / f).read_text(encoding='utf-8') for f in ORDEM)
 reg = base64.b64encode((root / 'fonts/DejaVuSans-sub.ttf').read_bytes()).decode()
 bold = base64.b64encode((root / 'fonts/DejaVuSans-Bold-sub.ttf').read_bytes()).decode()
