@@ -735,7 +735,7 @@ function renderMemoria() {
   const linha = m => { const ok = disp.includes(m), fl = ok && m.falha(PROJ, CALC);
     return `<div class="mem-item${MEMSEL === m.id ? ' on' : ''}${ok ? '' : ' vazio'}" data-scope="memgrupo">
       <label class="chk" title="Incluir no relatório consolidado"><input type="checkbox" data-k="${m.id}" data-type="chk"${grupo.includes(m.id) ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="Incluir ${esc(m.nome)} no consolidado"></label>
-      <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(m.norma)} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
+      <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(normaDe(m, PROJ))} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
       ${ok ? `<span class="pill ${fl ? 'fail' : 'ok'}">${fl ? 'Pendente' : 'OK'}</span><span class="mem-exp"><button class="btn sm" type="button" data-exp="pdf" data-doc="${m.id}">PDF</button><button class="btn sm" type="button" data-exp="docx" data-doc="${m.id}">Word</button><button class="btn sm" type="button" data-exp="html" data-doc="${m.id}">HTML</button></span>` : ''}
     </div>`; };
   $('#tab-memoria').innerHTML = `
@@ -866,6 +866,7 @@ document.addEventListener('click', ev => {
   if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.asel) { ASEL = el.dataset.asel; renderArrLista(); renderArrEditor(); if (window.innerWidth < 900) $('#a-ed').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
+  if (el.dataset.amodo) { PROJ.aterr.modo = el.dataset.amodo; if (el.dataset.amodo === 'simplificado' && PROJ.aterr.solo.modelo === '2c') PROJ.aterr.solo.modelo = 'homog'; mudou(true); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
   if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); return; }
   if (el.dataset.mat) { REFMAT = el.dataset.mat; renderTabelas(); return; }
@@ -901,6 +902,7 @@ document.addEventListener('click', ev => {
     case 'bt-med-serie': { const M = PROJ.aterr.solo.med, dir = String.fromCharCode(65 + new Set(M.map(m => m.dir)).size); [1, 2, 4, 8, 16].forEach(a => M.push({ dir, a, R: null })); mudou(true); return; }
     case 'bt-add-arr': { const t = $('#a-novo-tipo').value, a = arrPadrao(t, t === 'malha' ? 'subestacao' : 'massas'); PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true); return; }
     case 'bt-arr-ndu': return criarArranjoNDU();
+    case 'bt-dim-hastes': { const a = arrSel(), r = a && CALC.aterr.arr[a.id]; if (!r || !r.nMin) return; if (a.tipo === 'haste' && r.nMin > 1) a.tipo = 'linha'; a.n = r.nMin; mudou(true); toast(`${r.nMin} haste(s) alinhadas: R = ${nfmt(r.nMinR, 2)} Ω.`); return; }
     case 'bt-dup-arr': { const a = arrSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = a.nome + ' (cópia)'; PROJ.aterr.arr.splice(PROJ.aterr.arr.indexOf(a) + 1, 0, n); ASEL = n.id; mudou(true); return; }
     case 'bt-exc-arr': return confirmar2(el, 'Confirmar exclusão', () => { const A = PROJ.aterr.arr, i = A.findIndex(a => a.id === ASEL); if (i < 0) return; const [rm] = A.splice(i, 1); ASEL = (A[i] || A[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluído.`); });
     case 'bt-aplicar-ra': { const a = arrSel(); if (!a) return; PROJ.params.RA = +CALC.aterr.arr[a.id].R.toFixed(2); mudou(true); toast(`RA = ${nfmt(PROJ.params.RA, 2)} Ω aplicado ao esquema TT (verificação RA × IΔn nos circuitos).`); return; }

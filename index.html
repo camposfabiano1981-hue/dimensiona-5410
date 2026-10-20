@@ -2031,20 +2031,36 @@ const MAT_TERRA = {
   cuAco30: { nome: 'Aço cobreado 30 % IACS', ar: 0.00378, K0: 245, Tm: 1084, rr: 5.86, tcap: 3.85 },
   acoZn: { nome: 'Aço zincado', ar: 0.00320, K0: 293, Tm: 419, rr: 20.10, tcap: 3.93 }
 };
+/* resistividade típica de alguns solos — Kindermann & Campagnolo, Aterramento Elétrico (faixas da literatura;
+   quando há faixa adota-se o limite superior, a favor da segurança). Sempre que possível, medir pelo método de Wenner. */
+const SOLOS_TIPICOS = {
+  lama: { nome: 'Lama / solo alagadiço', faixa: '5 a 100', rho: 100 },
+  jardim50: { nome: 'Terra de jardim com 50 % de umidade', faixa: '140', rho: 140 },
+  jardim20: { nome: 'Terra de jardim com 20 % de umidade', faixa: '480', rho: 480 },
+  argila40: { nome: 'Argila com 40 % de umidade', faixa: '80', rho: 80 },
+  argila20: { nome: 'Argila com 20 % de umidade', faixa: '330', rho: 330 },
+  argilaSeca: { nome: 'Argila seca', faixa: '1.500 a 5.000', rho: 5000 },
+  areiaMolhada: { nome: 'Areia molhada', faixa: '1.300', rho: 1300 },
+  areiaSeca: { nome: 'Areia seca', faixa: '3.000 a 8.000', rho: 8000 },
+  calcario: { nome: 'Calcário compacto', faixa: '1.000 a 5.000', rho: 5000 },
+  granito: { nome: 'Granito', faixa: '1.500 a 10.000', rho: 10000 }
+};
+const CAIXAS_INSP = { todas: 'Uma caixa de inspeção em cada haste', primeira: 'Caixa de inspeção só na primeira haste (conexão do condutor)' };
 const CONEXAO_TERRA = { solda: 'Solda exotérmica (temperatura de fusão do material)', compressao: 'Conector de compressão ou aparafusado (250 °C)' };
 const POS_HASTES_MALHA = { nenhuma: 'Sem hastes', cantos: 'Nos 4 cantos', perimetro: 'Em todos os cruzamentos do perímetro', todos: 'Em todos os cruzamentos' };
 
 function soloPadrao() {
-  return { modo: 'wenner', rho: 300, p: 0.20, media: 'geo', descartar: true, modelo: 'homog', fs: 1.0, local: '', data: '', equip: '', med: [] };
+  return { modo: 'tipico', tipoSolo: 'argila20', rho: 300, p: 0.20, media: 'geo', descartar: true, modelo: 'homog', fs: 1.0, local: '', data: '', equip: '', med: [] };
 }
 function arrPadrao(tipo = 'linha', funcao = 'massas') {
   return {
     id: uid(), nome: TIPOS_ATERR[tipo], tipo, funcao, rmax: FUNC_ATERR[funcao].rmax, haste: 'h34-240', L: 2.4, d: 17.3, n: 3, e: 2.4, m: 3, raio: 3,
     Lc: 20, hc: 0.5, S: 50, mat: 'cu', Lx: 20, Ly: 15, Nx: 4, Ny: 5, posH: 'perimetro', Lh: 2.4, dh: 17.3,
+    Scond: 16, Lq: 5, caixas: 'todas',
     seg: tipo === 'malha', I3I0: 1500, sf: 100, xr: 5, tf: 0.5, tc: 1.0, brita: true, rhoS: 3000, hs: 0.10, peso: 50, conexao: 'solda', Smin: 50, rhoMan: null, obs: ''
   };
 }
-function aterrPadrao() { return { solo: soloPadrao(), arr: [] }; }
+function aterrPadrao() { return { modo: 'simplificado', solo: soloPadrao(), arr: [] }; }
 
 /* ---------- solo (NBR 7117-1) ---------- */
 function rhoWenner(a, R, p) { const t = 1 + 2 * a / Math.sqrt(a * a + 4 * p * p) - a / Math.sqrt(a * a + p * p); return 4 * Math.PI * a * R / t; }
@@ -2069,8 +2085,14 @@ function nelderMead(f, x0, passo, it = 600) {
   }
   S.sort((a, b) => a.f - b.f); return S[0];
 }
-function calcSolo(S) {
+function calcSolo(S, simples = false) {
   const r = { modo: S.modo, fs: +S.fs > 0 ? +S.fs : 1, avisos: [], falhas: [], linhas: [], porA: [] };
+  if (S.modo === 'tipico') {
+    const t = SOLOS_TIPICOS[S.tipoSolo] || SOLOS_TIPICOS.argila20;
+    r.tipo = t; r.rhoBase = t.rho; r.modelo = 'homog'; r.rho = r.rhoBase * r.fs;
+    r.avisos.push(`Resistividade estimada pelo tipo de solo (${t.nome.toLowerCase()}: ${t.faixa} Ω·m). Confirme por medição de Wenner antes da execução.`);
+    return r;
+  }
   if (S.modo === 'direto') {
     r.rhoBase = +S.rho || 0; r.modelo = 'homog'; r.rho = r.rhoBase * r.fs;
     if (!(r.rhoBase > 0)) r.falhas.push('Informe a resistividade do solo.');
@@ -2089,8 +2111,8 @@ function calcSolo(S) {
   const nd = r.linhas.filter(l => l.desc).length; if (nd) r.avisos.push(`${nd} medição(ões) com desvio superior a 50 % da média do espaçamento foram descartadas.`);
   r.rhoMed = med(r.porA.map(x => x.rho));
   r.rhoMinMax = (Math.min(...r.porA.map(x => x.rho)) + Math.max(...r.porA.map(x => x.rho))) / 2;
-  r.modelo = S.modelo === '2c' && r.porA.length >= 3 ? '2c' : 'homog';
-  if (S.modelo === '2c' && r.porA.length < 3) r.avisos.push('O modelo de duas camadas exige medições em pelo menos 3 espaçamentos; adotado solo homogêneo.');
+  r.modelo = !simples && S.modelo === '2c' && r.porA.length >= 3 ? '2c' : 'homog';
+  if (!simples && S.modelo === '2c' && r.porA.length < 3) r.avisos.push('O modelo de duas camadas exige medições em pelo menos 3 espaçamentos; adotado solo homogêneo.');
   if (r.modelo === '2c') {
     const A = r.porA, amin = A[0].a, amax = A[A.length - 1].a;
     const erro = x => { const [r1, r2, h] = x.map(Math.exp); if (h < 0.05 || h > 3 * amax) return 1e9; return A.reduce((s, q) => { const d = Math.log(rhoApar2c(q.a, r1, r2, h) / q.rho); return s + d * d; }, 0); };
@@ -2108,7 +2130,7 @@ function calcSolo(S) {
 function rhoHummel(m2, d) { return d <= m2.h ? m2.rho1 : d / (m2.h / m2.rho1 + (d - m2.h) / m2.rho2); }
 function rhoArranjo(a, rs) {
   if (+a.rhoMan > 0) return { rho: +a.rhoMan, txt: 'resistividade informada para o arranjo' };
-  if (!rs.m2 || rs.modelo !== '2c') return { rho: rs.rho, txt: rs.modo === 'direto' ? 'resistividade informada (solo homogêneo)' : `solo homogêneo — média ${rs.modo === 'wenner' ? 'das medições de Wenner' : ''}`.trim() + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') };
+  if (!rs.m2 || rs.modelo !== '2c') return { rho: rs.rho, txt: rs.modo === 'tipico' ? `valor típico — ${rs.tipo.nome.toLowerCase()}` + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') : rs.modo === 'direto' ? 'resistividade informada (solo homogêneo)' : `solo homogêneo — média ${rs.modo === 'wenner' ? 'das medições de Wenner' : ''}`.trim() + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') };
   const m = rs.m2; let d, base;
   if (TIPOS_HASTES.includes(a.tipo)) { d = +a.L; base = `Hummel até a profundidade da haste (${nfmt(d, 2)} m)`; }
   else if (a.tipo === 'cabo') { const rho = (+a.hc <= m.h ? m.rho1 : m.rho2); return { rho: rho * rs.fs, txt: `camada onde o cabo está enterrado (${+a.hc <= m.h ? '1ª' : '2ª'} camada)${rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : ''}` }; }
@@ -2222,12 +2244,42 @@ function calcArranjo(a, rs, proj, calc) {
   r.status = r.falhas.length ? 'fail' : (r.avisos.length ? 'warn' : 'ok');
   return r;
 }
+/* comprimento do cabo nu que interliga as hastes (m) */
+function caboInterligacao(a, r) {
+  const e = +a.e, n = r.nH, m = Math.round(+a.m);
+  switch (a.tipo) {
+    case 'linha': return (n - 1) * e;
+    case 'triangulo': return 3 * e;
+    case 'quadVazio': return 4 * (m - 1) * e;
+    case 'quadCheio': return 2 * m * (m - 1) * e;
+    case 'circ': return n < 2 ? 0 : (n === 2 ? 2 * +a.raio : n * 2 * +a.raio * Math.sin(Math.PI / n));
+  }
+  return 0;
+}
+/* complementos dos arranjos de hastes: resistência em função do nº de hastes alinhadas e lista de materiais */
+function complementosHastes(a, r) {
+  const L = +a.L, d = +a.d / 1000, e = +a.e || L, nMax = Math.min(30, Math.max(8, r.nH + 2, (r.nMin || 0) + 1));
+  r.serie = Array.from({ length: nMax }, (_, i) => ({ n: i + 1, R: reqHastes(r.rho, L, d, Array.from({ length: i + 1 }, (_, k) => [k * e, 0])).Req }));
+  r.Lcabo = caboInterligacao(a, r);
+  const S = +a.Scond || 16, haste = (HASTES_COM.find(h => h[0] === a.haste) || [])[1] || `${nfmt(L, 2)} m × Ø ${nfmt(+a.d, 1)} mm`;
+  r.materiais = [
+    ['Haste de aterramento aço-cobreada (NBR 13571) — ' + haste.replace(/ — aço cobreado.*$/, ''), r.nH, 'un'],
+    ['Conector cabo–haste (cunha, grampo ou solda exotérmica)', r.nH, 'un'],
+    ['Caixa de inspeção de aterramento com tampa', a.caixas === 'primeira' ? 1 : r.nH, 'un'],
+    ...(r.Lcabo > 0 ? [[`Cabo de cobre nu ${S} mm² — interligação das hastes (enterrado a ${nfmt(+a.hc, 2)} m)`, +r.Lcabo.toFixed(1), 'm']] : []),
+    ...(+a.Lq > 0 ? [[`Condutor de aterramento ${S} mm² — da primeira haste ao quadro / BEP`, +(+a.Lq).toFixed(1), 'm'], ['Eletroduto de proteção do condutor de aterramento', +(+a.Lq).toFixed(1), 'm']] : [])
+  ];
+}
 function calcAterramento(proj, calc) {
-  const T = proj.aterr || aterrPadrao();
-  const solo = calcSolo(T.solo || soloPadrao()), arr = {};
-  (T.arr || []).forEach(a => { arr[a.id] = calcArranjo(a, solo, proj, calc); });
-  const lista = Object.values(arr);
-  return { solo, arr, status: solo.falhas.length || lista.some(x => x.status === 'fail') ? 'fail' : (lista.some(x => x.status === 'warn') || solo.avisos.length ? 'warn' : 'ok') };
+  const T = proj.aterr || aterrPadrao(), simples = T.modo !== 'completo';
+  const solo = calcSolo(T.solo || soloPadrao(), simples), arr = {};
+  (T.arr || []).forEach(a => {
+    if (simples && !TIPOS_HASTES.includes(a.tipo)) { arr[a.id] = { excluido: true, status: 'off', avisos: [], falhas: [], R: NaN, rmax: +a.rmax || 0 }; return; }
+    const r = arr[a.id] = calcArranjo(a, solo, proj, calc);
+    if (TIPOS_HASTES.includes(a.tipo) && r.rho > 0) complementosHastes(a, r);
+  });
+  const lista = Object.values(arr).filter(x => !x.excluido);
+  return { simples, solo, arr, status: solo.falhas.length || lista.some(x => x.status === 'fail') ? 'fail' : (lista.some(x => x.status === 'warn') || solo.avisos.length ? 'warn' : 'ok') };
 }
 
 /* ================================================================
@@ -2443,14 +2495,11 @@ function projetoExemplo() {
       cg('arj', 'Ar-condicionado split 12.000 BTU/h (circ. 8)', { btu: 12000, tipoAr: 'split' }), cg('fogao', 'Forno elétrico (circ. 9)', { W: 1800 }),
       cg('secad', 'Forno de micro-ondas 25 L', { W: 1398 }), cg('mot1', 'Bomba d’água 1/2 cv (circ. 10)', { cv: 0.5 })] });
   const T = proj.aterr;
-  Object.assign(T.solo, { modo: 'wenner', p: 0.2, media: 'geo', descartar: true, modelo: '2c', fs: 1, local: 'terreno da obra — direções A (frente) e B (lateral)', equip: 'terrômetro digital de 4 terminais',
+  Object.assign(T.solo, { modo: 'wenner', p: 0.2, media: 'geo', descartar: true, modelo: 'homog', fs: 1, local: 'terreno da obra — direções A (frente) e B (lateral)', equip: 'terrômetro digital de 4 terminais',
     med: [['A', 1, 26.57], ['A', 2, 11.05], ['A', 4, 4.53], ['A', 8, 1.85], ['A', 16, 0.92], ['B', 1, 24.53], ['B', 2, 11.74], ['B', 4, 4.18], ['B', 8, 1.96], ['B', 16, 0.88]].map(([dir, a, R]) => ({ dir, a, R })) });
   const arK = (tipo, funcao, o) => Object.assign(arrPadrao(tipo, funcao), o);
-  T.arr = [
-    arK('linha', 'entrada', { nome: 'Padrão de entrada — categoria T3 (NDU 001)', n: 4, e: 2.4, haste: 'h34-240', L: 2.4, d: 17.3, rmax: 20 }),
-    arK('malha', 'spda', { nome: 'SPDA — anel de aterramento com 4 hastes', Lx: 14, Ly: 11, Nx: 2, Ny: 2, hc: 0.5, S: 50, posH: 'cantos', Lh: 2.4, dh: 17.3, seg: false, rmax: 10 }),
-    arK('malha', 'subestacao', { nome: 'Malha de terra — verificação de toque e passo (ilustrativo)', Lx: 16, Ly: 12, Nx: 5, Ny: 7, hc: 0.6, S: 50, posH: 'perimetro', Lh: 2.4, dh: 17.3, seg: true, I3I0: 1000, sf: 50, xr: 5, tf: 0.5, tc: 1.0, brita: true, rhoS: 3000, hs: 0.10, peso: 50, rmax: 10 })
-  ];
+  T.modo = 'simplificado';
+  T.arr = [arK('linha', 'entrada', { nome: 'Padrão de entrada — categoria T3 (NDU 001)', n: 4, e: 2.4, haste: 'h34-240', L: 2.4, d: 17.3, rmax: 20, hc: 0.5, Scond: 16, Lq: 3, caixas: 'todas' })];
   return proj;
 }
 if (typeof module !== 'undefined') module.exports = { projetoExemplo, projetoVazio };
@@ -3452,6 +3501,49 @@ function soloSVG(rs, doc = true) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Curva de resistividade aparente do solo"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}</svg>`;
 }
 
+/* esboço da instalação (vista lateral, sem escala): quadro/BEP, eletroduto, caixas de inspeção, cabo nu e hastes */
+function esquemaHastesSVG(a, r, doc = true) {
+  const C = corAterr(doc), W = 520, H = 250, yS = 92, f2 = v => nfmt(v, 2), S = +a.Scond || 16;
+  const n = r.nH, mostra = Math.min(n, 4), xs = mostra === 1 ? [300] : Array.from({ length: mostra }, (_, i) => 190 + i * 250 / (mostra - 1));
+  const zc = yS + 26, zL = yS + 118, x0 = xs[0], xl = xs[mostra - 1];
+  let g = `<rect x="0" y="${yS}" width="${W}" height="${H - yS}" fill="${C.solo1}"/><line x1="0" y1="${yS}" x2="${W}" y2="${yS}" stroke="${C.ink}" stroke-width="1.4"/>`;
+  // quadro de medição / BEP na parede
+  g += `<rect x="18" y="16" width="10" height="${yS - 16}" fill="${C.solo2}" stroke="${C.mut}" stroke-width="0.6"/><rect x="28" y="24" width="46" height="40" fill="${C.bg}" stroke="${C.ink}" stroke-width="1.2"/><line x1="34" y1="54" x2="68" y2="54" stroke="${C.cu}" stroke-width="2.2"/>` +
+    txtA(C, 51, 37, 'QUADRO', { fs: 7.5, anc: 'middle', b: true }) + txtA(C, 51, 47, '/ BEP', { fs: 7.5, anc: 'middle', b: true });
+  // condutor de aterramento em eletroduto até a primeira caixa
+  g += `<path d="M58 64 V${yS + 6} H${x0 - 12}" fill="none" stroke="${C.mut}" stroke-width="7" stroke-linejoin="round" opacity=".35"/><path d="M58 64 V${yS + 6} H${x0}" fill="none" stroke="${C.cu}" stroke-width="1.8"/>` +
+    txtA(C, 82, yS - 24, `condutor ${S} mm²`, { fs: 8.5, cor: C.mut }) + txtA(C, 82, yS - 13, `em eletroduto${+a.Lq > 0 ? ` (${f2(+a.Lq)} m)` : ''}`, { fs: 8.5, cor: C.mut });
+  if (mostra > 1) g += `<line x1="${x0}" y1="${zc}" x2="${xl}" y2="${zc}" stroke="${C.cu}" stroke-width="2.4"/>`;
+  xs.forEach((x, i) => {
+    if (a.caixas !== 'primeira' || i === 0) g += `<rect x="${x - 12}" y="${yS - 5}" width="24" height="${zc - yS + 9}" fill="${C.bg}" stroke="${C.ink}" stroke-width="1"/><rect x="${x - 15}" y="${yS - 8}" width="30" height="4" fill="${C.mut}"/>`;
+    g += `<rect x="${x - 3}" y="${zc - 6}" width="6" height="${zL - zc + 6}" fill="${C.cu}" stroke="${C.ink}" stroke-width="0.6"/><circle cx="${x}" cy="${zc}" r="3.2" fill="${C.ink}"/>` +
+      txtA(C, x + 7, zL - 4, 'H' + (n > 4 && i === 3 ? n : i + 1), { fs: 8.5, cor: C.mut });
+  });
+  if (n > 4) g += txtA(C, (xs[2] + xs[3]) / 2, zc - 6, '· · ·', { fs: 12, anc: 'middle', b: true });
+  g += cotaA(C, xl + 22, yS, xl + 22, zc, `${f2(+a.hc)} m`, -20) + cotaA(C, xl + 54, yS, xl + 54, zL, `L = ${f2(+a.L)} m`, -14);
+  if (mostra > 1) g += cotaA(C, xs[0], zL + 14, xs[1], zL + 14, `e = ${f2(+a.e)} m`);
+  g += `<line x1="${x0 + 12}" y1="${yS - 7}" x2="${x0 + 34}" y2="${yS - 32}" stroke="${C.mut}" stroke-width="0.7"/>` + txtA(C, x0 + 37, yS - 30, a.caixas === 'primeira' ? 'caixa de inspeção (conexão)' : 'caixa de inspeção em cada haste', { fs: 8.5 });
+  g += txtA(C, 10, H - 6, `${n} haste(s) aço-cobreada(s) Ø ${nfmt(+a.d, 1)} mm × ${f2(+a.L)} m${n > 1 ? ` interligadas por cabo de cobre nu ${S} mm² a ${f2(+a.hc)} m` : ''}`, { fs: 8.5, cor: C.mut });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Esboço da instalação do aterramento"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}${txtA(C, W - 8, 16, `ESBOÇO DA INSTALAÇÃO — sem escala`, { fs: 9, b: true, cor: C.mut, anc: 'end' })}</svg>`;
+}
+/* resistência de aterramento em função do número de hastes alinhadas */
+function serieHastesSVG(r, rmax, doc = true) {
+  const C = corAterr(doc), W = 480, H = 210, ml = 46, mr = 14, mt = 22, mb = 30, pw = W - ml - mr, ph = H - mt - mb, S = r.serie;
+  const ymax = Math.max(...S.map(x => x.R), rmax || 0) * 1.1, step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000].find(v => ymax / v <= 6) || 2000;
+  const bw = pw / S.length, Y = v => mt + ph - v / ymax * ph;
+  let g = '';
+  for (let v = 0; v <= ymax; v += step) g += `<line x1="${ml}" y1="${Y(v).toFixed(1)}" x2="${W - mr}" y2="${Y(v).toFixed(1)}" stroke="${C.grid}"/>` + txtA(C, ml - 5, Y(v) + 3, nfmt(v, 0), { fs: 9, anc: 'end', cor: C.mut });
+  S.forEach((x, i) => {
+    const ok = !(rmax > 0) || x.R <= rmax, atual = x.n === r.nH && (r.tipo === 'linha' || r.tipo === 'haste');
+    g += `<rect x="${(ml + i * bw + bw * 0.18).toFixed(1)}" y="${Y(x.R).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" height="${(mt + ph - Y(x.R)).toFixed(1)}" fill="${ok ? C.acc : C.line}"${atual ? ` stroke="${C.ink}" stroke-width="1.6"` : ''}/>` +
+      txtA(C, ml + i * bw + bw / 2, H - mb + 13, String(x.n), { fs: 9, anc: 'middle', cor: C.mut });
+    if (S.length <= 12) g += txtA(C, ml + i * bw + bw / 2, Y(x.R) - 3, nfmt(x.R, x.R < 10 ? 1 : 0), { fs: 8, anc: 'middle', cor: C.ink });
+  });
+  if (rmax > 0) g += `<line x1="${ml}" y1="${Y(rmax).toFixed(1)}" x2="${W - mr}" y2="${Y(rmax).toFixed(1)}" stroke="${C.warn}" stroke-width="1.4" stroke-dasharray="6 4"/>` + txtA(C, W - mr - 2, Y(rmax) - 4, `limite ${nfmt(rmax, 1)} Ω`, { fs: 9, anc: 'end', cor: C.warn });
+  g += `<line x1="${ml}" y1="${mt + ph}" x2="${W - mr}" y2="${mt + ph}" stroke="${C.ink}"/>` + txtA(C, ml + pw / 2, H - 4, 'número de hastes alinhadas, mesmo espaçamento', { fs: 9, anc: 'middle', cor: C.mut }) + txtA(C, 12, mt + ph / 2, 'R (Ω)', { fs: 9, anc: 'middle', cor: C.mut, rot: -90 });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Resistência em função do número de hastes"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}</svg>`;
+}
+
 /* ---------- memorial ---------- */
 function geomArranjoTxt(a, r) {
   const f2 = v => nfmt(v, 2);
@@ -3465,19 +3557,21 @@ function geomArranjoTxt(a, r) {
   return `malha de ${f2(r.Lx)} × ${f2(r.Ly)} m com ${r.Nx} × ${r.Ny} condutores de ${a.S} mm² a ${f2(r.h)} m; ${r.nR} haste(s) de ${f2(r.Lr)} m (${POS_HASTES_MALHA[a.posH].toLowerCase()})`;
 }
 function construirMemorialAterramento(proj, calc, ca) {
-  const T = proj.aterr, I = proj.info, S = T.solo, rs = ca.solo, B = [], A = T.arr;
+  const T = proj.aterr, I = proj.info, S = T.solo, rs = ca.solo, B = [], A = T.arr.filter(a => !ca.arr[a.id].excluido), simples = ca.simples;
   const f0 = v => nfmt(v, 0), f1 = v => nfmt(v, 1), f2 = v => nfmt(v, 2), f3 = v => nfmt(v, 3);
   const temMalha = A.some(a => a.tipo === 'malha'), temSeg = A.some(a => a.tipo === 'malha' && a.seg);
-  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 7117-1:2020 · NBR 15751:2013 · IEEE Std 80-2013', text: 'Memorial de cálculo de aterramento', sub: 'Resistividade do solo, resistência de aterramento de hastes, cabos e malhas' + (temSeg ? ' e verificação das tensões de toque e de passo' : '') });
+  if (simples) B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 13571 · NBR 15749:2009' + (A.some(a => a.funcao === 'entrada') ? ' · Energisa NDU 001' : ''), text: 'Memorial de cálculo de aterramento', sub: 'Método simplificado — eletrodos de hastes verticais: resistência de aterramento, número de hastes, esboço da instalação e lista de materiais' });
+  else B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 7117-1:2020 · NBR 15751:2013 · IEEE Std 80-2013', text: 'Memorial de cálculo de aterramento', sub: 'Resistividade do solo, resistência de aterramento de hastes, cabos e malhas' + (temSeg ? ' e verificação das tensões de toque e de passo' : '') });
   B.push({ t: 'meta', rows: [['Obra', I.obra || '—'], ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'], ['Esquema de aterramento da instalação', proj.params.aterramento],
     ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
   let n = 0; const sec = t => { n++; B.push({ t: 'h1', text: `${n}. ${t}` }); return n; };
   sec('Objetivo');
-  B.push({ t: 'p', text: `Determinar a resistividade do solo e calcular a resistência de aterramento ${A.length === 1 ? 'do sistema de aterramento' : `dos ${A.length} sistemas de aterramento`} da obra, verificando os limites aplicáveis${temSeg ? ' e a segurança das pessoas quanto às tensões de toque e de passo' : ''}, segundo a ABNT NBR 5410:2004, a ABNT NBR 7117-1:2020${temMalha ? ', a ABNT NBR 15751:2013 e a IEEE Std 80-2013' : ''}.` });
+  if (simples) B.push({ t: 'p', text: `Calcular a resistência de aterramento ${A.length === 1 ? 'do eletrodo de hastes' : `dos ${A.length} eletrodos de hastes`} da obra pelo método simplificado (fórmula da haste vertical e resistência mútua entre hastes), dimensionar o número de hastes necessário para o limite aplicável, apresentar o esboço da instalação e relacionar os materiais, segundo a ABNT NBR 5410:2004${A.some(a => a.funcao === 'entrada') ? ' e a norma de fornecimento Energisa NDU 001 v7.0' : ''}.` });
+  else B.push({ t: 'p', text: `Determinar a resistividade do solo e calcular a resistência de aterramento ${A.length === 1 ? 'do sistema de aterramento' : `dos ${A.length} sistemas de aterramento`} da obra, verificando os limites aplicáveis${temSeg ? ' e a segurança das pessoas quanto às tensões de toque e de passo' : ''}, segundo a ABNT NBR 5410:2004, a ABNT NBR 7117-1:2020${temMalha ? ', a ABNT NBR 15751:2013 e a IEEE Std 80-2013' : ''}.` });
   sec('Normas e documentos de referência');
   B.push({ t: 'list', items: [
     'ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão (6.4 — aterramento e equipotencialização).',
-    'ABNT NBR 7117-1:2020 — Parâmetros do solo para projetos de aterramentos elétricos — Parte 1: Medição da resistividade e modelagem geoelétrica.',
+    ...(!simples || rs.modo === 'wenner' ? ['ABNT NBR 7117-1:2020 — Parâmetros do solo para projetos de aterramentos elétricos — Parte 1: Medição da resistividade e modelagem geoelétrica.'] : []),
     'ABNT NBR 15749:2009 — Medição de resistência de aterramento e de potenciais na superfície do solo em sistemas de aterramento.',
     ...(temMalha ? ['ABNT NBR 15751:2013 — Sistemas de aterramento de subestações — Requisitos.', 'IEEE Std 80-2013 — Guide for Safety in AC Substation Grounding.'] : []),
     'ABNT NBR 13571 — Haste de aterramento aço-cobreada e acessórios.',
@@ -3487,7 +3581,11 @@ function construirMemorialAterramento(proj, calc, ca) {
   ] });
 
   const s3 = sec('Resistividade do solo');
-  if (rs.modo === 'direto') {
+  if (rs.modo === 'tipico') {
+    B.push({ t: 'p', text: `Resistividade estimada pelo tipo de solo do local: ${rs.tipo.nome.toLowerCase()}, faixa típica de ${rs.tipo.faixa} Ω·m (Kindermann & Campagnolo). Adotado ρ = ${f0(rs.rhoBase)} Ω·m${/ a /.test(rs.tipo.faixa) ? ', limite superior da faixa, a favor da segurança' : ''}${rs.fs !== 1 ? `; com o fator sazonal ${f2(rs.fs)}, ρ = ${f0(rs.rho)} Ω·m` : ''}. Solo considerado homogêneo.` });
+    B.push({ t: 'table', head: ['Tipo de solo', 'Resistividade típica (Ω·m)'], widths: [60, 40], align: 'lr', rows: Object.values(SOLOS_TIPICOS).map(t => [t.nome + (t === rs.tipo ? '  ◄ adotado' : ''), t.faixa]) });
+    B.push({ t: 'note', text: 'A resistividade real varia com a umidade, a temperatura, a compactação e a estratificação do solo. Recomenda-se medir pelo método de Wenner (NBR 7117-1) e, após a execução, medir a resistência do eletrodo (NBR 15749).' });
+  } else if (rs.modo === 'direto') {
     B.push({ t: 'p', text: `Resistividade adotada: ρ = ${f0(rs.rhoBase)} Ω·m${rs.fs !== 1 ? `, multiplicada pelo fator sazonal ${f2(rs.fs)} (ρ = ${f0(rs.rho)} Ω·m)` : ''}, considerada solo homogêneo.${S.local ? ` Origem do dado: ${S.local}.` : ''}` });
     B.push({ t: 'note', text: 'Recomenda-se confirmar a resistividade por medição em campo pelo método de Wenner (NBR 7117-1), em época seca, antes da execução.' });
   } else {
@@ -3506,7 +3604,7 @@ function construirMemorialAterramento(proj, calc, ca) {
     } else B.push({ t: 'p', text: `Solo considerado homogêneo, com a resistividade igual à média das resistividades aparentes por espaçamento: ρ = ${f0(rs.rhoMed)} Ω·m${rs.fs !== 1 ? `; com o fator sazonal ${f2(rs.fs)}, ρ = ${f0(rs.rho)} Ω·m` : ''}. Para comparação, (ρmáx + ρmín)/2 = ${f0(rs.rhoMinMax)} Ω·m (IEEE 80, eq. 50).` });
     const svg = soloSVG(rs, true); if (svg) B.push({ t: 'fig', svg: svgDoc(svg, 480, 240), ar: 0.5, w: 110, caption: 'Curva de resistividade aparente medida (pontos), média por espaçamento' + (rs.m2 ? ' e modelo de duas camadas ajustado.' : '.') });
   }
-  rs.avisos.forEach(x => B.push({ t: 'note', text: x }));
+  rs.avisos.filter(x => rs.modo !== 'tipico' || !/^Resistividade estimada/.test(x)).forEach(x => B.push({ t: 'note', text: x }));
 
   sec('Critérios de projeto');
   B.push({ t: 'table', head: ['Sistema', 'Função', 'Limite de resistência', 'Referência'], widths: [26, 26, 16, 32], align: 'llrl',
@@ -3517,7 +3615,7 @@ function construirMemorialAterramento(proj, calc, ca) {
   const s5 = sec('Metodologia de cálculo');
   const L5 = ['Haste vertical:            R₁ = ρ/(2πL) · ln(4L/d)', 'Resistência mútua (hastes h e m a e metros):  Rhm = ρ/(4πL) · ln{[(b + L)² − e²] / [e² − (b − L)²]},   b = √(L² + e²)',
     'Resistência de cada haste no conjunto:  Rh = R₁ + Σ Rhm;      Req = 1 / Σ (1/Rh);      índice de redução K = Req/R₁',
-    'Cabo horizontal enterrado:  R = ρ/(πL) · [ln(2L/√(2·r·h)) − 1]   (r = raio do condutor; h = profundidade)'];
+    ...(simples ? ['Número de hastes: menor quantidade de hastes alinhadas, com o espaçamento adotado, para a qual Req ≤ Rmáx'] : ['Cabo horizontal enterrado:  R = ρ/(πL) · [ln(2L/√(2·r·h)) − 1]   (r = raio do condutor; h = profundidade)'])];
   if (temMalha) L5.push('Malha (Sverak):  Rg = ρ · [1/LT + 1/√(20A) · (1 + 1/(1 + h·√(20/A)))]', 'Malha com hastes (Schwarz):  Rg = (R₁R₂ − Rm²)/(R₁ + R₂ − 2Rm)   — R₁ condutores, R₂ hastes, Rm mútua (k₁, k₂ da IEEE 80)');
   B.push({ t: 'eq', lines: L5 });
   B.push({ t: 'p', text: 'As hastes de um conjunto são consideradas interligadas e equipotenciais; a contribuição do cabo de interligação é desprezada, a favor da segurança. ' + (rs.m2 ? 'Em solo de duas camadas, a resistividade vista pelo eletrodo é a equivalente de Hummel até a profundidade alcançada (camadas em paralelo): ρeq = d / (h₁/ρ₁ + (d − h₁)/ρ₂).' : '') });
@@ -3532,6 +3630,13 @@ function construirMemorialAterramento(proj, calc, ca) {
   sec('Resumo');
   B.push({ t: 'table', head: ['Sistema', 'Configuração', 'ρ de cálculo (Ω·m)', 'R (Ω)', 'Limite (Ω)', 'Situação'], widths: [20, 34, 13, 10, 10, 13], align: 'llrrrl',
     rows: A.map(a => { const r = ca.arr[a.id]; return [a.nome, geomArranjoTxt(a, r), f0(r.rho), f2(r.R), r.rmax > 0 ? f1(r.rmax) : '—', statusTxt(r.status)]; }) });
+
+  const mats = {}; A.forEach(a => (ca.arr[a.id].materiais || []).forEach(([d, q, u]) => { const k = d + '|' + u; mats[k] = (mats[k] || 0) + q; }));
+  if (Object.keys(mats).length) {
+    sec('Lista de materiais');
+    B.push({ t: 'table', head: ['Item', 'Descrição', 'Quantidade', 'Unid.'], widths: [8, 64, 16, 12], align: 'llrl', rows: Object.entries(mats).map(([k, q], i) => { const [d, u] = k.split('|'); return [String(i + 1), d, u === 'm' ? f1(q) : f0(q), u]; }) });
+    B.push({ t: 'note', text: 'Quantidades de projeto, sem perdas; acrescente reserva para emendas, sobras e conexões. Cabos e condutores conforme a seção indicada em cada sistema e a norma da concessionária, quando aplicável.' });
+  }
 
   sec('Execução, medição e manutenção');
   B.push({ t: 'list', items: [
@@ -3549,8 +3654,10 @@ function memArranjo(B, a, r, rs, proj, num) {
   B.push({ t: 'h2', text: `${num} ${a.nome}` });
   B.push({ t: 'kv4', rows: [['Tipo', TIPOS_ATERR[a.tipo], 'Função', FUNC_ATERR[a.funcao].nome], ['Configuração', geomArranjoTxt(a, r), 'ρ de cálculo', `${f0(r.rho)} Ω·m — ${r.rhoTxt}`]] });
   if (!(r.rho > 0)) { r.falhas.forEach(x => B.push({ t: 'ver', ok: false, text: x })); return; }
+  const hastes = TIPOS_HASTES.includes(a.tipo);
+  if (hastes) B.push({ t: 'fig', svg: svgDoc(esquemaHastesSVG(a, r, true), 520, 250), ar: 250 / 520, w: 110, caption: `Esboço da instalação (vista lateral, sem escala): condutor de aterramento em eletroduto desde o quadro/BEP, caixas de inspeção, cabo nu de interligação e hastes.` });
   B.push({ t: 'fig', svg: svgDoc(arranjoSVG(a, r, true), 480, 260), ar: 260 / 480, w: 100, caption: `Planta — ${a.nome}.` });
-  B.push({ t: 'fig', svg: svgDoc(corteAterrSVG(a, r, rs, true), 480, 210), ar: 210 / 480, w: 100, caption: 'Corte esquemático com as camadas do solo consideradas (escala vertical; distâncias horizontais fora de escala).' });
+  if (!hastes || rs.modelo === '2c') B.push({ t: 'fig', svg: svgDoc(corteAterrSVG(a, r, rs, true), 480, 210), ar: 210 / 480, w: 100, caption: 'Corte esquemático com as camadas do solo consideradas (escala vertical; distâncias horizontais fora de escala).' });
   if (TIPOS_HASTES.includes(a.tipo)) {
     const L = +a.L, d = +a.d / 1000, Lin = [`R₁ = ${f0(r.rho)} / (2π × ${f2(L)}) × ln(4 × ${f2(L)} / ${nfmt(d, 4)}) = ${f2(r.R1)} Ω`];
     if (r.nH > 1) {
@@ -3560,6 +3667,12 @@ function memArranjo(B, a, r, rs, proj, num) {
     }
     B.push({ t: 'eq', lines: Lin });
     if (r.nH > 1 && r.nH <= 16) B.push({ t: 'table', small: true, head: ['Haste', ...r.Rh.map((_, i) => 'H' + (i + 1))], widths: [16, ...r.Rh.map(() => 84 / r.Rh.length)], align: 'l' + 'r'.repeat(r.Rh.length), rows: [['Rh (Ω)', ...r.Rh.map(f2)]] });
+    if (r.serie) {
+      const sr = r.serie.slice(0, 12);
+      B.push({ t: 'p', text: `Resistência em função do número de hastes alinhadas espaçadas de ${f2(+a.e || L)} m${r.nMin ? ` — mínimo para ${f1(r.rmax)} Ω: ${r.nMin} haste(s)` : ''}:` });
+      B.push({ t: 'table', small: true, head: ['Hastes', ...sr.map(x => String(x.n))], widths: [16, ...sr.map(() => 84 / sr.length)], align: 'l' + 'r'.repeat(sr.length), rows: [['R (Ω)', ...sr.map(x => f1(x.R))]] });
+      B.push({ t: 'fig', svg: svgDoc(serieHastesSVG(r, r.rmax, true), 480, 210), ar: 210 / 480, w: 95, caption: 'Resistência de aterramento em função do número de hastes alinhadas (barras escuras: atendem ao limite; contorno: quantidade adotada).' });
+    }
   } else if (a.tipo === 'cabo') {
     B.push({ t: 'eq', lines: [`R = ${f0(r.rho)} / (π × ${f2(+a.Lc)}) × [ln(2 × ${f2(+a.Lc)} / √(2 × ${nfmt(r.dCabo / 2, 4)} × ${f2(+a.hc)})) − 1] = ${f2(r.R)} Ω`] });
   } else {
@@ -3621,11 +3734,13 @@ const MEMORIAS = [
   { id: 'clima', nome: 'Carga térmica de climatização', norma: 'ABNT NBR 16401-1:2024 · 16401-2:2024 · 16401-3:2008', arq: 'memorial-carga-termica', titulo: 'Memorial de cálculo de carga térmica', rodape: 'Carga térmica conforme ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008',
     tem: p => (p.clima.amb || []).length > 0, resumo: p => `${p.clima.amb.length} ambiente(s)`, falha: (p, k) => Object.values(k.clima.amb).some(r => r.status === 'fail'),
     build: (p, k) => construirMemorialClima(p, k, k.clima) },
-  { id: 'aterr', nome: 'Aterramento', norma: 'ABNT NBR 5410 · NBR 7117-1 · NBR 15751 · IEEE 80', arq: 'memorial-aterramento', titulo: 'Memorial de cálculo de aterramento', rodape: 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013',
+  { id: 'aterr', nome: 'Aterramento', norma: p => p.aterr.modo === 'completo' ? 'ABNT NBR 5410 · NBR 7117-1 · NBR 15751 · IEEE 80' : 'ABNT NBR 5410 · método simplificado de hastes', arq: 'memorial-aterramento', titulo: 'Memorial de cálculo de aterramento',
+    rodape: p => p.aterr.modo === 'completo' ? 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013' : 'Aterramento conforme ABNT NBR 5410:2004 — método simplificado de hastes',
     tem: p => (p.aterr.arr || []).length > 0, resumo: (p, k) => { const nf = p.aterr.arr.filter(a => k.aterr.arr[a.id].status === 'fail').length; return `${p.aterr.arr.length} sistema(s)${nf ? ` · ${nf} com pendência` : ''}`; },
     falha: (p, k) => k.aterr.status === 'fail', build: (p, k) => construirMemorialAterramento(p, k, k.aterr) }
 ];
 const MEMO = Object.fromEntries(MEMORIAS.map(m => [m.id, m]));
+const normaDe = (m, p) => typeof m.norma === 'function' ? m.norma(p) : m.norma;
 const assinaturaRT = I => ({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
 const prefixoParte = (t, L) => /^\d/.test(t) ? `${L}.${t}` : `${L} — ${t}`;
 
@@ -3638,12 +3753,12 @@ function construirConsolidado(proj, calc, ids, opt = {}) {
     ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
   B.push({ t: 'h1', text: 'Sumário' });
   B.push({ t: 'table', head: ['Parte', 'Memória de cálculo', 'Referência normativa', 'Conteúdo'], widths: [9, 33, 34, 24], align: 'llll',
-    rows: partes.map((p, i) => [String.fromCharCode(65 + i), p.nome, p.norma, p.resumo(proj, calc)]) });
+    rows: partes.map((p, i) => [String.fromCharCode(65 + i), p.nome, normaDe(p, proj), p.resumo(proj, calc)]) });
   B.push({ t: 'p', text: 'Cada parte reúne a memória de cálculo completa da respectiva disciplina, com numeração própria precedida da letra da parte. As partes também podem ser emitidas separadamente.' });
   partes.forEach((p, i) => {
     const L = String.fromCharCode(65 + i);
     B.push({ t: 'break' });
-    B.push({ t: 'parte', letra: L, text: p.nome, sub: p.norma });
+    B.push({ t: 'parte', letra: L, text: p.nome, sub: normaDe(p, proj) });
     p.build(proj, calc, { ...opt, assinatura: false }).forEach(b => {
       if (b.t === 'title' || b.t === 'meta' || (b.t === 'sign' && !b.titular)) return;
       B.push(b.t === 'h1' || b.t === 'h2' || b.t === 'h3' ? { ...b, text: prefixoParte(b.text, L) } : b);
@@ -3655,7 +3770,7 @@ function construirConsolidado(proj, calc, ids, opt = {}) {
 function metaMemoria(proj, id) {
   const I = proj.info, m = MEMO[id], t = m ? m.titulo : 'Memorial de cálculo consolidado';
   const rod = m ? (typeof m.rodape === 'function' ? m.rodape(proj) : m.rodape) : 'Memorial de cálculo consolidado';
-  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`, rodape: rod + ' — gerado com Dimensiona 5410', assunto: m ? `${t} — ${m.norma}` : t };
+  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`, rodape: rod + ' — gerado com Dimensiona 5410', assunto: m ? `${t} — ${normaDe(m, proj)}` : t };
 }
 function docMemoria(proj, calc, id, opt = {}, grupo) {
   const rev = (proj.info.revisao || 'R00').toLowerCase(), sl = slugTxt(proj.info.obra);
@@ -4458,20 +4573,26 @@ function normalizarAterr(t) {
   const base = aterrPadrao(), out = { ...base, ...(t || {}) };
   out.solo = { ...soloPadrao(), ...((t && t.solo) || {}) }; out.solo.med = Array.isArray(out.solo.med) ? out.solo.med : [];
   out.arr = (Array.isArray(out.arr) ? out.arr : []).map(a => ({ ...arrPadrao(a.tipo || 'linha', FUNC_ATERR[a.funcao] ? a.funcao : 'massas'), ...a }));
+  if (!t || !t.modo) out.modo = out.arr.some(a => !TIPOS_HASTES.includes(a.tipo)) || out.solo.modelo === '2c' ? 'completo' : 'simplificado';
   return out;
 }
 function renderAterr() {
-  const T = PROJ.aterr, S = T.solo, ca = CALC.aterr;
+  const T = PROJ.aterr, S = T.solo, ca = CALC.aterr, simples = T.modo !== 'completo';
   if (!arrSel()) ASEL = T.arr[0]?.id || null;
+  const nExc = T.arr.filter(a => ca.arr[a.id].excluido).length;
+  const origens = [['tipico', 'Valor típico pelo tipo de solo'], ['direto', 'Resistividade informada'], ['wenner', simples ? 'Medições de Wenner (média)' : 'Medições pelo método de Wenner']];
   $('#tab-aterr').innerHTML = `
-  <div class="mem-bar"><div><h2 class="tit">Aterramento</h2><p class="sub" style="margin:0">Resistividade do solo pelo método de Wenner (NBR 7117-1:2020), resistência de hastes, cabos e malhas, e verificação das tensões de toque e de passo (NBR 15751:2013 / IEEE Std 80-2013).</p></div>
+  <div class="mem-bar"><div><h2 class="tit">Aterramento</h2><p class="sub" style="margin:0">${simples ? 'Modo simplificado: eletrodos de hastes verticais — resistência, número de hastes para o limite, esboço da instalação e lista de materiais.' : 'Modo completo: solo estratificado pelo método de Wenner (NBR 7117-1:2020), hastes, cabo contrapeso e malha com tensões de toque e de passo (NBR 15751:2013 / IEEE Std 80-2013).'}</p></div>
   <div class="mem-bt"><span class="mini" style="align-self:center">Memorial de aterramento:</span><button class="btn pri" type="button" data-exp="pdf" data-doc="aterr">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="aterr">Word</button><button class="btn" type="button" data-exp="html" data-doc="aterr">HTML</button></div></div>
-  <fieldset data-scope="asolo"><legend>Resistividade do solo (NBR 7117-1:2020)</legend><div class="grade">
-    ${fSel('as', 'modo', 'Origem do dado', S.modo, [['wenner', 'Medições pelo método de Wenner'], ['direto', 'Resistividade informada']], { struct: true })}
-    ${S.modo === 'direto' ? fNum('as', 'rho', 'Resistividade do solo', S.rho, { u: 'Ω·m' }) + fTxt('as', 'local', 'Origem do dado', S.local, { cls: 'w2', ph: 'ex.: sondagem, obra vizinha, estimativa' })
+  <div class="ref-sel" role="group" aria-label="Modo de cálculo"><button class="btn sm" type="button" data-amodo="simplificado" aria-pressed="${simples}">Simplificado — só hastes</button><button class="btn sm" type="button" data-amodo="completo" aria-pressed="${!simples}">Completo — solo em camadas, cabo e malha</button></div>
+  ${nExc ? `<p class="mini" style="margin:-4px 0 12px">${nExc} sistema(s) de cabo ou malha ficam fora do modo simplificado (não entram no cálculo nem no memorial) — use o modo completo para editá-los.</p>` : ''}
+  <fieldset data-scope="asolo"><legend>Resistividade do solo</legend><div class="grade">
+    ${fSel('as', 'modo', 'Origem do dado', S.modo, origens, { struct: true })}
+    ${S.modo === 'tipico' ? fSel('as', 'tipoSolo', 'Tipo de solo', S.tipoSolo, Object.entries(SOLOS_TIPICOS).map(([k, v]) => [k, `${v.nome} — ${v.faixa} Ω·m`]), { cls: 'w2', dica: 'valores típicos da literatura (Kindermann & Campagnolo); adota-se o limite superior da faixa' })
+      : S.modo === 'direto' ? fNum('as', 'rho', 'Resistividade do solo', S.rho, { u: 'Ω·m' }) + fTxt('as', 'local', 'Origem do dado', S.local, { cls: 'w2', ph: 'ex.: sondagem, obra vizinha, estimativa' })
       : `${fNum('as', 'p', 'Profundidade dos eletrodos de medição', S.p, { u: 'm' })}
          ${fSel('as', 'media', 'Média por espaçamento', S.media, [['geo', 'Geométrica (log-normal, NBR 7117-1:2020)'], ['ar', 'Aritmética']])}
-         ${fSel('as', 'modelo', 'Modelo do solo', S.modelo, [['homog', 'Homogêneo (média)'], ['2c', 'Duas camadas (ajuste)']], { struct: true })}
+         ${simples ? '' : fSel('as', 'modelo', 'Modelo do solo', S.modelo, [['homog', 'Homogêneo (média)'], ['2c', 'Duas camadas (ajuste)']], { struct: true })}
          ${fChk('as', 'descartar', 'Descartar leituras com desvio > 50 % da média', S.descartar)}
          ${fTxt('as', 'local', 'Local da medição', S.local, { ph: 'ex.: terreno da obra, eixo A–B' })}${fTxt('as', 'data', 'Data da medição', S.data, { ph: 'aaaa-mm-dd' })}${fTxt('as', 'equip', 'Instrumento', S.equip, { ph: 'terrômetro, modelo' })}`}
     ${fNum('as', 'fs', 'Fator sazonal (multiplica ρ)', S.fs, { dica: '1,0 se medido em época seca' })}
@@ -4483,7 +4604,7 @@ function renderAterr() {
   <div id="a-solo-res" style="margin-top:12px"></div></fieldset>
   <div class="bancada">
     <aside class="lista" aria-label="Sistemas de aterramento">
-      <div class="lista-topo"><select id="a-novo-tipo" aria-label="Tipo de arranjo" style="flex:1 1 150px;width:auto">${opts(Object.entries(TIPOS_ATERR), 'linha')}</select><button class="btn pri" type="button" id="bt-add-arr">Adicionar</button></div>
+      <div class="lista-topo"><select id="a-novo-tipo" aria-label="Tipo de arranjo" style="flex:1 1 150px;width:auto">${opts(Object.entries(TIPOS_ATERR).filter(([k]) => !simples || TIPOS_HASTES.includes(k)), 'linha')}</select><button class="btn pri" type="button" id="bt-add-arr">Adicionar</button></div>
       <div class="lista-itens" id="a-itens"></div>
       <div style="padding:10px;border-top:1px solid var(--line);display:grid;gap:6px"><button class="btn" type="button" id="bt-arr-ndu">Padrão de entrada (NDU 001)</button></div>
     </aside>
@@ -4494,7 +4615,7 @@ function renderAterr() {
 function renderAterrSolo() {
   const box = $('#a-solo-res'); if (!box) return; const rs = CALC.aterr.solo, S = PROJ.aterr.solo;
   (S.med || []).forEach((m, i) => { const l = rs.linhas.find(x => x.a === +m.a && x.R === +m.R && (x.dir || '') === (m.dir || '')); const r = $('#am-r-' + i), d = $('#am-d-' + i); if (r) r.textContent = l ? nfmt(l.rho, 0) : '—'; if (d) d.innerHTML = l ? `<span style="color:${l.desc ? 'var(--warn)' : 'inherit'}">${(l.desvio >= 0 ? '+' : '') + nfmt(l.desvio * 100, 0)} %${l.desc ? ' ✗' : ''}</span>` : '—'; });
-  const res = rs.modo === 'direto' ? `<p class="mini" style="margin:0">ρ de cálculo = <b>${nfmt(rs.rho, 0)} Ω·m</b> (solo homogêneo${rs.fs !== 1 ? `, com fator sazonal ${nfmt(rs.fs, 2)}` : ''}).</p>`
+  const res = rs.modo === 'direto' || rs.modo === 'tipico' ? `<p class="mini" style="margin:0">ρ de cálculo = <b>${nfmt(rs.rho, 0)} Ω·m</b> (solo homogêneo${rs.fs !== 1 ? `, com fator sazonal ${nfmt(rs.fs, 2)}` : ''}).</p>`
     : !rs.porA.length ? '' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;align-items:start">
       <div style="min-width:0">${soloSVG(rs, false)}</div>
       <div style="min-width:0"><table class="tbl nt"><thead><tr><th>a (m)</th><th class="r">Leituras</th><th class="r">ρa médio</th>${rs.m2 ? '<th class="r">Modelo</th>' : ''}</tr></thead><tbody>${rs.porA.map(q => `<tr><td>${nfmt(q.a, 2)}</td><td class="r">${q.n - q.nDesc}/${q.n}</td><td class="r">${nfmt(q.rho, 0)}</td>${rs.m2 ? `<td class="r">${nfmt(q.modelo, 0)}</td>` : ''}</tr>`).join('')}</tbody></table>
@@ -4504,12 +4625,13 @@ function renderAterrSolo() {
 function renderArrLista() {
   const box = $('#a-itens'); if (!box) return; const A = PROJ.aterr.arr;
   if (!A.length) { box.innerHTML = '<p class="mini" style="padding:12px">Nenhum sistema de aterramento. Escolha o tipo e clique em Adicionar, ou crie o padrão de entrada da NDU 001.</p>'; return; }
-  box.innerHTML = A.map((a, i) => { const r = CALC.aterr.arr[a.id]; return `<button type="button" class="item" data-asel="${a.id}" aria-current="${a.id === ASEL}"><span class="n">${i + 1}</span><span class="d">${esc(a.nome)}</span><span class="pill ${r.status}">${pillTxt(r.status)}</span><span class="e">${TIPOS_ATERR[a.tipo]} · ${nfmt(r.R, 2)} Ω${r.rmax > 0 ? ` / ${nfmt(r.rmax, 0)} Ω` : ''}</span></button>`; }).join('');
+  box.innerHTML = A.map((a, i) => { const r = CALC.aterr.arr[a.id]; return `<button type="button" class="item" data-asel="${a.id}" aria-current="${a.id === ASEL}"${r.excluido ? ' style="opacity:.55"' : ''}><span class="n">${i + 1}</span><span class="d">${esc(a.nome)}</span>${r.excluido ? '<span class="pill">Completo</span>' : `<span class="pill ${r.status}">${pillTxt(r.status)}</span>`}<span class="e">${TIPOS_ATERR[a.tipo]}${r.excluido ? ' · só no modo completo' : ` · ${nfmt(r.R, 2)} Ω${r.rmax > 0 ? ` / ${nfmt(r.rmax, 0)} Ω` : ''}${r.nH ? ` · ${r.nH} haste(s)` : ''}`}</span></button>`; }).join('');
 }
 function renderArrEditor() {
   const box = $('#a-ed'); if (!box) return; const a = arrSel();
   if (!a) { box.innerHTML = '<div class="res" style="padding:24px"><h2 class="tit">Sem sistemas de aterramento</h2><p class="sub">Calcule desde uma haste única até uma malha completa: escolha o tipo na lista ao lado.</p></div>'; return; }
-  box.innerHTML = `<div class="ed-topo"><span class="mini">Sistema ${PROJ.aterr.arr.indexOf(a) + 1} de ${PROJ.aterr.arr.length}</span><span style="display:flex;gap:6px">${PROJ.params.aterramento === 'TT' && a.funcao === 'massas' ? '<button class="btn sm" type="button" id="bt-aplicar-ra">Usar R como RA do esquema TT</button>' : ''}<button class="btn sm" type="button" id="bt-dup-arr">Duplicar</button><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></span></div>
+  if (CALC.aterr.arr[a.id].excluido) { box.innerHTML = `<div class="res" style="padding:24px"><h2 class="tit">${esc(a.nome)}</h2><p class="sub">${TIPOS_ATERR[a.tipo]}: disponível só no modo completo. Mude o modo no topo da aba para editar e calcular este sistema, ou exclua-o.</p><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></div>`; return; }
+  box.innerHTML = `<div class="ed-topo"><span class="mini">Sistema ${PROJ.aterr.arr.indexOf(a) + 1} de ${PROJ.aterr.arr.length}</span><span style="display:flex;gap:6px">${(a.tipo === 'linha' || a.tipo === 'haste') && CALC.aterr.arr[a.id].nMin && CALC.aterr.arr[a.id].nMin !== CALC.aterr.arr[a.id].nH ? `<button class="btn sm pri" type="button" id="bt-dim-hastes">Usar ${CALC.aterr.arr[a.id].nMin} haste(s) (mínimo p/ o limite)</button>` : ''}${PROJ.params.aterramento === 'TT' && a.funcao === 'massas' ? '<button class="btn sm" type="button" id="bt-aplicar-ra">Usar R como RA do esquema TT</button>' : ''}<button class="btn sm" type="button" id="bt-dup-arr">Duplicar</button><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></span></div>
     <section class="res" id="a-res" aria-live="polite"></section><div id="a-form"></div>`;
   renderArrRes(); renderArrForm();
 }
@@ -4521,7 +4643,9 @@ function renderArrRes() {
   if (r.tt) met.push(['RA máx. (TT)', `${f0(r.tt.RAmax)} Ω`]);
   box.innerHTML = `<div class="res-cab"><h3>${esc(a.nome)}</h3><span class="pill ${r.status}">${statusTxt(r.status)}</span></div>
     <div class="metr num">${met.map(([x, y]) => `<div><small>${x}</small><span${(x === 'Resistência' && !r.okR) || (x.startsWith('Toque') && r.okToque === false) || (x.startsWith('Passo') && r.okPasso === false) ? ' class="bad"' : ''}>${y}</span></div>`).join('')}</div>
-    ${r.rho > 0 ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${corteAterrSVG(a, r, CALC.aterr.solo, false)}</div></div>` : ''}
+    ${r.rho > 0 ? (r.serie ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${esquemaHastesSVG(a, r, false)}</div><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${serieHastesSVG(r, r.rmax, false)}</div>
+      <div style="min-width:0"><table class="tbl"><thead><tr><th>Material</th><th class="r">Qtd.</th></tr></thead><tbody>${r.materiais.map(([d, q, u]) => `<tr><td class="wrap">${esc(d)}</td><td class="r">${u === 'm' ? nfmt(q, 1) : q} ${u}</td></tr>`).join('')}</tbody></table></div></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${corteAterrSVG(a, r, CALC.aterr.solo, false)}</div></div>`) : ''}
     <p class="mini" style="margin:0;padding:0 14px 10px">ρ: ${esc(r.rhoTxt || '')}</p>
     ${r.falhas.length || r.avisos.length ? `<ul class="msgs">${r.falhas.map(x => `<li class="fail">${esc(x)}</li>`).join('')}${r.avisos.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : ''}`;
 }
@@ -4535,7 +4659,11 @@ function renderArrForm() {
       ${a.tipo === 'linha' || a.tipo === 'circ' ? fNum('aa', 'n', 'Número de hastes', a.n) : ''}
       ${a.tipo === 'quadVazio' || a.tipo === 'quadCheio' ? fNum('aa', 'm', 'Hastes por lado', a.m) : ''}
       ${a.tipo === 'circ' ? fNum('aa', 'raio', 'Raio da circunferência', a.raio, { u: 'm' }) : ''}
-      ${a.tipo !== 'haste' && a.tipo !== 'circ' ? fNum('aa', 'e', 'Espaçamento entre hastes', a.e, { u: 'm' }) : (a.tipo === 'haste' ? fNum('aa', 'e', 'Espaçamento p/ hastes adicionais', a.e, { u: 'm', dica: 'usado na sugestão de nº de hastes' }) : '')}`;
+      ${a.tipo !== 'haste' && a.tipo !== 'circ' ? fNum('aa', 'e', 'Espaçamento entre hastes', a.e, { u: 'm' }) : (a.tipo === 'haste' ? fNum('aa', 'e', 'Espaçamento p/ hastes adicionais', a.e, { u: 'm', dica: 'usado na sugestão de nº de hastes' }) : '')}
+      ${fNum('aa', 'hc', 'Profundidade do cabo de interligação', a.hc, { u: 'm' })}
+      ${fSel('aa', 'Scond', 'Seção do cabo / condutor de aterramento', a.Scond, [10, 16, 25, 35, 50, 70].map(x => [x, `${x} mm²`]), { type: 'numsel', dica: r.ndu ? `NDU 001, categoria ${r.ndu.cat}: ${r.ndu.aterr} mm²` : '' })}
+      ${fNum('aa', 'Lq', 'Distância da 1ª haste ao quadro / BEP', a.Lq, { u: 'm' })}
+      ${fSel('aa', 'caixas', 'Caixas de inspeção', a.caixas, Object.entries(CAIXAS_INSP), { cls: 'w2' })}`;
   } else if (a.tipo === 'cabo') {
     geo = `${fNum('aa', 'Lc', 'Comprimento do cabo', a.Lc, { u: 'm' })}${fNum('aa', 'hc', 'Profundidade', a.hc, { u: 'm' })}${fSel('aa', 'S', 'Seção do cabo nu', a.S, secs, { type: 'numsel' })}`;
   } else {
@@ -4559,7 +4687,7 @@ function renderArrForm() {
   box.innerHTML = `
   <fieldset data-scope="aarr"><legend>Sistema de aterramento</legend><div class="grade">
     ${fTxt('aa', 'nome', 'Nome', a.nome, { cls: 'w2' })}
-    ${fSel('aa', 'tipo', 'Configuração', a.tipo, Object.entries(TIPOS_ATERR), { struct: true })}
+    ${fSel('aa', 'tipo', 'Configuração', a.tipo, Object.entries(TIPOS_ATERR).filter(([k]) => PROJ.aterr.modo === 'completo' || TIPOS_HASTES.includes(k)), { struct: true })}
     ${fSel('aa', 'funcao', 'Função', a.funcao, Object.entries(FUNC_ATERR).map(([k, v]) => [k, v.nome]), { struct: true, cls: 'w2' })}
     ${fNum('aa', 'rmax', 'Resistência máxima', a.rmax, { u: 'Ω', dica: FUNC_ATERR[a.funcao].ref })}
     ${fNum('aa', 'rhoMan', 'ρ do arranjo (opcional)', a.rhoMan, { u: 'Ω·m', ph: Math.round(r.rho), dica: 'deixe vazio para usar o modelo do solo' })}
@@ -4578,7 +4706,7 @@ function efeitosArranjo(a, k) {
 function atualizarAterrParcial() { renderAterrSolo(); renderArrLista(); renderArrRes(); }
 function criarArranjoNDU() {
   const ce = CALC.energisa && Object.values(CALC.energisa.ucs || {})[0], cat = ce && ce.cat, n = cat ? cat.hastes : 3;
-  const a = arrPadrao('linha', 'entrada'); Object.assign(a, { nome: `Padrão de entrada${cat ? ` — categoria ${cat.cat}` : ''} (NDU 001)`, n: Math.max(1, n), haste: 'h34-240', L: 2.4, d: 17.3, e: 2.4, rmax: 20 });
+  const a = arrPadrao('linha', 'entrada'); Object.assign(a, { nome: `Padrão de entrada${cat ? ` — categoria ${cat.cat}` : ''} (NDU 001)`, n: Math.max(1, n), haste: 'h34-240', L: 2.4, d: 17.3, e: 2.4, rmax: 20, Scond: cat && +cat.aterr ? +cat.aterr : 16, Lq: 3 });
   if (n === 1) a.tipo = 'haste';
   PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true);
   toast(cat ? `Arranjo criado com ${n} haste(s) de 3/4" × 2,40 m, conforme a categoria ${cat.cat} da NDU 001.` : 'Arranjo criado com 3 hastes; calcule a demanda Energisa para ajustar ao mínimo da categoria.');
@@ -5321,7 +5449,7 @@ function renderMemoria() {
   const linha = m => { const ok = disp.includes(m), fl = ok && m.falha(PROJ, CALC);
     return `<div class="mem-item${MEMSEL === m.id ? ' on' : ''}${ok ? '' : ' vazio'}" data-scope="memgrupo">
       <label class="chk" title="Incluir no relatório consolidado"><input type="checkbox" data-k="${m.id}" data-type="chk"${grupo.includes(m.id) ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="Incluir ${esc(m.nome)} no consolidado"></label>
-      <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(m.norma)} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
+      <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(normaDe(m, PROJ))} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
       ${ok ? `<span class="pill ${fl ? 'fail' : 'ok'}">${fl ? 'Pendente' : 'OK'}</span><span class="mem-exp"><button class="btn sm" type="button" data-exp="pdf" data-doc="${m.id}">PDF</button><button class="btn sm" type="button" data-exp="docx" data-doc="${m.id}">Word</button><button class="btn sm" type="button" data-exp="html" data-doc="${m.id}">HTML</button></span>` : ''}
     </div>`; };
   $('#tab-memoria').innerHTML = `
@@ -5452,6 +5580,7 @@ document.addEventListener('click', ev => {
   if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.asel) { ASEL = el.dataset.asel; renderArrLista(); renderArrEditor(); if (window.innerWidth < 900) $('#a-ed').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
+  if (el.dataset.amodo) { PROJ.aterr.modo = el.dataset.amodo; if (el.dataset.amodo === 'simplificado' && PROJ.aterr.solo.modelo === '2c') PROJ.aterr.solo.modelo = 'homog'; mudou(true); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
   if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); return; }
   if (el.dataset.mat) { REFMAT = el.dataset.mat; renderTabelas(); return; }
@@ -5487,6 +5616,7 @@ document.addEventListener('click', ev => {
     case 'bt-med-serie': { const M = PROJ.aterr.solo.med, dir = String.fromCharCode(65 + new Set(M.map(m => m.dir)).size); [1, 2, 4, 8, 16].forEach(a => M.push({ dir, a, R: null })); mudou(true); return; }
     case 'bt-add-arr': { const t = $('#a-novo-tipo').value, a = arrPadrao(t, t === 'malha' ? 'subestacao' : 'massas'); PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true); return; }
     case 'bt-arr-ndu': return criarArranjoNDU();
+    case 'bt-dim-hastes': { const a = arrSel(), r = a && CALC.aterr.arr[a.id]; if (!r || !r.nMin) return; if (a.tipo === 'haste' && r.nMin > 1) a.tipo = 'linha'; a.n = r.nMin; mudou(true); toast(`${r.nMin} haste(s) alinhadas: R = ${nfmt(r.nMinR, 2)} Ω.`); return; }
     case 'bt-dup-arr': { const a = arrSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = a.nome + ' (cópia)'; PROJ.aterr.arr.splice(PROJ.aterr.arr.indexOf(a) + 1, 0, n); ASEL = n.id; mudou(true); return; }
     case 'bt-exc-arr': return confirmar2(el, 'Confirmar exclusão', () => { const A = PROJ.aterr.arr, i = A.findIndex(a => a.id === ASEL); if (i < 0) return; const [rm] = A.splice(i, 1); ASEL = (A[i] || A[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluído.`); });
     case 'bt-aplicar-ra': { const a = arrSel(); if (!a) return; PROJ.params.RA = +CALC.aterr.arr[a.id].R.toFixed(2); mudou(true); toast(`RA = ${nfmt(PROJ.params.RA, 2)} Ω aplicado ao esquema TT (verificação RA × IΔn nos circuitos).`); return; }

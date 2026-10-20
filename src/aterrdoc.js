@@ -100,6 +100,49 @@ function soloSVG(rs, doc = true) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Curva de resistividade aparente do solo"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}</svg>`;
 }
 
+/* esboço da instalação (vista lateral, sem escala): quadro/BEP, eletroduto, caixas de inspeção, cabo nu e hastes */
+function esquemaHastesSVG(a, r, doc = true) {
+  const C = corAterr(doc), W = 520, H = 250, yS = 92, f2 = v => nfmt(v, 2), S = +a.Scond || 16;
+  const n = r.nH, mostra = Math.min(n, 4), xs = mostra === 1 ? [300] : Array.from({ length: mostra }, (_, i) => 190 + i * 250 / (mostra - 1));
+  const zc = yS + 26, zL = yS + 118, x0 = xs[0], xl = xs[mostra - 1];
+  let g = `<rect x="0" y="${yS}" width="${W}" height="${H - yS}" fill="${C.solo1}"/><line x1="0" y1="${yS}" x2="${W}" y2="${yS}" stroke="${C.ink}" stroke-width="1.4"/>`;
+  // quadro de medição / BEP na parede
+  g += `<rect x="18" y="16" width="10" height="${yS - 16}" fill="${C.solo2}" stroke="${C.mut}" stroke-width="0.6"/><rect x="28" y="24" width="46" height="40" fill="${C.bg}" stroke="${C.ink}" stroke-width="1.2"/><line x1="34" y1="54" x2="68" y2="54" stroke="${C.cu}" stroke-width="2.2"/>` +
+    txtA(C, 51, 37, 'QUADRO', { fs: 7.5, anc: 'middle', b: true }) + txtA(C, 51, 47, '/ BEP', { fs: 7.5, anc: 'middle', b: true });
+  // condutor de aterramento em eletroduto até a primeira caixa
+  g += `<path d="M58 64 V${yS + 6} H${x0 - 12}" fill="none" stroke="${C.mut}" stroke-width="7" stroke-linejoin="round" opacity=".35"/><path d="M58 64 V${yS + 6} H${x0}" fill="none" stroke="${C.cu}" stroke-width="1.8"/>` +
+    txtA(C, 82, yS - 24, `condutor ${S} mm²`, { fs: 8.5, cor: C.mut }) + txtA(C, 82, yS - 13, `em eletroduto${+a.Lq > 0 ? ` (${f2(+a.Lq)} m)` : ''}`, { fs: 8.5, cor: C.mut });
+  if (mostra > 1) g += `<line x1="${x0}" y1="${zc}" x2="${xl}" y2="${zc}" stroke="${C.cu}" stroke-width="2.4"/>`;
+  xs.forEach((x, i) => {
+    if (a.caixas !== 'primeira' || i === 0) g += `<rect x="${x - 12}" y="${yS - 5}" width="24" height="${zc - yS + 9}" fill="${C.bg}" stroke="${C.ink}" stroke-width="1"/><rect x="${x - 15}" y="${yS - 8}" width="30" height="4" fill="${C.mut}"/>`;
+    g += `<rect x="${x - 3}" y="${zc - 6}" width="6" height="${zL - zc + 6}" fill="${C.cu}" stroke="${C.ink}" stroke-width="0.6"/><circle cx="${x}" cy="${zc}" r="3.2" fill="${C.ink}"/>` +
+      txtA(C, x + 7, zL - 4, 'H' + (n > 4 && i === 3 ? n : i + 1), { fs: 8.5, cor: C.mut });
+  });
+  if (n > 4) g += txtA(C, (xs[2] + xs[3]) / 2, zc - 6, '· · ·', { fs: 12, anc: 'middle', b: true });
+  g += cotaA(C, xl + 22, yS, xl + 22, zc, `${f2(+a.hc)} m`, -20) + cotaA(C, xl + 54, yS, xl + 54, zL, `L = ${f2(+a.L)} m`, -14);
+  if (mostra > 1) g += cotaA(C, xs[0], zL + 14, xs[1], zL + 14, `e = ${f2(+a.e)} m`);
+  g += `<line x1="${x0 + 12}" y1="${yS - 7}" x2="${x0 + 34}" y2="${yS - 32}" stroke="${C.mut}" stroke-width="0.7"/>` + txtA(C, x0 + 37, yS - 30, a.caixas === 'primeira' ? 'caixa de inspeção (conexão)' : 'caixa de inspeção em cada haste', { fs: 8.5 });
+  g += txtA(C, 10, H - 6, `${n} haste(s) aço-cobreada(s) Ø ${nfmt(+a.d, 1)} mm × ${f2(+a.L)} m${n > 1 ? ` interligadas por cabo de cobre nu ${S} mm² a ${f2(+a.hc)} m` : ''}`, { fs: 8.5, cor: C.mut });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Esboço da instalação do aterramento"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}${txtA(C, W - 8, 16, `ESBOÇO DA INSTALAÇÃO — sem escala`, { fs: 9, b: true, cor: C.mut, anc: 'end' })}</svg>`;
+}
+/* resistência de aterramento em função do número de hastes alinhadas */
+function serieHastesSVG(r, rmax, doc = true) {
+  const C = corAterr(doc), W = 480, H = 210, ml = 46, mr = 14, mt = 22, mb = 30, pw = W - ml - mr, ph = H - mt - mb, S = r.serie;
+  const ymax = Math.max(...S.map(x => x.R), rmax || 0) * 1.1, step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000].find(v => ymax / v <= 6) || 2000;
+  const bw = pw / S.length, Y = v => mt + ph - v / ymax * ph;
+  let g = '';
+  for (let v = 0; v <= ymax; v += step) g += `<line x1="${ml}" y1="${Y(v).toFixed(1)}" x2="${W - mr}" y2="${Y(v).toFixed(1)}" stroke="${C.grid}"/>` + txtA(C, ml - 5, Y(v) + 3, nfmt(v, 0), { fs: 9, anc: 'end', cor: C.mut });
+  S.forEach((x, i) => {
+    const ok = !(rmax > 0) || x.R <= rmax, atual = x.n === r.nH && (r.tipo === 'linha' || r.tipo === 'haste');
+    g += `<rect x="${(ml + i * bw + bw * 0.18).toFixed(1)}" y="${Y(x.R).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" height="${(mt + ph - Y(x.R)).toFixed(1)}" fill="${ok ? C.acc : C.line}"${atual ? ` stroke="${C.ink}" stroke-width="1.6"` : ''}/>` +
+      txtA(C, ml + i * bw + bw / 2, H - mb + 13, String(x.n), { fs: 9, anc: 'middle', cor: C.mut });
+    if (S.length <= 12) g += txtA(C, ml + i * bw + bw / 2, Y(x.R) - 3, nfmt(x.R, x.R < 10 ? 1 : 0), { fs: 8, anc: 'middle', cor: C.ink });
+  });
+  if (rmax > 0) g += `<line x1="${ml}" y1="${Y(rmax).toFixed(1)}" x2="${W - mr}" y2="${Y(rmax).toFixed(1)}" stroke="${C.warn}" stroke-width="1.4" stroke-dasharray="6 4"/>` + txtA(C, W - mr - 2, Y(rmax) - 4, `limite ${nfmt(rmax, 1)} Ω`, { fs: 9, anc: 'end', cor: C.warn });
+  g += `<line x1="${ml}" y1="${mt + ph}" x2="${W - mr}" y2="${mt + ph}" stroke="${C.ink}"/>` + txtA(C, ml + pw / 2, H - 4, 'número de hastes alinhadas, mesmo espaçamento', { fs: 9, anc: 'middle', cor: C.mut }) + txtA(C, 12, mt + ph / 2, 'R (Ω)', { fs: 9, anc: 'middle', cor: C.mut, rot: -90 });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Resistência em função do número de hastes"><rect width="${W}" height="${H}" fill="${C.bg}"/>${g}</svg>`;
+}
+
 /* ---------- memorial ---------- */
 function geomArranjoTxt(a, r) {
   const f2 = v => nfmt(v, 2);
@@ -113,19 +156,21 @@ function geomArranjoTxt(a, r) {
   return `malha de ${f2(r.Lx)} × ${f2(r.Ly)} m com ${r.Nx} × ${r.Ny} condutores de ${a.S} mm² a ${f2(r.h)} m; ${r.nR} haste(s) de ${f2(r.Lr)} m (${POS_HASTES_MALHA[a.posH].toLowerCase()})`;
 }
 function construirMemorialAterramento(proj, calc, ca) {
-  const T = proj.aterr, I = proj.info, S = T.solo, rs = ca.solo, B = [], A = T.arr;
+  const T = proj.aterr, I = proj.info, S = T.solo, rs = ca.solo, B = [], A = T.arr.filter(a => !ca.arr[a.id].excluido), simples = ca.simples;
   const f0 = v => nfmt(v, 0), f1 = v => nfmt(v, 1), f2 = v => nfmt(v, 2), f3 = v => nfmt(v, 3);
   const temMalha = A.some(a => a.tipo === 'malha'), temSeg = A.some(a => a.tipo === 'malha' && a.seg);
-  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 7117-1:2020 · NBR 15751:2013 · IEEE Std 80-2013', text: 'Memorial de cálculo de aterramento', sub: 'Resistividade do solo, resistência de aterramento de hastes, cabos e malhas' + (temSeg ? ' e verificação das tensões de toque e de passo' : '') });
+  if (simples) B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 13571 · NBR 15749:2009' + (A.some(a => a.funcao === 'entrada') ? ' · Energisa NDU 001' : ''), text: 'Memorial de cálculo de aterramento', sub: 'Método simplificado — eletrodos de hastes verticais: resistência de aterramento, número de hastes, esboço da instalação e lista de materiais' });
+  else B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 · NBR 7117-1:2020 · NBR 15751:2013 · IEEE Std 80-2013', text: 'Memorial de cálculo de aterramento', sub: 'Resistividade do solo, resistência de aterramento de hastes, cabos e malhas' + (temSeg ? ' e verificação das tensões de toque e de passo' : '') });
   B.push({ t: 'meta', rows: [['Obra', I.obra || '—'], ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'], ['Esquema de aterramento da instalação', proj.params.aterramento],
     ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
   let n = 0; const sec = t => { n++; B.push({ t: 'h1', text: `${n}. ${t}` }); return n; };
   sec('Objetivo');
-  B.push({ t: 'p', text: `Determinar a resistividade do solo e calcular a resistência de aterramento ${A.length === 1 ? 'do sistema de aterramento' : `dos ${A.length} sistemas de aterramento`} da obra, verificando os limites aplicáveis${temSeg ? ' e a segurança das pessoas quanto às tensões de toque e de passo' : ''}, segundo a ABNT NBR 5410:2004, a ABNT NBR 7117-1:2020${temMalha ? ', a ABNT NBR 15751:2013 e a IEEE Std 80-2013' : ''}.` });
+  if (simples) B.push({ t: 'p', text: `Calcular a resistência de aterramento ${A.length === 1 ? 'do eletrodo de hastes' : `dos ${A.length} eletrodos de hastes`} da obra pelo método simplificado (fórmula da haste vertical e resistência mútua entre hastes), dimensionar o número de hastes necessário para o limite aplicável, apresentar o esboço da instalação e relacionar os materiais, segundo a ABNT NBR 5410:2004${A.some(a => a.funcao === 'entrada') ? ' e a norma de fornecimento Energisa NDU 001 v7.0' : ''}.` });
+  else B.push({ t: 'p', text: `Determinar a resistividade do solo e calcular a resistência de aterramento ${A.length === 1 ? 'do sistema de aterramento' : `dos ${A.length} sistemas de aterramento`} da obra, verificando os limites aplicáveis${temSeg ? ' e a segurança das pessoas quanto às tensões de toque e de passo' : ''}, segundo a ABNT NBR 5410:2004, a ABNT NBR 7117-1:2020${temMalha ? ', a ABNT NBR 15751:2013 e a IEEE Std 80-2013' : ''}.` });
   sec('Normas e documentos de referência');
   B.push({ t: 'list', items: [
     'ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão (6.4 — aterramento e equipotencialização).',
-    'ABNT NBR 7117-1:2020 — Parâmetros do solo para projetos de aterramentos elétricos — Parte 1: Medição da resistividade e modelagem geoelétrica.',
+    ...(!simples || rs.modo === 'wenner' ? ['ABNT NBR 7117-1:2020 — Parâmetros do solo para projetos de aterramentos elétricos — Parte 1: Medição da resistividade e modelagem geoelétrica.'] : []),
     'ABNT NBR 15749:2009 — Medição de resistência de aterramento e de potenciais na superfície do solo em sistemas de aterramento.',
     ...(temMalha ? ['ABNT NBR 15751:2013 — Sistemas de aterramento de subestações — Requisitos.', 'IEEE Std 80-2013 — Guide for Safety in AC Substation Grounding.'] : []),
     'ABNT NBR 13571 — Haste de aterramento aço-cobreada e acessórios.',
@@ -135,7 +180,11 @@ function construirMemorialAterramento(proj, calc, ca) {
   ] });
 
   const s3 = sec('Resistividade do solo');
-  if (rs.modo === 'direto') {
+  if (rs.modo === 'tipico') {
+    B.push({ t: 'p', text: `Resistividade estimada pelo tipo de solo do local: ${rs.tipo.nome.toLowerCase()}, faixa típica de ${rs.tipo.faixa} Ω·m (Kindermann & Campagnolo). Adotado ρ = ${f0(rs.rhoBase)} Ω·m${/ a /.test(rs.tipo.faixa) ? ', limite superior da faixa, a favor da segurança' : ''}${rs.fs !== 1 ? `; com o fator sazonal ${f2(rs.fs)}, ρ = ${f0(rs.rho)} Ω·m` : ''}. Solo considerado homogêneo.` });
+    B.push({ t: 'table', head: ['Tipo de solo', 'Resistividade típica (Ω·m)'], widths: [60, 40], align: 'lr', rows: Object.values(SOLOS_TIPICOS).map(t => [t.nome + (t === rs.tipo ? '  ◄ adotado' : ''), t.faixa]) });
+    B.push({ t: 'note', text: 'A resistividade real varia com a umidade, a temperatura, a compactação e a estratificação do solo. Recomenda-se medir pelo método de Wenner (NBR 7117-1) e, após a execução, medir a resistência do eletrodo (NBR 15749).' });
+  } else if (rs.modo === 'direto') {
     B.push({ t: 'p', text: `Resistividade adotada: ρ = ${f0(rs.rhoBase)} Ω·m${rs.fs !== 1 ? `, multiplicada pelo fator sazonal ${f2(rs.fs)} (ρ = ${f0(rs.rho)} Ω·m)` : ''}, considerada solo homogêneo.${S.local ? ` Origem do dado: ${S.local}.` : ''}` });
     B.push({ t: 'note', text: 'Recomenda-se confirmar a resistividade por medição em campo pelo método de Wenner (NBR 7117-1), em época seca, antes da execução.' });
   } else {
@@ -154,7 +203,7 @@ function construirMemorialAterramento(proj, calc, ca) {
     } else B.push({ t: 'p', text: `Solo considerado homogêneo, com a resistividade igual à média das resistividades aparentes por espaçamento: ρ = ${f0(rs.rhoMed)} Ω·m${rs.fs !== 1 ? `; com o fator sazonal ${f2(rs.fs)}, ρ = ${f0(rs.rho)} Ω·m` : ''}. Para comparação, (ρmáx + ρmín)/2 = ${f0(rs.rhoMinMax)} Ω·m (IEEE 80, eq. 50).` });
     const svg = soloSVG(rs, true); if (svg) B.push({ t: 'fig', svg: svgDoc(svg, 480, 240), ar: 0.5, w: 110, caption: 'Curva de resistividade aparente medida (pontos), média por espaçamento' + (rs.m2 ? ' e modelo de duas camadas ajustado.' : '.') });
   }
-  rs.avisos.forEach(x => B.push({ t: 'note', text: x }));
+  rs.avisos.filter(x => rs.modo !== 'tipico' || !/^Resistividade estimada/.test(x)).forEach(x => B.push({ t: 'note', text: x }));
 
   sec('Critérios de projeto');
   B.push({ t: 'table', head: ['Sistema', 'Função', 'Limite de resistência', 'Referência'], widths: [26, 26, 16, 32], align: 'llrl',
@@ -165,7 +214,7 @@ function construirMemorialAterramento(proj, calc, ca) {
   const s5 = sec('Metodologia de cálculo');
   const L5 = ['Haste vertical:            R₁ = ρ/(2πL) · ln(4L/d)', 'Resistência mútua (hastes h e m a e metros):  Rhm = ρ/(4πL) · ln{[(b + L)² − e²] / [e² − (b − L)²]},   b = √(L² + e²)',
     'Resistência de cada haste no conjunto:  Rh = R₁ + Σ Rhm;      Req = 1 / Σ (1/Rh);      índice de redução K = Req/R₁',
-    'Cabo horizontal enterrado:  R = ρ/(πL) · [ln(2L/√(2·r·h)) − 1]   (r = raio do condutor; h = profundidade)'];
+    ...(simples ? ['Número de hastes: menor quantidade de hastes alinhadas, com o espaçamento adotado, para a qual Req ≤ Rmáx'] : ['Cabo horizontal enterrado:  R = ρ/(πL) · [ln(2L/√(2·r·h)) − 1]   (r = raio do condutor; h = profundidade)'])];
   if (temMalha) L5.push('Malha (Sverak):  Rg = ρ · [1/LT + 1/√(20A) · (1 + 1/(1 + h·√(20/A)))]', 'Malha com hastes (Schwarz):  Rg = (R₁R₂ − Rm²)/(R₁ + R₂ − 2Rm)   — R₁ condutores, R₂ hastes, Rm mútua (k₁, k₂ da IEEE 80)');
   B.push({ t: 'eq', lines: L5 });
   B.push({ t: 'p', text: 'As hastes de um conjunto são consideradas interligadas e equipotenciais; a contribuição do cabo de interligação é desprezada, a favor da segurança. ' + (rs.m2 ? 'Em solo de duas camadas, a resistividade vista pelo eletrodo é a equivalente de Hummel até a profundidade alcançada (camadas em paralelo): ρeq = d / (h₁/ρ₁ + (d − h₁)/ρ₂).' : '') });
@@ -180,6 +229,13 @@ function construirMemorialAterramento(proj, calc, ca) {
   sec('Resumo');
   B.push({ t: 'table', head: ['Sistema', 'Configuração', 'ρ de cálculo (Ω·m)', 'R (Ω)', 'Limite (Ω)', 'Situação'], widths: [20, 34, 13, 10, 10, 13], align: 'llrrrl',
     rows: A.map(a => { const r = ca.arr[a.id]; return [a.nome, geomArranjoTxt(a, r), f0(r.rho), f2(r.R), r.rmax > 0 ? f1(r.rmax) : '—', statusTxt(r.status)]; }) });
+
+  const mats = {}; A.forEach(a => (ca.arr[a.id].materiais || []).forEach(([d, q, u]) => { const k = d + '|' + u; mats[k] = (mats[k] || 0) + q; }));
+  if (Object.keys(mats).length) {
+    sec('Lista de materiais');
+    B.push({ t: 'table', head: ['Item', 'Descrição', 'Quantidade', 'Unid.'], widths: [8, 64, 16, 12], align: 'llrl', rows: Object.entries(mats).map(([k, q], i) => { const [d, u] = k.split('|'); return [String(i + 1), d, u === 'm' ? f1(q) : f0(q), u]; }) });
+    B.push({ t: 'note', text: 'Quantidades de projeto, sem perdas; acrescente reserva para emendas, sobras e conexões. Cabos e condutores conforme a seção indicada em cada sistema e a norma da concessionária, quando aplicável.' });
+  }
 
   sec('Execução, medição e manutenção');
   B.push({ t: 'list', items: [
@@ -197,8 +253,10 @@ function memArranjo(B, a, r, rs, proj, num) {
   B.push({ t: 'h2', text: `${num} ${a.nome}` });
   B.push({ t: 'kv4', rows: [['Tipo', TIPOS_ATERR[a.tipo], 'Função', FUNC_ATERR[a.funcao].nome], ['Configuração', geomArranjoTxt(a, r), 'ρ de cálculo', `${f0(r.rho)} Ω·m — ${r.rhoTxt}`]] });
   if (!(r.rho > 0)) { r.falhas.forEach(x => B.push({ t: 'ver', ok: false, text: x })); return; }
+  const hastes = TIPOS_HASTES.includes(a.tipo);
+  if (hastes) B.push({ t: 'fig', svg: svgDoc(esquemaHastesSVG(a, r, true), 520, 250), ar: 250 / 520, w: 110, caption: `Esboço da instalação (vista lateral, sem escala): condutor de aterramento em eletroduto desde o quadro/BEP, caixas de inspeção, cabo nu de interligação e hastes.` });
   B.push({ t: 'fig', svg: svgDoc(arranjoSVG(a, r, true), 480, 260), ar: 260 / 480, w: 100, caption: `Planta — ${a.nome}.` });
-  B.push({ t: 'fig', svg: svgDoc(corteAterrSVG(a, r, rs, true), 480, 210), ar: 210 / 480, w: 100, caption: 'Corte esquemático com as camadas do solo consideradas (escala vertical; distâncias horizontais fora de escala).' });
+  if (!hastes || rs.modelo === '2c') B.push({ t: 'fig', svg: svgDoc(corteAterrSVG(a, r, rs, true), 480, 210), ar: 210 / 480, w: 100, caption: 'Corte esquemático com as camadas do solo consideradas (escala vertical; distâncias horizontais fora de escala).' });
   if (TIPOS_HASTES.includes(a.tipo)) {
     const L = +a.L, d = +a.d / 1000, Lin = [`R₁ = ${f0(r.rho)} / (2π × ${f2(L)}) × ln(4 × ${f2(L)} / ${nfmt(d, 4)}) = ${f2(r.R1)} Ω`];
     if (r.nH > 1) {
@@ -208,6 +266,12 @@ function memArranjo(B, a, r, rs, proj, num) {
     }
     B.push({ t: 'eq', lines: Lin });
     if (r.nH > 1 && r.nH <= 16) B.push({ t: 'table', small: true, head: ['Haste', ...r.Rh.map((_, i) => 'H' + (i + 1))], widths: [16, ...r.Rh.map(() => 84 / r.Rh.length)], align: 'l' + 'r'.repeat(r.Rh.length), rows: [['Rh (Ω)', ...r.Rh.map(f2)]] });
+    if (r.serie) {
+      const sr = r.serie.slice(0, 12);
+      B.push({ t: 'p', text: `Resistência em função do número de hastes alinhadas espaçadas de ${f2(+a.e || L)} m${r.nMin ? ` — mínimo para ${f1(r.rmax)} Ω: ${r.nMin} haste(s)` : ''}:` });
+      B.push({ t: 'table', small: true, head: ['Hastes', ...sr.map(x => String(x.n))], widths: [16, ...sr.map(() => 84 / sr.length)], align: 'l' + 'r'.repeat(sr.length), rows: [['R (Ω)', ...sr.map(x => f1(x.R))]] });
+      B.push({ t: 'fig', svg: svgDoc(serieHastesSVG(r, r.rmax, true), 480, 210), ar: 210 / 480, w: 95, caption: 'Resistência de aterramento em função do número de hastes alinhadas (barras escuras: atendem ao limite; contorno: quantidade adotada).' });
+    }
   } else if (a.tipo === 'cabo') {
     B.push({ t: 'eq', lines: [`R = ${f0(r.rho)} / (π × ${f2(+a.Lc)}) × [ln(2 × ${f2(+a.Lc)} / √(2 × ${nfmt(r.dCabo / 2, 4)} × ${f2(+a.hc)})) − 1] = ${f2(r.R)} Ω`] });
   } else {

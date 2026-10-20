@@ -33,20 +33,36 @@ const MAT_TERRA = {
   cuAco30: { nome: 'Aço cobreado 30 % IACS', ar: 0.00378, K0: 245, Tm: 1084, rr: 5.86, tcap: 3.85 },
   acoZn: { nome: 'Aço zincado', ar: 0.00320, K0: 293, Tm: 419, rr: 20.10, tcap: 3.93 }
 };
+/* resistividade típica de alguns solos — Kindermann & Campagnolo, Aterramento Elétrico (faixas da literatura;
+   quando há faixa adota-se o limite superior, a favor da segurança). Sempre que possível, medir pelo método de Wenner. */
+const SOLOS_TIPICOS = {
+  lama: { nome: 'Lama / solo alagadiço', faixa: '5 a 100', rho: 100 },
+  jardim50: { nome: 'Terra de jardim com 50 % de umidade', faixa: '140', rho: 140 },
+  jardim20: { nome: 'Terra de jardim com 20 % de umidade', faixa: '480', rho: 480 },
+  argila40: { nome: 'Argila com 40 % de umidade', faixa: '80', rho: 80 },
+  argila20: { nome: 'Argila com 20 % de umidade', faixa: '330', rho: 330 },
+  argilaSeca: { nome: 'Argila seca', faixa: '1.500 a 5.000', rho: 5000 },
+  areiaMolhada: { nome: 'Areia molhada', faixa: '1.300', rho: 1300 },
+  areiaSeca: { nome: 'Areia seca', faixa: '3.000 a 8.000', rho: 8000 },
+  calcario: { nome: 'Calcário compacto', faixa: '1.000 a 5.000', rho: 5000 },
+  granito: { nome: 'Granito', faixa: '1.500 a 10.000', rho: 10000 }
+};
+const CAIXAS_INSP = { todas: 'Uma caixa de inspeção em cada haste', primeira: 'Caixa de inspeção só na primeira haste (conexão do condutor)' };
 const CONEXAO_TERRA = { solda: 'Solda exotérmica (temperatura de fusão do material)', compressao: 'Conector de compressão ou aparafusado (250 °C)' };
 const POS_HASTES_MALHA = { nenhuma: 'Sem hastes', cantos: 'Nos 4 cantos', perimetro: 'Em todos os cruzamentos do perímetro', todos: 'Em todos os cruzamentos' };
 
 function soloPadrao() {
-  return { modo: 'wenner', rho: 300, p: 0.20, media: 'geo', descartar: true, modelo: 'homog', fs: 1.0, local: '', data: '', equip: '', med: [] };
+  return { modo: 'tipico', tipoSolo: 'argila20', rho: 300, p: 0.20, media: 'geo', descartar: true, modelo: 'homog', fs: 1.0, local: '', data: '', equip: '', med: [] };
 }
 function arrPadrao(tipo = 'linha', funcao = 'massas') {
   return {
     id: uid(), nome: TIPOS_ATERR[tipo], tipo, funcao, rmax: FUNC_ATERR[funcao].rmax, haste: 'h34-240', L: 2.4, d: 17.3, n: 3, e: 2.4, m: 3, raio: 3,
     Lc: 20, hc: 0.5, S: 50, mat: 'cu', Lx: 20, Ly: 15, Nx: 4, Ny: 5, posH: 'perimetro', Lh: 2.4, dh: 17.3,
+    Scond: 16, Lq: 5, caixas: 'todas',
     seg: tipo === 'malha', I3I0: 1500, sf: 100, xr: 5, tf: 0.5, tc: 1.0, brita: true, rhoS: 3000, hs: 0.10, peso: 50, conexao: 'solda', Smin: 50, rhoMan: null, obs: ''
   };
 }
-function aterrPadrao() { return { solo: soloPadrao(), arr: [] }; }
+function aterrPadrao() { return { modo: 'simplificado', solo: soloPadrao(), arr: [] }; }
 
 /* ---------- solo (NBR 7117-1) ---------- */
 function rhoWenner(a, R, p) { const t = 1 + 2 * a / Math.sqrt(a * a + 4 * p * p) - a / Math.sqrt(a * a + p * p); return 4 * Math.PI * a * R / t; }
@@ -71,8 +87,14 @@ function nelderMead(f, x0, passo, it = 600) {
   }
   S.sort((a, b) => a.f - b.f); return S[0];
 }
-function calcSolo(S) {
+function calcSolo(S, simples = false) {
   const r = { modo: S.modo, fs: +S.fs > 0 ? +S.fs : 1, avisos: [], falhas: [], linhas: [], porA: [] };
+  if (S.modo === 'tipico') {
+    const t = SOLOS_TIPICOS[S.tipoSolo] || SOLOS_TIPICOS.argila20;
+    r.tipo = t; r.rhoBase = t.rho; r.modelo = 'homog'; r.rho = r.rhoBase * r.fs;
+    r.avisos.push(`Resistividade estimada pelo tipo de solo (${t.nome.toLowerCase()}: ${t.faixa} Ω·m). Confirme por medição de Wenner antes da execução.`);
+    return r;
+  }
   if (S.modo === 'direto') {
     r.rhoBase = +S.rho || 0; r.modelo = 'homog'; r.rho = r.rhoBase * r.fs;
     if (!(r.rhoBase > 0)) r.falhas.push('Informe a resistividade do solo.');
@@ -91,8 +113,8 @@ function calcSolo(S) {
   const nd = r.linhas.filter(l => l.desc).length; if (nd) r.avisos.push(`${nd} medição(ões) com desvio superior a 50 % da média do espaçamento foram descartadas.`);
   r.rhoMed = med(r.porA.map(x => x.rho));
   r.rhoMinMax = (Math.min(...r.porA.map(x => x.rho)) + Math.max(...r.porA.map(x => x.rho))) / 2;
-  r.modelo = S.modelo === '2c' && r.porA.length >= 3 ? '2c' : 'homog';
-  if (S.modelo === '2c' && r.porA.length < 3) r.avisos.push('O modelo de duas camadas exige medições em pelo menos 3 espaçamentos; adotado solo homogêneo.');
+  r.modelo = !simples && S.modelo === '2c' && r.porA.length >= 3 ? '2c' : 'homog';
+  if (!simples && S.modelo === '2c' && r.porA.length < 3) r.avisos.push('O modelo de duas camadas exige medições em pelo menos 3 espaçamentos; adotado solo homogêneo.');
   if (r.modelo === '2c') {
     const A = r.porA, amin = A[0].a, amax = A[A.length - 1].a;
     const erro = x => { const [r1, r2, h] = x.map(Math.exp); if (h < 0.05 || h > 3 * amax) return 1e9; return A.reduce((s, q) => { const d = Math.log(rhoApar2c(q.a, r1, r2, h) / q.rho); return s + d * d; }, 0); };
@@ -110,7 +132,7 @@ function calcSolo(S) {
 function rhoHummel(m2, d) { return d <= m2.h ? m2.rho1 : d / (m2.h / m2.rho1 + (d - m2.h) / m2.rho2); }
 function rhoArranjo(a, rs) {
   if (+a.rhoMan > 0) return { rho: +a.rhoMan, txt: 'resistividade informada para o arranjo' };
-  if (!rs.m2 || rs.modelo !== '2c') return { rho: rs.rho, txt: rs.modo === 'direto' ? 'resistividade informada (solo homogêneo)' : `solo homogêneo — média ${rs.modo === 'wenner' ? 'das medições de Wenner' : ''}`.trim() + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') };
+  if (!rs.m2 || rs.modelo !== '2c') return { rho: rs.rho, txt: rs.modo === 'tipico' ? `valor típico — ${rs.tipo.nome.toLowerCase()}` + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') : rs.modo === 'direto' ? 'resistividade informada (solo homogêneo)' : `solo homogêneo — média ${rs.modo === 'wenner' ? 'das medições de Wenner' : ''}`.trim() + (rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : '') };
   const m = rs.m2; let d, base;
   if (TIPOS_HASTES.includes(a.tipo)) { d = +a.L; base = `Hummel até a profundidade da haste (${nfmt(d, 2)} m)`; }
   else if (a.tipo === 'cabo') { const rho = (+a.hc <= m.h ? m.rho1 : m.rho2); return { rho: rho * rs.fs, txt: `camada onde o cabo está enterrado (${+a.hc <= m.h ? '1ª' : '2ª'} camada)${rs.fs !== 1 ? `, × ${nfmt(rs.fs, 2)} (fator sazonal)` : ''}` }; }
@@ -224,10 +246,40 @@ function calcArranjo(a, rs, proj, calc) {
   r.status = r.falhas.length ? 'fail' : (r.avisos.length ? 'warn' : 'ok');
   return r;
 }
+/* comprimento do cabo nu que interliga as hastes (m) */
+function caboInterligacao(a, r) {
+  const e = +a.e, n = r.nH, m = Math.round(+a.m);
+  switch (a.tipo) {
+    case 'linha': return (n - 1) * e;
+    case 'triangulo': return 3 * e;
+    case 'quadVazio': return 4 * (m - 1) * e;
+    case 'quadCheio': return 2 * m * (m - 1) * e;
+    case 'circ': return n < 2 ? 0 : (n === 2 ? 2 * +a.raio : n * 2 * +a.raio * Math.sin(Math.PI / n));
+  }
+  return 0;
+}
+/* complementos dos arranjos de hastes: resistência em função do nº de hastes alinhadas e lista de materiais */
+function complementosHastes(a, r) {
+  const L = +a.L, d = +a.d / 1000, e = +a.e || L, nMax = Math.min(30, Math.max(8, r.nH + 2, (r.nMin || 0) + 1));
+  r.serie = Array.from({ length: nMax }, (_, i) => ({ n: i + 1, R: reqHastes(r.rho, L, d, Array.from({ length: i + 1 }, (_, k) => [k * e, 0])).Req }));
+  r.Lcabo = caboInterligacao(a, r);
+  const S = +a.Scond || 16, haste = (HASTES_COM.find(h => h[0] === a.haste) || [])[1] || `${nfmt(L, 2)} m × Ø ${nfmt(+a.d, 1)} mm`;
+  r.materiais = [
+    ['Haste de aterramento aço-cobreada (NBR 13571) — ' + haste.replace(/ — aço cobreado.*$/, ''), r.nH, 'un'],
+    ['Conector cabo–haste (cunha, grampo ou solda exotérmica)', r.nH, 'un'],
+    ['Caixa de inspeção de aterramento com tampa', a.caixas === 'primeira' ? 1 : r.nH, 'un'],
+    ...(r.Lcabo > 0 ? [[`Cabo de cobre nu ${S} mm² — interligação das hastes (enterrado a ${nfmt(+a.hc, 2)} m)`, +r.Lcabo.toFixed(1), 'm']] : []),
+    ...(+a.Lq > 0 ? [[`Condutor de aterramento ${S} mm² — da primeira haste ao quadro / BEP`, +(+a.Lq).toFixed(1), 'm'], ['Eletroduto de proteção do condutor de aterramento', +(+a.Lq).toFixed(1), 'm']] : [])
+  ];
+}
 function calcAterramento(proj, calc) {
-  const T = proj.aterr || aterrPadrao();
-  const solo = calcSolo(T.solo || soloPadrao()), arr = {};
-  (T.arr || []).forEach(a => { arr[a.id] = calcArranjo(a, solo, proj, calc); });
-  const lista = Object.values(arr);
-  return { solo, arr, status: solo.falhas.length || lista.some(x => x.status === 'fail') ? 'fail' : (lista.some(x => x.status === 'warn') || solo.avisos.length ? 'warn' : 'ok') };
+  const T = proj.aterr || aterrPadrao(), simples = T.modo !== 'completo';
+  const solo = calcSolo(T.solo || soloPadrao(), simples), arr = {};
+  (T.arr || []).forEach(a => {
+    if (simples && !TIPOS_HASTES.includes(a.tipo)) { arr[a.id] = { excluido: true, status: 'off', avisos: [], falhas: [], R: NaN, rmax: +a.rmax || 0 }; return; }
+    const r = arr[a.id] = calcArranjo(a, solo, proj, calc);
+    if (TIPOS_HASTES.includes(a.tipo) && r.rho > 0) complementosHastes(a, r);
+  });
+  const lista = Object.values(arr).filter(x => !x.excluido);
+  return { simples, solo, arr, status: solo.falhas.length || lista.some(x => x.status === 'fail') ? 'fail' : (lista.some(x => x.status === 'warn') || solo.avisos.length ? 'warn' : 'ok') };
 }

@@ -65,6 +65,14 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
 - **Integração:** cria os circuitos dos aparelhos na aba Circuitos.
 
 **Aterramento (NBR 5410, NBR 7117-1, NBR 15751 / IEEE 80)**
+
+Dois modos, escolhidos no topo da aba:
+- **Simplificado (só hastes):**
+  - resistividade por tipo de solo (valores típicos da literatura), informada ou pela média das medições de Wenner;
+  - haste única ou conjuntos de hastes, com o número mínimo de hastes para atingir o limite (botão "Usar N hastes") e gráfico da resistência em função do número de hastes;
+  - esboço da instalação (quadro/BEP, eletroduto, caixas de inspeção, cabo nu e hastes), planta e lista de materiais.
+- **Completo:** acrescenta solo em duas camadas, cabo contrapeso e malha, com os itens abaixo.
+
 - **Resistividade do solo:**
   - medições pelo método de Wenner (NBR 7117-1:2020), com média geométrica ou aritmética por espaçamento e descarte de leituras com desvio acima de 50 %;
   - modelo homogêneo ou de duas camadas (ρ₁, ρ₂, h₁) ajustado por mínimos quadrados, com curva de resistividade aparente;

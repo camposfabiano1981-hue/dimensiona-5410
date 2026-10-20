@@ -114,11 +114,25 @@ test('Aterramento — estratificação do solo em duas camadas recupera o modelo
   perto(s.m2.rho1, 600, 6, 'ρ1'); perto(s.m2.rho2, 150, 2, 'ρ2'); perto(s.m2.h, 2.5, 0.05, 'h1');
 });
 
-test('Aterramento — sistemas do exemplo', () => {
-  const [ent, spda, malha] = P.aterr.arr.map(a => T.arr[a.id]);
+test('Aterramento — modo simplificado do exemplo (hastes)', () => {
+  assert.equal(T.simples, true);
+  const ent = T.arr[P.aterr.arr[0].id];
   assert.ok(ent.R <= 20 && ent.status !== 'fail', `padrão de entrada ${ent.R} Ω`);
-  assert.ok(spda.R <= 10, `SPDA ${spda.R} Ω`);
-  assert.ok(malha.okToque && malha.okPasso && malha.cond.ok, 'malha atende toque, passo e condutor');
+  assert.equal(ent.nMin, 4, 'mínimo de hastes alinhadas para 20 Ω');
+  assert.equal(ent.serie[3].R.toFixed(6), ent.R.toFixed(6), 'série de hastes coerente com o arranjo adotado');
+  assert.ok(ent.materiais.some(m => /Haste/.test(m[0]) && m[1] === 4), 'lista de materiais com 4 hastes');
+  perto(ent.Lcabo, 7.2, 1e-9, 'cabo de interligação (m)');
+});
+
+test('Aterramento — valor típico pelo tipo de solo e exclusão de malha no modo simplificado', () => {
+  const p2 = JSON.parse(JSON.stringify(P));
+  p2.aterr.solo = { ...p2.aterr.solo, modo: 'tipico', tipoSolo: 'argila20' };
+  p2.aterr.arr.push(Object.assign(A.arrPadrao('malha', 'subestacao'), { id: 'm1' }));
+  const t = A.calcAterramento(p2, K);
+  assert.equal(t.solo.rho, 330);
+  assert.equal(t.arr.m1.excluido, true, 'malha fica fora do modo simplificado');
+  p2.aterr.modo = 'completo';
+  assert.ok(A.calcAterramento(p2, K).arr.m1.R > 0, 'no modo completo a malha é calculada');
 });
 
 test('Memoriais — cada memória separada e o consolidado são montados sem erro', () => {

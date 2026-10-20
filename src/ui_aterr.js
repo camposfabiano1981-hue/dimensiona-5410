@@ -6,20 +6,26 @@ function normalizarAterr(t) {
   const base = aterrPadrao(), out = { ...base, ...(t || {}) };
   out.solo = { ...soloPadrao(), ...((t && t.solo) || {}) }; out.solo.med = Array.isArray(out.solo.med) ? out.solo.med : [];
   out.arr = (Array.isArray(out.arr) ? out.arr : []).map(a => ({ ...arrPadrao(a.tipo || 'linha', FUNC_ATERR[a.funcao] ? a.funcao : 'massas'), ...a }));
+  if (!t || !t.modo) out.modo = out.arr.some(a => !TIPOS_HASTES.includes(a.tipo)) || out.solo.modelo === '2c' ? 'completo' : 'simplificado';
   return out;
 }
 function renderAterr() {
-  const T = PROJ.aterr, S = T.solo, ca = CALC.aterr;
+  const T = PROJ.aterr, S = T.solo, ca = CALC.aterr, simples = T.modo !== 'completo';
   if (!arrSel()) ASEL = T.arr[0]?.id || null;
+  const nExc = T.arr.filter(a => ca.arr[a.id].excluido).length;
+  const origens = [['tipico', 'Valor típico pelo tipo de solo'], ['direto', 'Resistividade informada'], ['wenner', simples ? 'Medições de Wenner (média)' : 'Medições pelo método de Wenner']];
   $('#tab-aterr').innerHTML = `
-  <div class="mem-bar"><div><h2 class="tit">Aterramento</h2><p class="sub" style="margin:0">Resistividade do solo pelo método de Wenner (NBR 7117-1:2020), resistência de hastes, cabos e malhas, e verificação das tensões de toque e de passo (NBR 15751:2013 / IEEE Std 80-2013).</p></div>
+  <div class="mem-bar"><div><h2 class="tit">Aterramento</h2><p class="sub" style="margin:0">${simples ? 'Modo simplificado: eletrodos de hastes verticais — resistência, número de hastes para o limite, esboço da instalação e lista de materiais.' : 'Modo completo: solo estratificado pelo método de Wenner (NBR 7117-1:2020), hastes, cabo contrapeso e malha com tensões de toque e de passo (NBR 15751:2013 / IEEE Std 80-2013).'}</p></div>
   <div class="mem-bt"><span class="mini" style="align-self:center">Memorial de aterramento:</span><button class="btn pri" type="button" data-exp="pdf" data-doc="aterr">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="aterr">Word</button><button class="btn" type="button" data-exp="html" data-doc="aterr">HTML</button></div></div>
-  <fieldset data-scope="asolo"><legend>Resistividade do solo (NBR 7117-1:2020)</legend><div class="grade">
-    ${fSel('as', 'modo', 'Origem do dado', S.modo, [['wenner', 'Medições pelo método de Wenner'], ['direto', 'Resistividade informada']], { struct: true })}
-    ${S.modo === 'direto' ? fNum('as', 'rho', 'Resistividade do solo', S.rho, { u: 'Ω·m' }) + fTxt('as', 'local', 'Origem do dado', S.local, { cls: 'w2', ph: 'ex.: sondagem, obra vizinha, estimativa' })
+  <div class="ref-sel" role="group" aria-label="Modo de cálculo"><button class="btn sm" type="button" data-amodo="simplificado" aria-pressed="${simples}">Simplificado — só hastes</button><button class="btn sm" type="button" data-amodo="completo" aria-pressed="${!simples}">Completo — solo em camadas, cabo e malha</button></div>
+  ${nExc ? `<p class="mini" style="margin:-4px 0 12px">${nExc} sistema(s) de cabo ou malha ficam fora do modo simplificado (não entram no cálculo nem no memorial) — use o modo completo para editá-los.</p>` : ''}
+  <fieldset data-scope="asolo"><legend>Resistividade do solo</legend><div class="grade">
+    ${fSel('as', 'modo', 'Origem do dado', S.modo, origens, { struct: true })}
+    ${S.modo === 'tipico' ? fSel('as', 'tipoSolo', 'Tipo de solo', S.tipoSolo, Object.entries(SOLOS_TIPICOS).map(([k, v]) => [k, `${v.nome} — ${v.faixa} Ω·m`]), { cls: 'w2', dica: 'valores típicos da literatura (Kindermann & Campagnolo); adota-se o limite superior da faixa' })
+      : S.modo === 'direto' ? fNum('as', 'rho', 'Resistividade do solo', S.rho, { u: 'Ω·m' }) + fTxt('as', 'local', 'Origem do dado', S.local, { cls: 'w2', ph: 'ex.: sondagem, obra vizinha, estimativa' })
       : `${fNum('as', 'p', 'Profundidade dos eletrodos de medição', S.p, { u: 'm' })}
          ${fSel('as', 'media', 'Média por espaçamento', S.media, [['geo', 'Geométrica (log-normal, NBR 7117-1:2020)'], ['ar', 'Aritmética']])}
-         ${fSel('as', 'modelo', 'Modelo do solo', S.modelo, [['homog', 'Homogêneo (média)'], ['2c', 'Duas camadas (ajuste)']], { struct: true })}
+         ${simples ? '' : fSel('as', 'modelo', 'Modelo do solo', S.modelo, [['homog', 'Homogêneo (média)'], ['2c', 'Duas camadas (ajuste)']], { struct: true })}
          ${fChk('as', 'descartar', 'Descartar leituras com desvio > 50 % da média', S.descartar)}
          ${fTxt('as', 'local', 'Local da medição', S.local, { ph: 'ex.: terreno da obra, eixo A–B' })}${fTxt('as', 'data', 'Data da medição', S.data, { ph: 'aaaa-mm-dd' })}${fTxt('as', 'equip', 'Instrumento', S.equip, { ph: 'terrômetro, modelo' })}`}
     ${fNum('as', 'fs', 'Fator sazonal (multiplica ρ)', S.fs, { dica: '1,0 se medido em época seca' })}
@@ -31,7 +37,7 @@ function renderAterr() {
   <div id="a-solo-res" style="margin-top:12px"></div></fieldset>
   <div class="bancada">
     <aside class="lista" aria-label="Sistemas de aterramento">
-      <div class="lista-topo"><select id="a-novo-tipo" aria-label="Tipo de arranjo" style="flex:1 1 150px;width:auto">${opts(Object.entries(TIPOS_ATERR), 'linha')}</select><button class="btn pri" type="button" id="bt-add-arr">Adicionar</button></div>
+      <div class="lista-topo"><select id="a-novo-tipo" aria-label="Tipo de arranjo" style="flex:1 1 150px;width:auto">${opts(Object.entries(TIPOS_ATERR).filter(([k]) => !simples || TIPOS_HASTES.includes(k)), 'linha')}</select><button class="btn pri" type="button" id="bt-add-arr">Adicionar</button></div>
       <div class="lista-itens" id="a-itens"></div>
       <div style="padding:10px;border-top:1px solid var(--line);display:grid;gap:6px"><button class="btn" type="button" id="bt-arr-ndu">Padrão de entrada (NDU 001)</button></div>
     </aside>
@@ -42,7 +48,7 @@ function renderAterr() {
 function renderAterrSolo() {
   const box = $('#a-solo-res'); if (!box) return; const rs = CALC.aterr.solo, S = PROJ.aterr.solo;
   (S.med || []).forEach((m, i) => { const l = rs.linhas.find(x => x.a === +m.a && x.R === +m.R && (x.dir || '') === (m.dir || '')); const r = $('#am-r-' + i), d = $('#am-d-' + i); if (r) r.textContent = l ? nfmt(l.rho, 0) : '—'; if (d) d.innerHTML = l ? `<span style="color:${l.desc ? 'var(--warn)' : 'inherit'}">${(l.desvio >= 0 ? '+' : '') + nfmt(l.desvio * 100, 0)} %${l.desc ? ' ✗' : ''}</span>` : '—'; });
-  const res = rs.modo === 'direto' ? `<p class="mini" style="margin:0">ρ de cálculo = <b>${nfmt(rs.rho, 0)} Ω·m</b> (solo homogêneo${rs.fs !== 1 ? `, com fator sazonal ${nfmt(rs.fs, 2)}` : ''}).</p>`
+  const res = rs.modo === 'direto' || rs.modo === 'tipico' ? `<p class="mini" style="margin:0">ρ de cálculo = <b>${nfmt(rs.rho, 0)} Ω·m</b> (solo homogêneo${rs.fs !== 1 ? `, com fator sazonal ${nfmt(rs.fs, 2)}` : ''}).</p>`
     : !rs.porA.length ? '' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;align-items:start">
       <div style="min-width:0">${soloSVG(rs, false)}</div>
       <div style="min-width:0"><table class="tbl nt"><thead><tr><th>a (m)</th><th class="r">Leituras</th><th class="r">ρa médio</th>${rs.m2 ? '<th class="r">Modelo</th>' : ''}</tr></thead><tbody>${rs.porA.map(q => `<tr><td>${nfmt(q.a, 2)}</td><td class="r">${q.n - q.nDesc}/${q.n}</td><td class="r">${nfmt(q.rho, 0)}</td>${rs.m2 ? `<td class="r">${nfmt(q.modelo, 0)}</td>` : ''}</tr>`).join('')}</tbody></table>
@@ -52,12 +58,13 @@ function renderAterrSolo() {
 function renderArrLista() {
   const box = $('#a-itens'); if (!box) return; const A = PROJ.aterr.arr;
   if (!A.length) { box.innerHTML = '<p class="mini" style="padding:12px">Nenhum sistema de aterramento. Escolha o tipo e clique em Adicionar, ou crie o padrão de entrada da NDU 001.</p>'; return; }
-  box.innerHTML = A.map((a, i) => { const r = CALC.aterr.arr[a.id]; return `<button type="button" class="item" data-asel="${a.id}" aria-current="${a.id === ASEL}"><span class="n">${i + 1}</span><span class="d">${esc(a.nome)}</span><span class="pill ${r.status}">${pillTxt(r.status)}</span><span class="e">${TIPOS_ATERR[a.tipo]} · ${nfmt(r.R, 2)} Ω${r.rmax > 0 ? ` / ${nfmt(r.rmax, 0)} Ω` : ''}</span></button>`; }).join('');
+  box.innerHTML = A.map((a, i) => { const r = CALC.aterr.arr[a.id]; return `<button type="button" class="item" data-asel="${a.id}" aria-current="${a.id === ASEL}"${r.excluido ? ' style="opacity:.55"' : ''}><span class="n">${i + 1}</span><span class="d">${esc(a.nome)}</span>${r.excluido ? '<span class="pill">Completo</span>' : `<span class="pill ${r.status}">${pillTxt(r.status)}</span>`}<span class="e">${TIPOS_ATERR[a.tipo]}${r.excluido ? ' · só no modo completo' : ` · ${nfmt(r.R, 2)} Ω${r.rmax > 0 ? ` / ${nfmt(r.rmax, 0)} Ω` : ''}${r.nH ? ` · ${r.nH} haste(s)` : ''}`}</span></button>`; }).join('');
 }
 function renderArrEditor() {
   const box = $('#a-ed'); if (!box) return; const a = arrSel();
   if (!a) { box.innerHTML = '<div class="res" style="padding:24px"><h2 class="tit">Sem sistemas de aterramento</h2><p class="sub">Calcule desde uma haste única até uma malha completa: escolha o tipo na lista ao lado.</p></div>'; return; }
-  box.innerHTML = `<div class="ed-topo"><span class="mini">Sistema ${PROJ.aterr.arr.indexOf(a) + 1} de ${PROJ.aterr.arr.length}</span><span style="display:flex;gap:6px">${PROJ.params.aterramento === 'TT' && a.funcao === 'massas' ? '<button class="btn sm" type="button" id="bt-aplicar-ra">Usar R como RA do esquema TT</button>' : ''}<button class="btn sm" type="button" id="bt-dup-arr">Duplicar</button><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></span></div>
+  if (CALC.aterr.arr[a.id].excluido) { box.innerHTML = `<div class="res" style="padding:24px"><h2 class="tit">${esc(a.nome)}</h2><p class="sub">${TIPOS_ATERR[a.tipo]}: disponível só no modo completo. Mude o modo no topo da aba para editar e calcular este sistema, ou exclua-o.</p><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></div>`; return; }
+  box.innerHTML = `<div class="ed-topo"><span class="mini">Sistema ${PROJ.aterr.arr.indexOf(a) + 1} de ${PROJ.aterr.arr.length}</span><span style="display:flex;gap:6px">${(a.tipo === 'linha' || a.tipo === 'haste') && CALC.aterr.arr[a.id].nMin && CALC.aterr.arr[a.id].nMin !== CALC.aterr.arr[a.id].nH ? `<button class="btn sm pri" type="button" id="bt-dim-hastes">Usar ${CALC.aterr.arr[a.id].nMin} haste(s) (mínimo p/ o limite)</button>` : ''}${PROJ.params.aterramento === 'TT' && a.funcao === 'massas' ? '<button class="btn sm" type="button" id="bt-aplicar-ra">Usar R como RA do esquema TT</button>' : ''}<button class="btn sm" type="button" id="bt-dup-arr">Duplicar</button><button class="btn sm" type="button" id="bt-exc-arr">Excluir</button></span></div>
     <section class="res" id="a-res" aria-live="polite"></section><div id="a-form"></div>`;
   renderArrRes(); renderArrForm();
 }
@@ -69,7 +76,9 @@ function renderArrRes() {
   if (r.tt) met.push(['RA máx. (TT)', `${f0(r.tt.RAmax)} Ω`]);
   box.innerHTML = `<div class="res-cab"><h3>${esc(a.nome)}</h3><span class="pill ${r.status}">${statusTxt(r.status)}</span></div>
     <div class="metr num">${met.map(([x, y]) => `<div><small>${x}</small><span${(x === 'Resistência' && !r.okR) || (x.startsWith('Toque') && r.okToque === false) || (x.startsWith('Passo') && r.okPasso === false) ? ' class="bad"' : ''}>${y}</span></div>`).join('')}</div>
-    ${r.rho > 0 ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${corteAterrSVG(a, r, CALC.aterr.solo, false)}</div></div>` : ''}
+    ${r.rho > 0 ? (r.serie ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${esquemaHastesSVG(a, r, false)}</div><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${serieHastesSVG(r, r.rmax, false)}</div>
+      <div style="min-width:0"><table class="tbl"><thead><tr><th>Material</th><th class="r">Qtd.</th></tr></thead><tbody>${r.materiais.map(([d, q, u]) => `<tr><td class="wrap">${esc(d)}</td><td class="r">${u === 'm' ? nfmt(q, 1) : q} ${u}</td></tr>`).join('')}</tbody></table></div></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;padding:12px 14px"><div style="min-width:0">${arranjoSVG(a, r, false)}</div><div style="min-width:0">${corteAterrSVG(a, r, CALC.aterr.solo, false)}</div></div>`) : ''}
     <p class="mini" style="margin:0;padding:0 14px 10px">ρ: ${esc(r.rhoTxt || '')}</p>
     ${r.falhas.length || r.avisos.length ? `<ul class="msgs">${r.falhas.map(x => `<li class="fail">${esc(x)}</li>`).join('')}${r.avisos.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : ''}`;
 }
@@ -83,7 +92,11 @@ function renderArrForm() {
       ${a.tipo === 'linha' || a.tipo === 'circ' ? fNum('aa', 'n', 'Número de hastes', a.n) : ''}
       ${a.tipo === 'quadVazio' || a.tipo === 'quadCheio' ? fNum('aa', 'm', 'Hastes por lado', a.m) : ''}
       ${a.tipo === 'circ' ? fNum('aa', 'raio', 'Raio da circunferência', a.raio, { u: 'm' }) : ''}
-      ${a.tipo !== 'haste' && a.tipo !== 'circ' ? fNum('aa', 'e', 'Espaçamento entre hastes', a.e, { u: 'm' }) : (a.tipo === 'haste' ? fNum('aa', 'e', 'Espaçamento p/ hastes adicionais', a.e, { u: 'm', dica: 'usado na sugestão de nº de hastes' }) : '')}`;
+      ${a.tipo !== 'haste' && a.tipo !== 'circ' ? fNum('aa', 'e', 'Espaçamento entre hastes', a.e, { u: 'm' }) : (a.tipo === 'haste' ? fNum('aa', 'e', 'Espaçamento p/ hastes adicionais', a.e, { u: 'm', dica: 'usado na sugestão de nº de hastes' }) : '')}
+      ${fNum('aa', 'hc', 'Profundidade do cabo de interligação', a.hc, { u: 'm' })}
+      ${fSel('aa', 'Scond', 'Seção do cabo / condutor de aterramento', a.Scond, [10, 16, 25, 35, 50, 70].map(x => [x, `${x} mm²`]), { type: 'numsel', dica: r.ndu ? `NDU 001, categoria ${r.ndu.cat}: ${r.ndu.aterr} mm²` : '' })}
+      ${fNum('aa', 'Lq', 'Distância da 1ª haste ao quadro / BEP', a.Lq, { u: 'm' })}
+      ${fSel('aa', 'caixas', 'Caixas de inspeção', a.caixas, Object.entries(CAIXAS_INSP), { cls: 'w2' })}`;
   } else if (a.tipo === 'cabo') {
     geo = `${fNum('aa', 'Lc', 'Comprimento do cabo', a.Lc, { u: 'm' })}${fNum('aa', 'hc', 'Profundidade', a.hc, { u: 'm' })}${fSel('aa', 'S', 'Seção do cabo nu', a.S, secs, { type: 'numsel' })}`;
   } else {
@@ -107,7 +120,7 @@ function renderArrForm() {
   box.innerHTML = `
   <fieldset data-scope="aarr"><legend>Sistema de aterramento</legend><div class="grade">
     ${fTxt('aa', 'nome', 'Nome', a.nome, { cls: 'w2' })}
-    ${fSel('aa', 'tipo', 'Configuração', a.tipo, Object.entries(TIPOS_ATERR), { struct: true })}
+    ${fSel('aa', 'tipo', 'Configuração', a.tipo, Object.entries(TIPOS_ATERR).filter(([k]) => PROJ.aterr.modo === 'completo' || TIPOS_HASTES.includes(k)), { struct: true })}
     ${fSel('aa', 'funcao', 'Função', a.funcao, Object.entries(FUNC_ATERR).map(([k, v]) => [k, v.nome]), { struct: true, cls: 'w2' })}
     ${fNum('aa', 'rmax', 'Resistência máxima', a.rmax, { u: 'Ω', dica: FUNC_ATERR[a.funcao].ref })}
     ${fNum('aa', 'rhoMan', 'ρ do arranjo (opcional)', a.rhoMan, { u: 'Ω·m', ph: Math.round(r.rho), dica: 'deixe vazio para usar o modelo do solo' })}
@@ -126,7 +139,7 @@ function efeitosArranjo(a, k) {
 function atualizarAterrParcial() { renderAterrSolo(); renderArrLista(); renderArrRes(); }
 function criarArranjoNDU() {
   const ce = CALC.energisa && Object.values(CALC.energisa.ucs || {})[0], cat = ce && ce.cat, n = cat ? cat.hastes : 3;
-  const a = arrPadrao('linha', 'entrada'); Object.assign(a, { nome: `Padrão de entrada${cat ? ` — categoria ${cat.cat}` : ''} (NDU 001)`, n: Math.max(1, n), haste: 'h34-240', L: 2.4, d: 17.3, e: 2.4, rmax: 20 });
+  const a = arrPadrao('linha', 'entrada'); Object.assign(a, { nome: `Padrão de entrada${cat ? ` — categoria ${cat.cat}` : ''} (NDU 001)`, n: Math.max(1, n), haste: 'h34-240', L: 2.4, d: 17.3, e: 2.4, rmax: 20, Scond: cat && +cat.aterr ? +cat.aterr : 16, Lq: 3 });
   if (n === 1) a.tipo = 'haste';
   PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true);
   toast(cat ? `Arranjo criado com ${n} haste(s) de 3/4" × 2,40 m, conforme a categoria ${cat.cat} da NDU 001.` : 'Arranjo criado com 3 hastes; calcule a demanda Energisa para ajustar ao mínimo da categoria.');

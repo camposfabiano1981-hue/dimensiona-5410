@@ -26,11 +26,13 @@ const MEMORIAS = [
   { id: 'clima', nome: 'Carga térmica de climatização', norma: 'ABNT NBR 16401-1:2024 · 16401-2:2024 · 16401-3:2008', arq: 'memorial-carga-termica', titulo: 'Memorial de cálculo de carga térmica', rodape: 'Carga térmica conforme ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008',
     tem: p => (p.clima.amb || []).length > 0, resumo: p => `${p.clima.amb.length} ambiente(s)`, falha: (p, k) => Object.values(k.clima.amb).some(r => r.status === 'fail'),
     build: (p, k) => construirMemorialClima(p, k, k.clima) },
-  { id: 'aterr', nome: 'Aterramento', norma: 'ABNT NBR 5410 · NBR 7117-1 · NBR 15751 · IEEE 80', arq: 'memorial-aterramento', titulo: 'Memorial de cálculo de aterramento', rodape: 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013',
+  { id: 'aterr', nome: 'Aterramento', norma: p => p.aterr.modo === 'completo' ? 'ABNT NBR 5410 · NBR 7117-1 · NBR 15751 · IEEE 80' : 'ABNT NBR 5410 · método simplificado de hastes', arq: 'memorial-aterramento', titulo: 'Memorial de cálculo de aterramento',
+    rodape: p => p.aterr.modo === 'completo' ? 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013' : 'Aterramento conforme ABNT NBR 5410:2004 — método simplificado de hastes',
     tem: p => (p.aterr.arr || []).length > 0, resumo: (p, k) => { const nf = p.aterr.arr.filter(a => k.aterr.arr[a.id].status === 'fail').length; return `${p.aterr.arr.length} sistema(s)${nf ? ` · ${nf} com pendência` : ''}`; },
     falha: (p, k) => k.aterr.status === 'fail', build: (p, k) => construirMemorialAterramento(p, k, k.aterr) }
 ];
 const MEMO = Object.fromEntries(MEMORIAS.map(m => [m.id, m]));
+const normaDe = (m, p) => typeof m.norma === 'function' ? m.norma(p) : m.norma;
 const assinaturaRT = I => ({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
 const prefixoParte = (t, L) => /^\d/.test(t) ? `${L}.${t}` : `${L} — ${t}`;
 
@@ -43,12 +45,12 @@ function construirConsolidado(proj, calc, ids, opt = {}) {
     ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
   B.push({ t: 'h1', text: 'Sumário' });
   B.push({ t: 'table', head: ['Parte', 'Memória de cálculo', 'Referência normativa', 'Conteúdo'], widths: [9, 33, 34, 24], align: 'llll',
-    rows: partes.map((p, i) => [String.fromCharCode(65 + i), p.nome, p.norma, p.resumo(proj, calc)]) });
+    rows: partes.map((p, i) => [String.fromCharCode(65 + i), p.nome, normaDe(p, proj), p.resumo(proj, calc)]) });
   B.push({ t: 'p', text: 'Cada parte reúne a memória de cálculo completa da respectiva disciplina, com numeração própria precedida da letra da parte. As partes também podem ser emitidas separadamente.' });
   partes.forEach((p, i) => {
     const L = String.fromCharCode(65 + i);
     B.push({ t: 'break' });
-    B.push({ t: 'parte', letra: L, text: p.nome, sub: p.norma });
+    B.push({ t: 'parte', letra: L, text: p.nome, sub: normaDe(p, proj) });
     p.build(proj, calc, { ...opt, assinatura: false }).forEach(b => {
       if (b.t === 'title' || b.t === 'meta' || (b.t === 'sign' && !b.titular)) return;
       B.push(b.t === 'h1' || b.t === 'h2' || b.t === 'h3' ? { ...b, text: prefixoParte(b.text, L) } : b);
@@ -60,7 +62,7 @@ function construirConsolidado(proj, calc, ids, opt = {}) {
 function metaMemoria(proj, id) {
   const I = proj.info, m = MEMO[id], t = m ? m.titulo : 'Memorial de cálculo consolidado';
   const rod = m ? (typeof m.rodape === 'function' ? m.rodape(proj) : m.rodape) : 'Memorial de cálculo consolidado';
-  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`, rodape: rod + ' — gerado com Dimensiona 5410', assunto: m ? `${t} — ${m.norma}` : t };
+  return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`, rodape: rod + ' — gerado com Dimensiona 5410', assunto: m ? `${t} — ${normaDe(m, proj)}` : t };
 }
 function docMemoria(proj, calc, id, opt = {}, grupo) {
   const rev = (proj.info.revisao || 'R00').toLowerCase(), sl = slugTxt(proj.info.obra);
