@@ -2,8 +2,8 @@
    INTERFACE
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'memoria', 'tabelas'];
-let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, MEMSEL = 'consolidado', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'materiais', 'memoria', 'tabelas'];
+let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, DESC_ABERTO = false, MEMSEL = 'descritivo', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
 const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -65,6 +65,8 @@ function normalizarProjeto(p) {
   out.energisa = normalizarEnergisa(p.energisa);
   out.clima = normalizarClima(p.clima);
   out.aterr = normalizarAterr(p.aterr);
+  out.materiais = normalizarMateriais(p.materiais);
+  out.descritivo = normalizarDescritivo(p.descritivo, out.params.edificacao);
   out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
   out.lumi = (Array.isArray(p.lumi) ? p.lumi : []).map((a, i) => { const n = { ...defaultsAmbiente(i + 1), ...a }; if (!AMB[n.amb]) n.amb = AMB_PADRAO; if (n.prod !== 'custom' && !CATL[n.prod]) n.prod = CAT_LUM[0].id; return n; });
   out.circuitos = (Array.isArray(p.circuitos) ? p.circuitos : []).map(c => { const d = defaultsCircuito(out.params, c.tipo || 'tug'); const n = { ...d, ...c, id: c.id || d.id }; if (!ISOL[n.isolacao]) n.isolacao = 'PVC'; if (!MET[n.metodo]) n.metodo = d.metodo; return n; });
@@ -82,7 +84,7 @@ function carregar() {
 }
 
 /* ---------- ciclo de atualização ---------- */
-function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); }
+function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
 function circSel() { return PROJ.circuitos.find(c => c.id === SEL) || null; }
 function ambSel() { return (PROJ.lumi || []).find(a => a.id === LSEL) || null; }
 function mudou(struct) { recalc(); salvarLocal(); renderCabecalho(); if (struct) renderAba(); else renderParcial(); }
@@ -115,6 +117,12 @@ function onCampo(ev, isChange) {
   else if (sc === 'memopt') { MEMOPT[k] = v; struct = true; }
   else if (sc === 'memgrupo') { const g = new Set(PROJ.memorias.grupo); if (v) g.add(k); else g.delete(k); PROJ.memorias.grupo = MEMORIAS.map(m => m.id).filter(id => g.has(id)); struct = true; }
   else if (sc === 'asolo') { PROJ.aterr.solo[k] = v; }
+  else if (sc === 'mat') { PROJ.materiais[k] = v; }
+  else if (sc === 'matauto') { const A = PROJ.materiais.auto, o = A[box.dataset.key] = A[box.dataset.key] || {}; if (k === 'inc') o.off = !v; else if (k === 'qtd' && (v == null || v === '')) delete o.qtd; else o[k] = v; }
+  else if (sc === 'matitem') { const x = PROJ.materiais.itens[+box.dataset.i]; if (x) x[k] = v; }
+  else if (sc === 'desc') { PROJ.descritivo[k] = v; }
+  else if (sc === 'descinf') { const D = PROJ.descritivo, inf = box.dataset.inf; if (k === 'cod') D.influencias[inf] = v; else { D.medidas = D.medidas || {}; if (v) D.medidas[inf] = v; else delete D.medidas[inf]; } }
+  else if (sc === 'desclocal') { const l = PROJ.descritivo.locais[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
   else if (sc === 'aarr') { const a = arrSel(); if (!a) return; a[k] = v; struct = efeitosArranjo(a, k) || struct; }
   else if (sc === 'cat') { if (v == null || !(v > 0)) delete PROJ.catalogo[k]; else PROJ.catalogo[k] = v; }
@@ -183,9 +191,10 @@ function docAtual(doc) { return docMemoria(PROJ, CALC, doc === 'memoria' ? 'cons
 async function exportar(tipo, bt, doc) {
   const txt = bt.textContent; bt.disabled = true; bt.textContent = 'Gerando…';
   try {
-    const { blocos, nome, meta } = tipo === 'xlsx' ? {} : docAtual(doc);
+    const { blocos, nome, meta } = tipo.startsWith('xlsx') ? {} : docAtual(doc);
     if (tipo === 'pdf') await oferecerArquivo(nome + '.pdf', await gerarPDF(blocos, meta), 'application/pdf');
     else if (tipo === 'docx') await oferecerArquivo(nome + '.docx', await gerarDOCX(blocos, meta), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    else if (tipo === 'xlsxmat') await oferecerArquivo(`lista-de-materiais-${slug()}-${(PROJ.info.revisao || 'R00').toLowerCase()}.xlsx`, await gerarXLSX(PROJ, CALC, 'materiais'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     else if (tipo === 'xlsx') await oferecerArquivo(`quadro-de-cargas-${slug()}-${(PROJ.info.revisao || 'R00').toLowerCase()}.xlsx`, await gerarXLSX(PROJ, CALC), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     else await oferecerArquivo(nome + '.html', gerarHTMLArquivo(blocos, meta.titulo), 'text/html');
   } catch (e) { console.error(e); toast(e.message || 'Falha ao gerar o arquivo.'); }
@@ -225,7 +234,7 @@ function irPara(tab) {
   ABAS.forEach(a => { $('#tab-' + a).hidden = a !== TAB; });
   renderCabecalho(); renderAba();
 }
-function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
+function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
 function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
@@ -234,6 +243,8 @@ function renderParcial() {
   else if (TAB === 'energisa') atualizarEnergisaParcial();
   else if (TAB === 'clima') atualizarClimaParcial();
   else if (TAB === 'aterr') atualizarAterrParcial();
+  else if (TAB === 'materiais') renderMatResumo();
+  else if (TAB === 'memoria') { clearTimeout(renderParcial._t); renderParcial._t = setTimeout(() => { const f = $('#folha'); if (f && TAB === 'memoria') f.innerHTML = renderHTMLDoc(docAtual(MEMSEL).blocos); }, 400); }
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
   else if (TAB === 'quadros') Object.values(CALC.quadros).forEach(q => { const r = $('#q-' + safeId(q.q) + '-res'); if (r) r.innerHTML = quadroRes(q); });
 }
@@ -730,16 +741,22 @@ function renderLumiForm() {
 /* ---------- MEMÓRIA ---------- */
 function renderMemoria() {
   const disp = MEMORIAS.filter(m => m.tem(PROJ, CALC)), grupo = PROJ.memorias.grupo.filter(id => disp.some(m => m.id === id));
-  if (MEMSEL !== 'consolidado' && !disp.some(m => m.id === MEMSEL)) MEMSEL = 'consolidado';
+  if (MEMSEL !== 'consolidado' && MEMSEL !== 'descritivo' && !disp.some(m => m.id === MEMSEL)) MEMSEL = 'descritivo';
   const blocos = docAtual(MEMSEL).blocos, sel = MEMO[MEMSEL];
   const linha = m => { const ok = disp.includes(m), fl = ok && m.falha(PROJ, CALC);
     return `<div class="mem-item${MEMSEL === m.id ? ' on' : ''}${ok ? '' : ' vazio'}" data-scope="memgrupo">
-      <label class="chk" title="Incluir no relatório consolidado"><input type="checkbox" data-k="${m.id}" data-type="chk"${grupo.includes(m.id) ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="Incluir ${esc(m.nome)} no consolidado"></label>
+      <label class="chk" title="Anexar ao memorial descritivo e incluir no relatório consolidado"><input type="checkbox" data-k="${m.id}" data-type="chk"${grupo.includes(m.id) ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="Anexar ${esc(m.nome)}"></label>
       <button type="button" class="mem-nome" data-memsel="${m.id}"${ok ? '' : ' disabled'}><b>${esc(m.nome)}</b><span>${esc(normaDe(m, PROJ))} · ${ok ? esc(m.resumo(PROJ, CALC)) : 'sem dados no projeto'}</span></button>
       ${ok ? `<span class="pill ${fl ? 'fail' : 'ok'}">${fl ? 'Pendente' : 'OK'}</span><span class="mem-exp"><button class="btn sm" type="button" data-exp="pdf" data-doc="${m.id}">PDF</button><button class="btn sm" type="button" data-exp="docx" data-doc="${m.id}">Word</button><button class="btn sm" type="button" data-exp="html" data-doc="${m.id}">HTML</button></span>` : ''}
     </div>`; };
   $('#tab-memoria').innerHTML = `
-  <div class="mem-bar"><div><h2 class="tit">Memórias de cálculo</h2><p class="sub" style="margin:0">Emita cada memória separadamente ou marque as que devem compor o relatório consolidado, com sumário, partes A, B, C… e uma única assinatura.</p></div></div>
+  <div class="mem-bar"><div><h2 class="tit">Memorial descritivo e memórias de cálculo</h2><p class="sub" style="margin:0">O memorial descritivo descreve a instalação segundo a NBR 5410 e leva como anexos as memórias marcadas abaixo e a lista de materiais. Cada memória também pode ser emitida separadamente ou reunida no relatório consolidado.</p></div></div>
+  <div class="mem-cons mem-desc${MEMSEL === 'descritivo' ? ' on' : ''}">
+    <div><b>Memorial descritivo</b><span class="mini"> · NBR 5410 e normas complementares · ${grupo.length} anexo(s): ${grupo.map((id, i) => String.fromCharCode(65 + i) + ' ' + esc(MEMO[id].nome.toLowerCase())).join(', ') || 'nenhum'}</span></div>
+    <div class="mem-bt"><button class="btn${MEMSEL === 'descritivo' ? ' pri' : ''}" type="button" data-memsel="descritivo">Visualizar</button><button class="btn pri" type="button" data-exp="pdf" data-doc="descritivo">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="descritivo">Word</button><button class="btn" type="button" data-exp="html" data-doc="descritivo">HTML</button></div>
+  </div>
+  ${descritivoHTML()}
+  <p class="mini" style="margin:12px 0 6px">Marque os documentos que serão <b>anexos do memorial descritivo</b> (e partes do relatório consolidado):</p>
   <div class="mem-lista" role="list">${MEMORIAS.map(linha).join('')}</div>
   <div class="mem-cons">
     <div><b>Relatório consolidado</b><span class="mini"> · ${grupo.length} de ${disp.length} memória(s) marcada(s)</span></div>
@@ -758,7 +775,7 @@ function renderMemoria() {
     ${fChk('m', 'anexo33', 'Anexo com esquemas da Tabela 33', MEMOPT.anexo33, { struct: true })}
     ${fChk('m', 'assinatura', 'Campo de assinatura', MEMOPT.assinatura, { struct: true })}
   </div>
-  <p class="aviso-prev">Pré-visualização: <b>${MEMSEL === 'consolidado' ? 'relatório consolidado' : esc(sel.titulo)}</b>. No PDF e no Word o documento sai em A4, com cabeçalho, rodapé e numeração de páginas.</p>
+  <p class="aviso-prev">Pré-visualização: <b>${MEMSEL === 'consolidado' ? 'relatório consolidado' : MEMSEL === 'descritivo' ? 'memorial descritivo com anexos' : esc(sel.titulo)}</b>. No PDF e no Word o documento sai em A4, com cabeçalho, rodapé e numeração de páginas.</p>
   <article class="folha doc" id="folha">${grupo.length || MEMSEL !== 'consolidado' ? renderHTMLDoc(blocos) : '<p>Marque ao menos uma memória para compor o relatório consolidado.</p>'}</article>`;
 }
 
@@ -855,7 +872,7 @@ function renderTabelas() {
 
 /* ---------- eventos ---------- */
 document.addEventListener('input', ev => onCampo(ev, false));
-document.addEventListener('toggle', ev => { if (ev.target && ev.target.id === 'k-cons-box') CCONS_ABERTO = ev.target.open; }, true);
+document.addEventListener('toggle', ev => { if (ev.target && ev.target.id === 'k-cons-box') CCONS_ABERTO = ev.target.open; if (ev.target && ev.target.id === 'm-desc-box') DESC_ABERTO = ev.target.open; }, true);
 document.addEventListener('change', ev => onCampo(ev, true));
 document.addEventListener('click', ev => {
   const el = ev.target.closest('button, tr[data-ir]'); if (!el) return;
@@ -865,6 +882,8 @@ document.addEventListener('click', ev => {
   if (el.dataset.exp) return exportar(el.dataset.exp, el, el.dataset.doc || (TAB === 'memoria' ? MEMSEL : 'circuitos'));
   if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.asel) { ASEL = el.dataset.asel; renderArrLista(); renderArrEditor(); if (window.innerWidth < 900) $('#a-ed').scrollIntoView({ block: 'start' }); return; }
+  if (el.dataset.delmat) { PROJ.materiais.itens.splice(+el.dataset.delmat, 1); mudou(true); return; }
+  if (el.dataset.dellocal) { PROJ.descritivo.locais.splice(+el.dataset.dellocal, 1); DESC_ABERTO = true; mudou(true); return; }
   if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
   if (el.dataset.amodo) { PROJ.aterr.modo = el.dataset.amodo; if (el.dataset.amodo === 'simplificado' && PROJ.aterr.solo.modelo === '2c') PROJ.aterr.solo.modelo = 'homog'; mudou(true); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
@@ -902,6 +921,10 @@ document.addEventListener('click', ev => {
     case 'bt-med-serie': { const M = PROJ.aterr.solo.med, dir = String.fromCharCode(65 + new Set(M.map(m => m.dir)).size); [1, 2, 4, 8, 16].forEach(a => M.push({ dir, a, R: null })); mudou(true); return; }
     case 'bt-add-arr': { const t = $('#a-novo-tipo').value, a = arrPadrao(t, t === 'malha' ? 'subestacao' : 'massas'); PROJ.aterr.arr.push(a); ASEL = a.id; mudou(true); return; }
     case 'bt-arr-ndu': return criarArranjoNDU();
+    case 'bt-add-mat': { const cat = $('#mt-novo-cat').value; PROJ.materiais.itens.push({ id: uid(), cat, desc: 'Novo material', un: 'un', norma: '', fab: '', qtd: 0 }); mudou(true); return; }
+    case 'bt-zera-mat': return confirmar2(el, 'Confirmar: zerar?', () => { PROJ.materiais.itens.forEach(x => { x.qtd = 0; }); mudou(true); toast('Quantidades do cadastro zeradas.'); });
+    case 'bt-add-local': PROJ.descritivo.locais.push({ local: '', infl: '', medidas: '' }); DESC_ABERTO = true; mudou(true); return;
+    case 'bt-inf-padrao': return confirmar2(el, 'Substituir a classificação?', () => { const d = descritivoPadrao(PROJ.params.edificacao); Object.assign(PROJ.descritivo, { influencias: d.influencias, medidas: {}, locais: d.locais }); DESC_ABERTO = true; mudou(true); toast('Classificação padrão restaurada.'); });
     case 'bt-dim-hastes': { const a = arrSel(), r = a && CALC.aterr.arr[a.id]; if (!r || !r.nMin) return; if (a.tipo === 'haste' && r.nMin > 1) a.tipo = 'linha'; a.n = r.nMin; mudou(true); toast(`${r.nMin} haste(s) alinhadas: R = ${nfmt(r.nMinR, 2)} Ω.`); return; }
     case 'bt-dup-arr': { const a = arrSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = a.nome + ' (cópia)'; PROJ.aterr.arr.splice(PROJ.aterr.arr.indexOf(a) + 1, 0, n); ASEL = n.id; mudou(true); return; }
     case 'bt-exc-arr': return confirmar2(el, 'Confirmar exclusão', () => { const A = PROJ.aterr.arr, i = A.findIndex(a => a.id === ASEL); if (i < 0) return; const [rm] = A.splice(i, 1); ASEL = (A[i] || A[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluído.`); });

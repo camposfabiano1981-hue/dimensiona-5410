@@ -29,7 +29,10 @@ const MEMORIAS = [
   { id: 'aterr', nome: 'Aterramento', norma: p => p.aterr.modo === 'completo' ? 'ABNT NBR 5410 · NBR 7117-1 · NBR 15751 · IEEE 80' : 'ABNT NBR 5410 · método simplificado de hastes', arq: 'memorial-aterramento', titulo: 'Memorial de cálculo de aterramento',
     rodape: p => p.aterr.modo === 'completo' ? 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013' : 'Aterramento conforme ABNT NBR 5410:2004 — método simplificado de hastes',
     tem: p => (p.aterr.arr || []).length > 0, resumo: (p, k) => { const nf = p.aterr.arr.filter(a => k.aterr.arr[a.id].status === 'fail').length; return `${p.aterr.arr.length} sistema(s)${nf ? ` · ${nf} com pendência` : ''}`; },
-    falha: (p, k) => k.aterr.status === 'fail', build: (p, k) => construirMemorialAterramento(p, k, k.aterr) }
+    falha: (p, k) => k.aterr.status === 'fail', build: (p, k) => construirMemorialAterramento(p, k, k.aterr) },
+  { id: 'materiais', nome: 'Lista de materiais', norma: 'Cadastro de materiais e normas de fabricação', arq: 'lista-de-materiais', titulo: 'Lista de materiais', rodape: 'Lista de materiais',
+    tem: (p, k) => (k.materiais || calcMateriais(p, k)).lista.length > 0, resumo: (p, k) => `${(k.materiais || calcMateriais(p, k)).lista.length} itens`, falha: () => false,
+    build: (p, k, o) => construirListaMateriais(p, k, o) }
 ];
 const MEMO = Object.fromEntries(MEMORIAS.map(m => [m.id, m]));
 const normaDe = (m, p) => typeof m.norma === 'function' ? m.norma(p) : m.norma;
@@ -47,25 +50,18 @@ function construirConsolidado(proj, calc, ids, opt = {}) {
   B.push({ t: 'table', head: ['Parte', 'Memória de cálculo', 'Referência normativa', 'Conteúdo'], widths: [9, 33, 34, 24], align: 'llll',
     rows: partes.map((p, i) => [String.fromCharCode(65 + i), p.nome, normaDe(p, proj), p.resumo(proj, calc)]) });
   B.push({ t: 'p', text: 'Cada parte reúne a memória de cálculo completa da respectiva disciplina, com numeração própria precedida da letra da parte. As partes também podem ser emitidas separadamente.' });
-  partes.forEach((p, i) => {
-    const L = String.fromCharCode(65 + i);
-    B.push({ t: 'break' });
-    B.push({ t: 'parte', letra: L, text: p.nome, sub: normaDe(p, proj) });
-    p.build(proj, calc, { ...opt, assinatura: false }).forEach(b => {
-      if (b.t === 'title' || b.t === 'meta' || (b.t === 'sign' && !b.titular)) return;
-      B.push(b.t === 'h1' || b.t === 'h2' || b.t === 'h3' ? { ...b, text: prefixoParte(b.text, L) } : b);
-    });
-  });
+  anexarPartes(B, partes, 'PARTE', proj, calc, opt);
   if (opt.assinatura !== false) { B.push({ t: 'h1', text: 'Responsabilidade técnica' }); B.push({ t: 'p', text: `Declaro que as memórias de cálculo das partes ${partes.map((_, i) => String.fromCharCode(65 + i)).join(', ')} deste documento foram elaboradas sob minha responsabilidade técnica.` }); B.push(assinaturaRT(I)); }
   return B;
 }
 function metaMemoria(proj, id) {
-  const I = proj.info, m = MEMO[id], t = m ? m.titulo : 'Memorial de cálculo consolidado';
-  const rod = m ? (typeof m.rodape === 'function' ? m.rodape(proj) : m.rodape) : 'Memorial de cálculo consolidado';
+  const I = proj.info, m = MEMO[id], t = m ? m.titulo : id === 'descritivo' ? 'Memorial descritivo' : 'Memorial de cálculo consolidado';
+  const rod = m ? (typeof m.rodape === 'function' ? m.rodape(proj) : m.rodape) : id === 'descritivo' ? 'Memorial descritivo das instalações elétricas — ABNT NBR 5410:2004' : 'Memorial de cálculo consolidado';
   return { titulo: `${t} — ${I.obra || 'projeto'}`, cabecalho: `${t} — ${I.obra || 'projeto'}`.slice(0, 95), direita: `${I.revisao || 'R00'} · ${dataCurta(I.data)}`, rodape: rod + ' — gerado com Dimensiona 5410', assunto: m ? `${t} — ${normaDe(m, proj)}` : t };
 }
 function docMemoria(proj, calc, id, opt = {}, grupo) {
   const rev = (proj.info.revisao || 'R00').toLowerCase(), sl = slugTxt(proj.info.obra);
+  if (id === 'descritivo') return { blocos: construirMemorialDescritivo(proj, calc, grupo || [], opt), nome: `memorial-descritivo-${sl}-${rev}`, meta: metaMemoria(proj, id) };
   if (id === 'consolidado') return { blocos: construirConsolidado(proj, calc, grupo || MEMORIAS.map(m => m.id), opt), nome: `memorial-consolidado-${sl}-${rev}`, meta: metaMemoria(proj, id) };
   const m = MEMO[id] || MEMO.circuitos;
   let blocos = m.build(proj, calc, opt);

@@ -8,7 +8,7 @@ Plataforma web para **projetos elétricos de baixa tensão**:
 - carga térmica de climatização pela **ABNT NBR 16401**;
 - aterramento, da haste única à malha, pelas **NBR 5410, NBR 7117-1 e NBR 15751 / IEEE Std 80**.
 
-Cada disciplina emite sua memória de cálculo em **PDF**, **Word (.docx)** e **HTML**, separadamente ou agrupada num **relatório consolidado** com sumário e partes A, B, C… O quadro de cargas sai em **Excel (.xlsx)**.
+O documento principal é o **memorial descritivo** da instalação (NBR 5410), com influências externas, especificação dos materiais e normas de fabricação, tendo como **anexos** as memórias de cálculo escolhidas pelo profissional e a **lista de materiais**. Cada memória também sai separadamente ou num **relatório consolidado**, em **PDF**, **Word (.docx)** e **HTML**. O quadro de cargas e a lista de materiais saem em **Excel (.xlsx)**.
 
 Funciona 100% no navegador: **não precisa de servidor, banco de dados nem instalação**. Está publicada gratuitamente no **GitHub Pages**.
 
@@ -88,6 +88,26 @@ Dois modos, escolhidos no topo da aba:
   - esquema TT: RA × IΔn ≤ 50 V.
 - **Saídas:** planta e corte de cada arranjo, sugestão do número de hastes para atingir o limite e memorial com recomendações de execução e de medição (NBR 15749).
 
+**Materiais**
+- **Quantitativo automático do projeto:**
+  - condutores por tipo, seção e cor (fases preto/vermelho/branco, neutro azul-claro, proteção verde-amarelo), com acréscimo configurável;
+  - disjuntores e dispositivos DR por modelo;
+  - quadros com módulos DIN e espaço de reserva da Tabela 59;
+  - eletrodutos e eletrocalhas por tipo e diâmetro;
+  - luminárias da luminotécnica;
+  - hastes, conectores, caixas e cabos do aterramento;
+  - padrão de entrada Energisa e, opcionalmente, os condicionadores de ar.
+- **Cadastro de materiais:** cerca de 40 itens com norma de fabricação (DPS, barramentos, tomadas, interruptores, caixas, acessórios de eletroduto, materiais diversos). O profissional escolhe os itens informando a quantidade e pode cadastrar outros.
+- **Lista de materiais:** composta pelo quantitativo automático (cada item pode ser desmarcado ou ter a quantidade ajustada) e pelos itens escolhidos, com norma de fabricação e fabricante/referência; sai em PDF, Word, HTML e Excel.
+
+**Memorial descritivo (NBR 5410)**
+- **Conteúdo:** objetivo e escopo; normas; caracterização da obra e da instalação; critérios de projeto; descrição da entrada de energia, quadros, circuitos, linhas elétricas, iluminação, climatização, aterramento e proteção contra surtos; especificação dos materiais com as normas de fabricação; execução, inspeção, ensaios e documentação.
+- **Influências externas (4.2.6):**
+  - classificação das 23 influências (AA a CB), com a classe adotada e as medidas no projeto;
+  - padrão por tipo de edificação, editável;
+  - tabela de locais com influências específicas (banheiros, cozinha, áreas externas, quadros).
+- **Anexos:** as memórias de cálculo e a lista de materiais marcadas pelo profissional entram como Anexo A, B, C…, com uma única assinatura.
+
 **Memórias de cálculo**
 - **Memórias separadas:** condutores e proteção, eletrodutos, eletrocalhas, quadros de carga, luminotécnica, demanda Energisa, carga térmica e aterramento, cada uma em PDF, Word e HTML.
 - **Relatório consolidado:** reúne as memórias marcadas, com sumário, partes A, B, C… (numeração prefixada pela letra da parte) e uma única assinatura do responsável técnico. A declaração de carga do titular, exigida pela Energisa, é mantida.
@@ -157,7 +177,9 @@ src/lumidoc.js        Relatório luminotécnico (plantas e desenhos das luminár
 src/energisadoc.js    Memorial de demanda para a concessionária
 src/climadoc.js       Memorial de carga térmica
 src/aterrdoc.js       Memorial de aterramento (planta, corte e curva do solo)
-src/memorias.js       Memórias separadas e relatório consolidado
+src/materiais.js      Cadastro de materiais, quantitativo automático e lista de materiais
+src/descritivo.js     Memorial descritivo (influências externas, especificações) e lista de materiais
+src/memorias.js       Memórias separadas, relatório consolidado e anexos
 src/export.js         Saída em PDF (jsPDF), Word (docx), HTML e Excel (ExcelJS)
 src/ui*.js            Interface (abas, formulários, bancadas)
 src/sample.js         Projeto de exemplo
@@ -187,4 +209,6 @@ Os testes do motor conferem o projeto de exemplo com valores verificados à mão
   - haste e conjunto de hastes;
   - malha reproduzindo o exemplo 1 do anexo B da IEEE Std 80-2013 (Rg 2,78 Ω; Em 1.002 V);
   - recuperação de um modelo de solo de duas camadas;
-- montagem das oito memórias e do relatório consolidado.
+- quantitativo de materiais coerente com os circuitos;
+- memorial descritivo com as 23 influências externas e os anexos escolhidos;
+- montagem das memórias, da lista de materiais e do relatório consolidado.

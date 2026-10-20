@@ -62,7 +62,7 @@ function renderHTMLDoc(blocks) {
   return blocks.map(b => {
     switch (b.t) {
       case 'title': return `<header class="d-title"><div class="d-kicker">${escH(b.kicker)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
-      case 'parte': return `<header class="d-parte"><div class="d-kicker">Parte ${escH(b.letra)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
+      case 'parte': return `<header class="d-parte"><div class="d-kicker">${escH(b.rotulo || 'Parte')} ${escH(b.letra)}</div><h2>${escH(b.text)}</h2><p>${escH(b.sub)}</p></header>`;
       case 'meta': return `<table class="d-meta"><tbody>${b.rows.map(r => `<tr><th scope="row">${escH(r[0])}</th><td>${escH(r[1])}</td></tr>`).join('')}</tbody></table>`;
       case 'h1': return `<h3 class="d-h1">${escH(b.text)}</h3>`;
       case 'h2': return `<h4 class="d-h2">${escH(b.text)}</h4>`;
@@ -179,7 +179,7 @@ async function gerarPDF(blocks, meta) {
       }
       case 'parte': {
         const h = 24; ensure(h + 40); doc.setFillColor(...C.head); doc.rect(M.l, y, W, h, 'F'); doc.setFillColor(...C.acc); doc.rect(M.l, y, 1.6, h, 'F');
-        font(true, 8, C.acc); doc.text(`PARTE ${b.letra}`, M.l + 6, y + 6.5);
+        font(true, 8, C.acc); doc.text(`${(b.rotulo || 'Parte').toUpperCase()} ${b.letra}`, M.l + 6, y + 6.5);
         let ft = 15; font(true, ft, C.ink); while (doc.getTextWidth(b.text.toUpperCase()) > W - 12 && ft > 11) { ft -= 0.5; doc.setFontSize(ft); }
         doc.text(b.text.toUpperCase(), M.l + 6, y + 13.5);
         font(false, 8.6, C.muted); doc.text(doc.splitTextToSize(b.sub, W - 12)[0], M.l + 6, y + 19.5);
@@ -280,10 +280,12 @@ async function gerarDOCX(blocks, meta) {
   const P = (text, o = {}) => new D.Paragraph({ children: tr(text, o), spacing: { after: o.after ?? 100, before: o.before ?? 0, line: o.line }, alignment: o.align, keepNext: o.keepNext, indent: o.indent, border: o.border, shading: o.shading });
   const borda = (c = LINE) => ({ style: D.BorderStyle.SINGLE, size: 4, color: c });
   const bordas = c => ({ top: borda(c), bottom: borda(c), left: borda(c), right: borda(c) });
+  const LARG_DOCX = 11906 - 1250 - 900;   // largura útil da página A4 (twips), igual às margens da seção
+  const grade = ws => ws && ws.length ? { columnWidths: ws.map(p => Math.round(LARG_DOCX * p / 100)), layout: D.TableLayoutType.FIXED } : {};
   const cell = (text, o = {}) => new D.TableCell({
     children: [new D.Paragraph({ children: tr(text, { size: o.size || 17, bold: o.bold, color: o.color }), alignment: o.right ? D.AlignmentType.RIGHT : D.AlignmentType.LEFT })],
     shading: o.fill ? { fill: o.fill, type: D.ShadingType.CLEAR, color: 'auto' } : undefined,
-    width: o.w ? { size: o.w, type: D.WidthType.PERCENTAGE } : undefined,
+    width: o.w ? { size: Math.round(LARG_DOCX * o.w / 100), type: D.WidthType.DXA } : undefined,
     margins: { top: 30, bottom: 30, left: 70, right: 70 }, borders: o.borders
   });
   const out = [];
@@ -294,12 +296,12 @@ async function gerarDOCX(blocks, meta) {
           P(b.kicker.toUpperCase(), { size: 16, bold: true, color: ACC, after: 60 }), P(b.text.toUpperCase(), { size: 40, bold: true, after: 60 }), P(b.sub, { size: 19, color: MUT, after: 0 })] })] })] }));
         break;
       case 'meta':
-        out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows: b.rows.map(r => new D.TableRow({ children: [cell(r[0].toUpperCase(), { w: 28, size: 15, bold: true, color: MUT, borders: bordas('1B1F23') }), cell(r[1], { w: 72, size: 19, borders: bordas('1B1F23') })] })) }));
+        out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, ...grade([28, 72]), rows: b.rows.map(r => new D.TableRow({ children: [cell(r[0].toUpperCase(), { w: 28, size: 15, bold: true, color: MUT, borders: bordas('1B1F23') }), cell(r[1], { w: 72, size: 19, borders: bordas('1B1F23') })] })) }));
         out.push(P('', { after: 120 })); break;
       case 'h1': out.push(new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, keepNext: true, spacing: { before: 320, after: 140 }, border: { bottom: borda() }, children: [new D.TextRun({ text: b.text.toUpperCase(), bold: true, size: 26, color: ACC, font: FONT })] })); break;
       case 'parte': {
         const band = { shading: { fill: HEAD, type: D.ShadingType.CLEAR, color: 'auto' }, border: { left: { style: D.BorderStyle.SINGLE, size: 36, color: ACC } }, keepNext: true };
-        out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' PARTE ' + b.letra, bold: true, size: 16, color: ACC, font: FONT })] }));
+        out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' ' + (b.rotulo || 'Parte').toUpperCase() + ' ' + b.letra, bold: true, size: 16, color: ACC, font: FONT })] }));
         out.push(new D.Paragraph({ ...band, heading: D.HeadingLevel.HEADING_1, spacing: { before: 0, after: 0 }, children: [new D.TextRun({ text: ' ' + b.text.toUpperCase(), bold: true, size: 32, color: '1B1F23', font: FONT })] }));
         out.push(new D.Paragraph({ ...band, spacing: { before: 0, after: 240 }, children: [new D.TextRun({ text: ' ' + b.sub, size: 18, color: MUT, font: FONT })] }));
         break;
@@ -313,14 +315,14 @@ async function gerarDOCX(blocks, meta) {
       case 'ver': out.push(new D.Paragraph({ spacing: { after: 50 }, children: [new D.TextRun({ text: (b.ok ? '✓ ' : '✗ ') + b.text, color: b.ok ? '1F6E43' : 'A8231A', size: 19, font: FONT })] })); break;
       case 'kv4': {
         const nb = { top: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: D.BorderStyle.NONE, size: 0, color: 'FFFFFF' } };
-        out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, borders: { insideHorizontal: nb.top, insideVertical: nb.top, ...nb }, rows: b.rows.map(r => new D.TableRow({ children: [cell(r[0], { w: 13, bold: true, color: MUT, borders: nb }), cell(r[1], { w: 37, borders: nb }), cell(r[2], { w: 15, bold: true, color: MUT, borders: nb }), cell(r[3], { w: 35, borders: nb })] })) }));
+        out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, ...grade([13, 37, 15, 35]), borders: { insideHorizontal: nb.top, insideVertical: nb.top, ...nb }, rows: b.rows.map(r => new D.TableRow({ children: [cell(r[0], { w: 13, bold: true, color: MUT, borders: nb }), cell(r[1], { w: 37, borders: nb }), cell(r[2], { w: 15, bold: true, color: MUT, borders: nb }), cell(r[3], { w: 35, borders: nb })] })) }));
         out.push(P('', { after: 60 })); break;
       }
       case 'table': {
         const al = b.align || '', ws = b.widths || [];
         const rows = [new D.TableRow({ tableHeader: true, children: b.head.map((h, i) => cell(h, { bold: true, fill: HEAD, size: b.small ? 15 : 17, right: al[i] === 'r', w: ws[i] })) })]
           .concat(b.rows.map((r, ri) => new D.TableRow({ cantSplit: true, children: r.map((v, i) => cell(String(v), { size: b.small ? 15 : 17, right: al[i] === 'r', w: ws[i], bold: b.lastBold && ri === b.rows.length - 1, fill: b.lastBold && ri === b.rows.length - 1 ? EQ : undefined })) })));
-        out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows })); out.push(P('', { after: 80 })); break;
+        out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, ...grade(ws.length === b.head.length ? ws : null), rows })); out.push(P('', { after: 80 })); break;
       }
       case 'spec': {
         const col = b.status === 'ok' ? '1F6E43' : (b.status === 'warn' ? '8A5A00' : 'A8231A');
@@ -366,7 +368,7 @@ async function gerarDOCX(blocks, meta) {
 
 /* ---------------- EXCEL (quadro de cargas) ---------------- */
 const EXCELJS_URL = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
-async function gerarXLSX(proj, calc) {
+async function gerarXLSX(proj, calc, so) {
   await loadScript(EXCELJS_URL);
   const X = window.ExcelJS; if (!X) throw new Error('Biblioteca de planilhas indisponível.');
   const wb = new X.Workbook(); wb.creator = 'Dimensiona 5410'; wb.created = new Date(); wb.calcProperties.fullCalcOnLoad = true;
@@ -395,6 +397,16 @@ async function gerarXLSX(proj, calc) {
   const fasesDe = c => (c.fases || '').split('').slice(0, nFases(c.ligacao)).join('-');
   const conduto = r => r.calha ? (r.calha.esc ? `${r.calha.T.nome} ${r.calha.esc.W}×${r.calha.esc.H} mm` : 'não dimensionada') : (r.trecho && r.trecho.esc ? `${r.trecho.esc.nome} DN ${r.trecho.esc.dn} (${r.trecho.esc.pol})` : (r.trecho && !r.trecho.aplica ? 'não se aplica' : '—'));
   const secoes = (c, r) => { const k = r.nPar > 1 ? r.nPar + '×' : ''; return `${k}${fS(r.Sf)} / ${r.hasN ? k + fS(r.SN) : '—'} / ${r.SPE ? k + fS(r.SPE) : '—'}${c.material === 'Al' ? ' Al' : ''}`; };
+
+  /* lista de materiais (sozinha ou como última aba) */
+  function abaMateriais() {
+    const cm = calc.materiais || calcMateriais(proj, calc); if (!cm.lista.length) return;
+    const ws = wb.addWorksheet(nomeAba('Lista de materiais'), { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
+    const cols = [{ h: 'Item', w: 6, al: 'c' }, { h: 'Categoria', w: 22, al: 'l' }, { h: 'Descrição / especificação', w: 62, al: 'l' }, { h: 'Norma de fabricação', w: 30, al: 'l' }, { h: 'Fabricante / ref.', w: 18, al: 'l' }, { h: 'Unid.', w: 7, al: 'c' }, { h: 'Qtd.', w: 9, fmt: '#,##0.##' }, { h: 'Origem', w: 22, al: 'l' }];
+    const r0 = cabecalho(ws, 'Lista de materiais', cols.length);
+    tabela(ws, r0, cols, cm.lista.map((x, i) => [i + 1, CAT_MAT[x.cat].nome, x.desc, x.norma || '', x.fab || '', x.un, x.qtd, x.auto ? (x.origem || []).join(', ') : 'cadastro']));
+  }
+  if (so === 'materiais') { abaMateriais(); const b = await wb.xlsx.writeBuffer(); return new Blob([b], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); }
 
   /* uma aba por quadro */
   Object.values(calc.quadros).forEach(q => {
@@ -501,6 +513,7 @@ async function gerarXLSX(proj, calc) {
     const { r1: q1 } = tabela(ws2, q0, cols2, Array.from({ length: 24 }, (_, j) => [j + 1, +tempExt(Cc, j + 1).toFixed(1), ...A.map(a => Math.round(cc.amb[a.id].T[j])), Math.round(cc.T[j])]));
     for (let i = q0 + 1; i <= q1; i++) ws2.getCell(i, cols2.length).value = { formula: `SUM(${L(2)}${i}:${L(cols2.length - 2)}${i})`, result: ws2.getCell(i, cols2.length).value };
   }
+  abaMateriais();
   const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }

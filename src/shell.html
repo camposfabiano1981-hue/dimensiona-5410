@@ -207,6 +207,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 .mem-nome span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
 .mem-nome:hover:not(:disabled) b{color:var(--accent)}
 .mem-exp{display:flex;gap:4px}
+.tbl.mat tr.grp td{background:var(--sunk);font:600 11px/1.2 var(--f-display);letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.tbl.mat tr.off td{opacity:.5}.tbl.mat tr.sel td{background:var(--accent-soft)}
+.mem-desc.on{border-color:var(--accent);background:var(--accent-soft)}
 .mem-cons{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--sunk);padding:10px 12px;margin-bottom:12px}
 .folha{background:var(--doc-bg);color:var(--doc-ink);max-width:840px;margin:0 auto;padding:44px 52px;border:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .aviso-prev{max-width:840px;margin:0 auto 10px;font-size:12px;color:var(--muted)}
@@ -237,7 +240,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
         <circle cx="29" cy="27.5" r="6" fill="var(--c-neutro)" stroke="var(--ink)" stroke-width=".8"/><circle cx="29" cy="27.5" r="2.4" fill="var(--copper)"/>
         <circle cx="23" cy="17" r="6" fill="var(--c-pe)" stroke="var(--c-pe2)" stroke-width="1.6"/><circle cx="23" cy="17" r="2.4" fill="var(--copper)"/>
       </svg>
-      <div><h1>Dimensiona <b>5410</b></h1><p>Condutores, proteção, eletrodutos, eletrocalhas, demanda Energisa, luminotécnica, carga térmica e aterramento · memórias de cálculo</p></div>
+      <div><h1>Dimensiona <b>5410</b></h1><p>Condutores, proteção, eletrodutos, eletrocalhas, demanda Energisa, luminotécnica, carga térmica, aterramento e materiais · memorial descritivo e memórias de cálculo</p></div>
     </div>
     <div class="carimbo" id="carimbo" aria-label="Identificação do projeto"></div>
     <div class="acoes">
@@ -260,6 +263,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <button role="tab" data-tab="lumi" id="tab-b-lumi">Luminotécnica</button>
     <button role="tab" data-tab="clima" id="tab-b-clima">Climatização</button>
     <button role="tab" data-tab="aterr" id="tab-b-aterr">Aterramento</button>
+    <button role="tab" data-tab="materiais" id="tab-b-materiais">Materiais</button>
     <button role="tab" data-tab="memoria" id="tab-b-memoria">Memória de cálculo</button>
     <button role="tab" data-tab="tabelas" id="tab-b-tabelas">Tabelas da norma</button>
   </nav>
@@ -273,6 +277,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <section class="painel" id="tab-lumi" role="tabpanel" hidden></section>
     <section class="painel" id="tab-clima" role="tabpanel" hidden></section>
     <section class="painel" id="tab-aterr" role="tabpanel" hidden></section>
+    <section class="painel" id="tab-materiais" role="tabpanel" hidden></section>
     <section class="painel" id="tab-memoria" role="tabpanel" hidden></section>
     <section class="painel" id="tab-tabelas" role="tabpanel" hidden></section>
   </main>

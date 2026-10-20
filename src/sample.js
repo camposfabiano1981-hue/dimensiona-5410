@@ -7,7 +7,7 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(),
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
     memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }
@@ -68,6 +68,10 @@ function projetoExemplo() {
   const arK = (tipo, funcao, o) => Object.assign(arrPadrao(tipo, funcao), o);
   T.modo = 'simplificado';
   T.arr = [arK('linha', 'entrada', { nome: 'Padrão de entrada — categoria T3 (NDU 001)', n: 4, e: 2.4, haste: 'h34-240', L: 2.4, d: 17.3, rmax: 20, hc: 0.5, Scond: 16, Lq: 3, caixas: 'todas' })];
+  Object.assign(proj.descritivo, { uso: 'Residência unifamiliar térrea', area: 120, pavimentos: 1, padraoLocal: 'no muro frontal, no limite do lote com a via pública, com leitura voltada para a calçada' });
+  const qtd = (ini, q) => { const x = proj.materiais.itens.find(m => m.desc.startsWith(ini)); if (x) x.qtd = q; };
+  [['DPS classe II', 4], ['Barramento de neutro', 1], ['Barramento de proteção', 1], ['Caixa de embutir 4×2', 30], ['Caixa octogonal', 14], ['Tomada 2P+T 10 A', 18], ['Tomada 2P+T 20 A', 4],
+    ['Interruptor simples 10 A', 8], ['Interruptor paralelo', 2], ['Saída de fio', 3], ['Barramento de equipotencialização', 1], ['Conector de emenda', 40], ['Fita isolante', 5], ['Anilhas', 1]].forEach(([i, q]) => qtd(i, q));
   return proj;
 }
 if (typeof module !== 'undefined') module.exports = { projetoExemplo, projetoVazio };

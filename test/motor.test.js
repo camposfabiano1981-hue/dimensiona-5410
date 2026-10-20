@@ -6,12 +6,12 @@ const assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const SRC = path.join(__dirname, '..', 'src');
-const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'energisa', 'clima', 'aterr', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'memorias', 'export'];
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'energisa', 'clima', 'aterr', 'materiais', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'descritivo', 'memorias', 'export'];
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -20,6 +20,7 @@ const E = A.calcEnergisa(P);
 const C = A.calcClima(P, K);
 K.energisa = E; K.clima = C;
 const T = A.calcAterramento(P, K); K.aterr = T;
+const MT = A.calcMateriais(P, K); K.materiais = MT;
 const perto = (v, ref, tol, msg) => assert.ok(Math.abs(v - ref) <= tol, `${msg}: ${v} ≠ ${ref} ± ${tol}`);
 
 test('NBR 5410 — circuitos do exemplo dimensionados sem falhas', () => {
@@ -133,6 +134,33 @@ test('Aterramento — valor típico pelo tipo de solo e exclusão de malha no mo
   assert.equal(t.arr.m1.excluido, true, 'malha fica fora do modo simplificado');
   p2.aterr.modo = 'completo';
   assert.ok(A.calcAterramento(p2, K).arr.m1.R > 0, 'no modo completo a malha é calculada');
+});
+
+test('Materiais — quantitativo automático coerente com o projeto', () => {
+  const soma = re => MT.lista.filter(x => re.test(x.desc)).reduce((s, x) => s + x.qtd, 0);
+  const nDisj = P.circuitos.filter(c => c.dispositivo !== 'fus_gG').length;
+  assert.equal(soma(/^Disjuntor termomagnético \d/), nDisj, 'um disjuntor por circuito');
+  assert.equal(soma(/^Interruptor diferencial/), P.circuitos.filter(c => K.res[c.id].drUsado).length, 'um DR por circuito com DR');
+  // condutores: comprimento × número de condutores × (1 + acréscimo), arredondado para cima por item
+  const esperado = P.circuitos.reduce((s, c) => s + (+c.L) * K.res[c.id].cabos.length, 0) * 1.1;
+  const cabos = MT.lista.filter(x => x.cat === 'cond').reduce((s, x) => s + x.qtd, 0);
+  assert.ok(cabos >= esperado - 1e-9 && cabos <= esperado + MT.lista.filter(x => x.cat === 'cond').length, `metros de condutores ${cabos} × ${esperado}`);
+  assert.ok(MT.lista.some(x => /Haste de aterramento/.test(x.desc) && x.qtd === 4), 'hastes do aterramento');
+  assert.ok(MT.lista.every(x => x.cat !== 'cond' || /NBR/.test(x.norma)), 'condutores com norma de fabricação');
+  assert.ok(MT.lista.some(x => !x.auto && /Tomada 2P\+T 10 A/.test(x.desc)), 'itens escolhidos no cadastro entram na lista');
+});
+
+test('Memorial descritivo — influências externas, materiais e anexos escolhidos', () => {
+  const opt = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
+  const B = A.docMemoria(P, K, 'descritivo', opt, ['circuitos', 'aterr', 'materiais']).blocos;
+  const txt = JSON.stringify(B.map(b => ({ ...b, svg: undefined })));
+  assert.ok(!/NaN|undefined|Infinity/.test(txt), 'valor inválido no texto');
+  const inf = B.find(b => b.t === 'table' && b.head[0] === 'Código');
+  assert.equal(inf.rows.length, A.INFLUENCIAS.length, 'todas as influências externas classificadas');
+  const anexos = B.filter(b => b.t === 'parte');
+  assert.deepEqual(Array.from(anexos, b => b.rotulo + ' ' + b.letra + ' ' + b.text), ['ANEXO A Condutores e proteção dos circuitos', 'ANEXO B Aterramento', 'ANEXO C Lista de materiais']);
+  assert.ok(/ABNT NBR NM 247-3/.test(txt) && /ABNT NBR IEC 61643-11/.test(txt), 'normas de fabricação citadas');
+  assert.equal(B.filter(b => b.t === 'sign' && !b.titular).length, 1, 'uma assinatura do responsável técnico');
 });
 
 test('Memoriais — cada memória separada e o consolidado são montados sem erro', () => {
