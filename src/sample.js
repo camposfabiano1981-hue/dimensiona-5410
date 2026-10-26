@@ -7,7 +7,7 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
     memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }
@@ -39,6 +39,7 @@ function projetoExemplo() {
     mk({ num: '10', desc: 'Motor — bomba d’água 1/2 cv', tipo: 'motor', local: 'externa', ligacao: 'FF', fases: 'CA', pot: 0.5, unid: 'cv', fp: 0.8, rend: 0.7, fs: 1.15, ipIn: 6, L: 28, tipoCabo: 'unipolar', metodo: '61A', curva: 'C', dr: 'sim' }),
     mk({ num: '11', desc: 'Iluminação — garagem (perfilado)', tipo: 'ilum', local: 'garagem', ligacao: 'FN', fases: 'A', pot: 300, unid: 'VA', fp: 0.92, L: 20, metodo: '35', trecho: 'P1' }),
     mk({ num: '12', desc: 'TUG — garagem (perfilado)', tipo: 'tug', local: 'garagem', ligacao: 'FN', fases: 'B', pot: 600, unid: 'VA', fp: 0.8, L: 22, metodo: '35', trecho: 'P1' }),
+    mk({ num: '13', desc: 'Iluminação externa — estacionamento', tipo: 'ilum', local: 'externa', ligacao: 'FN', fases: 'C', pot: 200, unid: 'W', fp: 0.95, L: 35, tipoCabo: 'unipolar', metodo: '61A', dr: 'sim', potLumi: true }),
     mk({ num: 'AL-1', desc: 'Alimentador do QD-1', tipo: 'dist', quadro: 'QM', local: 'quadro', alimenta: 'QD-1', demandaAuto: true, ligacao: 'FFFN', fases: 'ABC', L: 12, tipoCabo: 'unipolar', metodo: '61A', curva: 'C' })
   ];
   const c1 = proj.circuitos[0].id, c2 = proj.circuitos[1].id, amb = (o, i) => Object.assign(defaultsAmbiente(i), o);
@@ -48,6 +49,7 @@ function projetoExemplo() {
     amb({ nome: 'Cozinha', amb: 'resi-cozinha-bancada-pia-e-fogao-local', L: 3.2, W: 2.8, pd: 2.7, hwp: 0.9, prod: 'ldv-down12', fm: '0.8', circuito: c2 }, 3),
     amb({ nome: 'Escritório (home office)', amb: 'escr-escrever-teclar-ler-e-processar-dados', L: 3.2, W: 2.6, pd: 2.7, hwp: 0.75, prod: 'lum-ef40-17', fm: '0.8', circuito: c1 }, 4)
   ];
+  proj.lumiExt = [Object.assign(ambExtPadrao(1), { nome: 'Estacionamento externo', req: REQX_PADRAO, L: 30, W: 18, arranjo: 'ambos', n: 2, k: 1, h: 7, tilt: 40, recuo: 0.5, prod: 'ref50', fu: 0.45, fd: 0.8, circuito: proj.circuitos.find(c => c.num === '13').id })];
   const K = proj.clima; Object.assign(K, { cidade: 'Campo Grande', uf: 'MS', lat: -20.47, alt: 530, mes: 0, freq: '1%', tbs: 34, tbu: 24, amp: 11, fonte: 'Valores ilustrativos do exemplo — substitua pelos do Anexo A da NBR 16401-1:2024 para a localidade' });
   const envK = (tipo, o) => Object.assign(envPadrao(tipo), o), ambK = o => Object.assign(ambClimaPadrao(), o);
   K.amb = [

@@ -385,7 +385,8 @@ function calcularProjeto(proj) {
   const tipoTrecho = {}; C.forEach(c => { const k = chaveTrecho(c); if (!tipoTrecho[k]) tipoTrecho[k] = trechoCfg(proj, k, C.filter(x => chaveTrecho(x) === k)).tipo; });
   const pot = {}, demQD = {}, visit = new Set();
   const lumi = typeof calcLumi === 'function' ? calcLumi(proj) : {}, lumiCirc = {};
-  (proj.lumi || []).forEach(a => { const l = lumi[a.id]; if (!a.circuito || !l) return; const o = lumiCirc[a.circuito] = lumiCirc[a.circuito] || { W: 0, amb: [] }; o.W += l.P; o.amb.push(a.nome); });
+  const lumiExt = typeof calcLumiExt === 'function' ? calcLumiExt(proj) : {};
+  [[proj.lumi, lumi], [proj.lumiExt, lumiExt]].forEach(([L, R]) => (L || []).forEach(a => { const l = R[a.id]; if (!a.circuito || !l) return; const o = lumiCirc[a.circuito] = lumiCirc[a.circuito] || { W: 0, amb: [] }; o.W += l.P; o.amb.push(a.nome); }));
   function potC(c) {
     if (pot[c.id]) return pot[c.id];
     if (c.tipo === 'ilum' && c.potLumi && lumiCirc[c.id]) { const o = lumiCirc[c.id]; return pot[c.id] = { ...potencias({ ...c, pot: o.W, unid: 'W' }), lumi: o }; }
@@ -426,7 +427,7 @@ function calcularProjeto(proj) {
   const calhas = calcCalhas(proj, res);
   C.forEach(c => { const r = res[c.id]; r.status = r.falhas.length ? 'fail' : (r.avisos.length ? 'warn' : 'ok'); });
   const quadros = calcQuadros(proj, res, demandaQD);
-  return { res, trechos, calhas, quadros, demandaQD, lumi, lumiCirc };
+  return { res, trechos, calhas, quadros, demandaQD, lumi, lumiExt, lumiCirc };
 }
 
 /* ============== ELETRODUTOS ============== */

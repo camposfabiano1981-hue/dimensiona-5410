@@ -6,11 +6,12 @@ const assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const SRC = path.join(__dirname, '..', 'src');
-const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'energisa', 'clima', 'aterr', 'materiais', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'descritivo', 'memorias', 'export'];
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'materiais', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'descritivo', 'memorias', 'export'];
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
+  calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi,
   WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS };`, ctx);
 const A = ctx.api;
 
@@ -24,7 +25,7 @@ const MT = A.calcMateriais(P, K); K.materiais = MT;
 const perto = (v, ref, tol, msg) => assert.ok(Math.abs(v - ref) <= tol, `${msg}: ${v} ≠ ${ref} ± ${tol}`);
 
 test('NBR 5410 — circuitos do exemplo dimensionados sem falhas', () => {
-  const esperado = { 1: [1.5, 10], 2: [1.5, 10], 3: [2.5, 16], 4: [4, 16], 5: [4, 16], 6: [4, 25], 7: [10, 40], 8: [2.5, 10], 9: [4, 16], 10: [2.5, 10], 11: [1.5, 10], 12: [2.5, 10], 'AL-1': [16, 63] };
+  const esperado = { 1: [1.5, 10], 2: [1.5, 10], 3: [2.5, 16], 4: [4, 16], 5: [4, 16], 6: [4, 25], 7: [10, 40], 8: [2.5, 10], 9: [4, 16], 10: [2.5, 10], 11: [1.5, 10], 12: [2.5, 10], 13: [1.5, 10], 'AL-1': [16, 63] };
   for (const c of P.circuitos) {
     const r = K.res[c.id];
     assert.equal(r.status, 'ok', `circuito ${c.num}: ${r.falhas.concat(r.avisos).join(' | ')}`);
@@ -39,6 +40,32 @@ test('Luminotécnica — iluminância mantida atende a NBR ISO/CIE 8995-1', () =
     assert.ok(r.okEm, `${a.nome}: Em ${r.Emed} < ${r.Em}`);
     assert.notEqual(r.status, 'fail', a.nome);
   }
+});
+
+test('Iluminação de exteriores — ponto a ponto confere com a solução analítica e o exemplo atende', () => {
+  // projetor único apontado para baixo no centro de uma área: E(centro) ≈ I0 · Fd / h² (o ponto da malha mais próximo fica a meio passo)
+  const a = Object.assign(A.ambExtPadrao(1), { L: 10, W: 10, arranjo: 'grade', nx: 1, ny: 1, k: 1, h: 10, tilt: 0, prod: 'ref100', fd: 1 });
+  const r = A.calcAreaExt(a), I0 = 10000 * (r.m + 1) / (2 * Math.PI);
+  perto(r.I0, I0, 1e-6, 'intensidade no eixo');
+  perto(r.EmaxPP, I0 / 100, I0 / 100 * 0.03, 'iluminância máxima sob o projetor');
+  perto(A.mDeFacho(120), 1, 1e-9, 'facho de 120° → cos¹θ');
+  // método dos lúmens: N = E·S/(Φ·Fu·Fd)
+  const x = P.lumiExt[0], rx = K.lumiExt[x.id];
+  perto(rx.Nreq, rx.Em * rx.A / (rx.phi * rx.Fu * rx.Fd), 1e-9, 'número de projetores');
+  assert.ok(rx.N >= Math.ceil(rx.Nreq - 1e-9), 'quantidade adotada cobre o método dos lúmens');
+  assert.ok(rx.okEm && rx.okU0, `exemplo: Eméd ${rx.EmedPP} lx, U0 ${rx.U0}`);
+  assert.equal(rx.status, 'ok', rx.falhas.concat(rx.avisos).join(' | '));
+  // potência no circuito, materiais e relatório
+  const c = P.circuitos.find(c => c.id === x.circuito);
+  perto(K.lumiCirc[c.id].W, rx.P, 1e-9, 'potência do circuito de iluminação externa');
+  const poste = MT.auto.find(i => i.key.startsWith('poste|'));
+  assert.ok(poste && poste.q === rx.nPostes, 'postes no quantitativo');
+  const B = A.construirRelatorioLumi(P, K);
+  assert.ok(B.some(b => b.t === 'h1' && /exteriores/.test(b.text)), 'seção de exteriores no relatório');
+  // arranjo em um lado com poucos postes: sugestão respeita o espaçamento de 3 × h
+  const b = Object.assign(A.ambExtPadrao(2), { L: 60, W: 10, arranjo: 'lado', n: 1, h: 8 });
+  const rb = A.calcAreaExt(b);
+  assert.ok(60 / rb.sugestao.n <= 3 * 8 + 1e-9, 'espaçamento da sugestão');
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

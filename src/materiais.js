@@ -119,6 +119,13 @@ function materiaisAuto(proj, calc) {
     const r = calc.lumi[a.id]; if (!r || !r.N) return; const pr = r.prod;
     add(`lum|${pr.id}`, 'ilum', `${pr.tipo === 'lampada' ? 'Lâmpada' : 'Luminária'} ${pr.fab && pr.fab !== '—' ? pr.fab + ' ' : ''}${pr.mod}${r.nLamp > 1 ? ` (${r.nLamp} lâmpadas)` : ''}`, 'un', pr.tipo === 'lampada' ? 'ABNT NBR IEC 62560' : 'ABNT NBR IEC 60598-1', r.N, a.nome);
   });
+  // iluminação externa: projetores e postes
+  (proj.lumiExt || []).forEach(a => {
+    const r = (calc.lumiExt || {})[a.id]; if (!r || !r.N) return; const pr = r.prod;
+    add(`lumx|${pr.id}|${pr.W}|${pr.lm}`, 'ilum', `${pr.nome}${pr.id === 'custom' ? ` ${nfmt(pr.W, 0)} W / ${nfmt(pr.lm, 0)} lm` : ''} — ${nfmt(pr.lm, 0)} lm, facho ${nfmt(pr.facho, 0)}°, ${pr.ip || 'IP65'} mín., com braço/suporte`, 'un', 'ABNT NBR IEC 60598-1 / IEC 60598-2-5', r.N, a.nome);
+    add(`poste|${nfmt(r.h, 1)}`, 'ilum', `Poste de aço galvanizado a fogo, altura útil ${nfmt(r.h, 1)} m, com base, chumbadores e caixa de passagem`, 'un', 'ABNT NBR 14744', r.nPostes, a.nome);
+    add('rele-fotoe', 'ilum', 'Relé fotoelétrico (ou temporizador) para comando da iluminação externa', 'un', 'ABNT NBR 5123', 1, a.nome);
+  });
   // aterramento (sistemas de hastes)
   if (calc.aterr) (proj.aterr.arr || []).forEach(a => {
     const r = calc.aterr.arr[a.id]; if (!r || !r.materiais) return;

@@ -69,6 +69,7 @@ function normalizarProjeto(p) {
   out.descritivo = normalizarDescritivo(p.descritivo, out.params.edificacao);
   out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
   out.lumi = (Array.isArray(p.lumi) ? p.lumi : []).map((a, i) => { const n = { ...defaultsAmbiente(i + 1), ...a }; if (!AMB[n.amb]) n.amb = AMB_PADRAO; if (n.prod !== 'custom' && !CATL[n.prod]) n.prod = CAT_LUM[0].id; return n; });
+  out.lumiExt = (Array.isArray(p.lumiExt) ? p.lumiExt : []).map((a, i) => { const n = { ...ambExtPadrao(i + 1), ...a }; if (!REQX[n.req]) n.req = REQX_PADRAO; if (n.prod !== 'custom' && !CATX[n.prod]) n.prod = 'ref150'; if (!ARRANJOS_EXT[n.arranjo]) n.arranjo = 'lado'; return n; });
   out.circuitos = (Array.isArray(p.circuitos) ? p.circuitos : []).map(c => { const d = defaultsCircuito(out.params, c.tipo || 'tug'); const n = { ...d, ...c, id: c.id || d.id }; if (!ISOL[n.isolacao]) n.isolacao = 'PVC'; if (!MET[n.metodo]) n.metodo = d.metodo; return n; });
   garantirQuadros(out);
   return out;
@@ -77,6 +78,7 @@ function garantirQuadros(p) {
   if (!Object.keys(p.quadros).length) p.quadros['QD-1'] = { desc: 'Quadro de distribuição', fd: null, icc: p.params.icc, dvMont: 0 };
   p.circuitos.forEach(c => { if (!c.quadro) c.quadro = Object.keys(p.quadros)[0]; if (!p.quadros[c.quadro]) p.quadros[c.quadro] = { desc: '', fd: null, icc: p.params.icc, dvMont: 0 }; });
   if (!Array.isArray(p.lumi)) p.lumi = [];
+  if (!Array.isArray(p.lumiExt)) p.lumiExt = [];
 }
 function carregar() {
   try { const s = localStorage.getItem(LS_KEY); if (s) return normalizarProjeto(JSON.parse(s)); } catch (e) { }
@@ -114,6 +116,7 @@ function onCampo(ev, isChange) {
   else if (sc === 'conj') { const c = PROJ.energisa.conj[+box.dataset.i]; if (c) c[k] = v; }
   else if (sc === 't003') { const row = PROJ.energisa.t003[box.dataset.tab][+box.dataset.i]; if (row) row[+k] = v; }
   else if (sc === 'amb') { const a = ambSel(); if (!a) return; a[k] = v; struct = efeitosAmbiente(a, k) || struct; }
+  else if (sc === 'lext') { const a = areaXSel(); if (!a) return; a[k] = v; struct = efeitosAreaExt(a, k) || struct; }
   else if (sc === 'memopt') { MEMOPT[k] = v; struct = true; }
   else if (sc === 'memgrupo') { const g = new Set(PROJ.memorias.grupo); if (v) g.add(k); else g.delete(k); PROJ.memorias.grupo = MEMORIAS.map(m => m.id).filter(id => g.has(id)); struct = true; }
   else if (sc === 'asolo') { PROJ.aterr.solo[k] = v; }
@@ -223,9 +226,7 @@ function renderCabecalho() {
   $('#carimbo').innerHTML = [['Obra', I.obra || 'sem nome'], ['Responsável', I.responsavel || '—'], ['Sistema', `${P.U0}/${P.U} V · ${P.aterramento}`], ['Rev. · data', `${I.revisao || 'R00'} · ${dataCurta(I.data) || '—'}`]]
     .map(([a, b]) => `<div><small>${a}</small><span title="${esc(b)}">${esc(b)}</span></div>`).join('');
   $('#banner').hidden = !PROJ.exemplo;
-  const nf = PROJ.circuitos.filter(c => CALC.res[c.id].status === 'fail').length;
-  const cnt = $('#cnt-circ'); cnt.textContent = nf ? `${nf} pend.` : PROJ.circuitos.length; cnt.className = 'cnt' + (nf ? ' fail' : '');
-  $$('.abas [role=tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === TAB)));
+  renderTrilha();
 }
 function irPara(tab) {
   TAB = ABAS.includes(tab) ? tab : 'circuitos';
@@ -239,7 +240,7 @@ function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
   else if (TAB === 'eletrocalhas') Object.values(CALC.calhas).forEach(t => { const pre = 'k-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = calhaRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillCalha(t, pre); });
-  else if (TAB === 'lumi') { renderLumiLista(); renderLumiRes(); }
+  else if (TAB === 'lumi') { if (LMODO === 'ext') { renderLumiExtLista(); renderLumiExtRes(); } else { renderLumiLista(); renderLumiRes(); } }
   else if (TAB === 'energisa') atualizarEnergisaParcial();
   else if (TAB === 'clima') atualizarClimaParcial();
   else if (TAB === 'aterr') atualizarAterrParcial();
@@ -649,11 +650,13 @@ function renderEletrocalhas() {
 
 /* ---------- LUMINOTÉCNICA ---------- */
 function renderLumi() {
+  if (LMODO === 'ext') return renderLumiExt();
   const A = PROJ.lumi || [];
   if (!ambSel()) LSEL = A[0]?.id || null;
   const tot = A.reduce((s, a) => s + (CALC.lumi[a.id]?.P || 0), 0);
   $('#tab-lumi').innerHTML = `
-  <div class="mem-bar"><h2 class="tit" style="margin:0">Luminotécnica</h2>${A.length ? `<div class="mem-bt"><span class="mini" style="align-self:center">Relatório luminotécnico:</span><button class="btn pri" type="button" data-exp="pdf" data-doc="lumi">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="lumi">Word</button><button class="btn" type="button" data-exp="html" data-doc="lumi">HTML</button></div>` : ''}</div>
+  <div class="mem-bar"><h2 class="tit" style="margin:0">Luminotécnica</h2>${lumiExpHTML()}</div>
+  ${lumiModoHTML()}
   <p class="sub">Iluminação de interiores segundo a ABNT NBR ISO/CIE 8995-1:2013: iluminância mantida (Em), uniformidade (Uo ≥ 0,7 na área da tarefa), limite de ofuscamento (UGRL) e reprodução de cor (Ra). Quantidade pelo método dos lúmens, fator de utilização calculado por radiosidade (ou informado pela tabela do fabricante), fator de manutenção conforme a CIE 97 e verificação ponto a ponto da uniformidade. ${A.length ? `${A.length} ambiente${A.length > 1 ? 's' : ''} · ${nfmt(tot, 0)} W de iluminação.` : ''}</p>
   <div class="bancada">
     <aside class="lista" aria-label="Ambientes">
@@ -783,7 +786,7 @@ function renderMemoria() {
 function tabelaHTML(head, rows, alignR = true, cls = '') { return `<div class="tw"><table class="tbl ${cls}"><thead><tr>${head.map((h, i) => `<th class="${i && alignR ? 'r' : ''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((v, i) => `<td class="${i && alignR ? 'r' : ''}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`; }
 const h3t = (t, top = 18) => `<h3 class="tit" style="font-size:16px;margin:${top}px 0 8px">${t}</h3>`;
 function renderTabelas() {
-  const tabs = [['33', 'Tab. 33'], ['35', 'Tab. 35'], ['36', 'Tab. 36'], ['37', 'Tab. 37'], ['38', 'Tab. 38'], ['39', 'Tab. 39'], ['40', 'Tab. 40/41'], ['42', 'Tab. 42/43'], ['44', 'Tab. 44/45'], ['46', 'Tab. 46/47/48/58'], ['k', 'Fator k'], ['r20', 'Resistências'], ['cat', 'Diâmetros'], ['8995', 'NBR ISO/CIE 8995-1'], ['lum', 'Lâmpadas e luminárias'], ['ndu', 'Energisa NDU 001']];
+  const tabs = REF_TABS;
   let corpo = '', nota = '';
   const nf = v => v == null ? '—' : nfmt(v, v % 1 ? 1 : 0);
   const selMat = `<div class="ref-sel" style="margin-top:-4px">${['Cu', 'Al'].map(m => `<button class="btn sm" type="button" data-mat="${m}" aria-pressed="${m === REFMAT}">${m === 'Cu' ? 'Cobre' : 'Alumínio'}</button>`).join('')}</div>`;
@@ -859,6 +862,12 @@ function renderTabelas() {
       + h3t('Tabela 14 — solda a transformador, raios X e galvanização') + tabelaHTML(['Equipamento', 'Fatores'], [['Solda a arco e galvanização', '1º maior 100 % · 2º maior 70 % · 3º maior 40 % · demais 30 %'], ['Solda a resistência', 'maior 100 % · demais 60 %'], ['Raios X', 'maior 100 % · demais 70 %']], false)
       + h3t('Tabela 16 — categorias de atendimento, 220/127 V') + cat(CAT_T16) + h3t('Tabela 21 — categorias de atendimento, 254/127 V (rede monofásica)') + cat(CAT_T21);
     nota = `Energisa ${NDU001_VER}. D (kVA) = (d1 + … + d7) / 0,92. Tipos M e B enquadrados pela carga instalada (kW); tipo T pela demanda (kVA). Valores "a (b)": cabo embutido (subterrâneo). Disjuntor dimensionado para o limite superior da faixa. A Tabela 16 vale para EAC, EMR, EMS, EMT, ERO, ESE e ESS. As tabelas da NDU 003 (agrupamentos e edifícios) são informadas na aba Demanda Energisa.`;
+  } else if (REFTAB === 'ext') {
+    const linhas = []; let g = null;
+    REQ_EXT.forEach(a => { if (a.g !== g) { g = a.g; linhas.push([`<b>${esc(g)}</b>`, '', '', '']); } linhas.push([esc(a.n), nfmt(a.Em, 0), nfmt(a.U0, 2), esc(a.ref)]); });
+    corpo = tabelaHTML(['Área externa', 'Eméd (lx)', 'U0 = Emín/Eméd', 'Referência'], linhas, true, 't8995')
+      + h3t('Produtos genéricos para exteriores') + tabelaHTML(['Produto', 'P (W)', 'Fluxo (lm)', 'lm/W', 'Facho', 'm (cosᵐθ)', 'IP'], CAT_EXT.map(x => [esc(x.nome), nfmt(x.W, 0), nfmt(x.lm, 0), nfmt(x.lm / x.W, 0), x.facho + '°', nfmt(mDeFacho(x.facho), 2), x.ip]), false);
+    nota = 'Níveis médios mantidos e uniformidade mínima para o cálculo de exteriores. NBR 5101: valores por iluminância das classes V1 a V5 (veículos) e P1 a P4 (pedestres) da edição de 2018; a edição de 2024 passou a usar as classes M, C e P, com requisitos de luminância — confirme na edição vigente e na norma da distribuidora ou da prefeitura. EN 12464-2 (CIE S 015) e EN 12193: valores de referência para locais de trabalho, estacionamentos e quadras externos. Método de cálculo: número de projetores pelo método dos lúmens N = E × S / (Φ × Fu × Fd) e verificação ponto a ponto E = Σ I(θ) × h / d³ (Mamede Filho, Instalações Elétricas Industriais, iluminação de exteriores). Os produtos são genéricos, com fluxo e facho típicos de catálogo.';
   } else if (REFTAB === 'lum') {
     corpo = tabelaHTML(['Fabricante', 'Produto', 'Tipo', 'P (W)', 'Fluxo (lm)', 'lm/W', 'Ra', 'Vida (h)', 'Fonte dos dados'], CAT_LUM.map(x => [esc(x.fab), `<span style="white-space:normal">${esc(x.mod)}</span>`, x.tipo === 'lampada' ? 'lâmpada' : 'luminária', nfmt(x.W, 1), nfmt(x.lm, 0), nfmt(x.lm / x.W, 0), String(x.Ra), x.vida ? nfmt(x.vida, 0) : '—', `<span class="mini" style="white-space:normal">${esc(x.fonte || '')}</span>`]), false)
       + h3t('Luminárias para lâmpadas avulsas (rendimento típico)') + tabelaHTML(['Luminária', 'Rendimento (LOR)', 'Abertura do facho', 'Fluxo para cima'], Object.values(CORPOS).map(x => [esc(x.nome), nfmt(x.lor, 2), x.facho + '°', nfmt(x.up * 100, 0) + ' %']));
@@ -876,18 +885,19 @@ document.addEventListener('toggle', ev => { if (ev.target && ev.target.id === 'k
 document.addEventListener('change', ev => onCampo(ev, true));
 document.addEventListener('click', ev => {
   const el = ev.target.closest('button, tr[data-ir]'); if (!el) return;
-  if (el.matches('[role=tab]')) return irPara(el.dataset.tab);
+  if (el.closest('#menubar')) return cliqueMenu(el);
+  if (el.dataset.go) return irPara(el.dataset.go);
   if (el.dataset.sel) { SEL = el.dataset.sel; renderLista(); renderEditor(); if (window.innerWidth < 900) $('#editor').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.ir) { SEL = el.dataset.ir; irPara('circuitos'); return; }
   if (el.dataset.exp) return exportar(el.dataset.exp, el, el.dataset.doc || (TAB === 'memoria' ? MEMSEL : 'circuitos'));
-  if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
+  if (el.dataset.memsel) { MEMSEL = el.dataset.memsel; renderMemoria(); renderTrilha(); if (window.innerWidth < 900) $('#folha').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.asel) { ASEL = el.dataset.asel; renderArrLista(); renderArrEditor(); if (window.innerWidth < 900) $('#a-ed').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.delmat) { PROJ.materiais.itens.splice(+el.dataset.delmat, 1); mudou(true); return; }
   if (el.dataset.dellocal) { PROJ.descritivo.locais.splice(+el.dataset.dellocal, 1); DESC_ABERTO = true; mudou(true); return; }
   if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
   if (el.dataset.amodo) { PROJ.aterr.modo = el.dataset.amodo; if (el.dataset.amodo === 'simplificado' && PROJ.aterr.solo.modelo === '2c') PROJ.aterr.solo.modelo = 'homog'; mudou(true); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
-  if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); return; }
+  if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); renderTrilha(); return; }
   if (el.dataset.mat) { REFMAT = el.dataset.mat; renderTabelas(); return; }
   if (el.dataset.bal) { balancearFases(PROJ, CALC, el.dataset.bal); mudou(true); toast(`Fases do ${el.dataset.bal} redistribuídas.`); return; }
   if (el.dataset.csel) { CSEL = el.dataset.csel; renderCambLista(); renderCambEditor(); if (window.innerWidth < 900) $('#k-ed').scrollIntoView({ block: 'start' }); return; }
@@ -902,13 +912,15 @@ document.addEventListener('click', ev => {
   if (el.dataset.delconj) { PROJ.energisa.conj.splice(+el.dataset.delconj, 1); mudou(true); return; }
   if (el.dataset.add003) { PROJ.energisa.t003[el.dataset.add003].push([null, null]); mudou(true); return; }
   if (el.dataset.del003) { const [t, i] = el.dataset.del003.split(':'); PROJ.energisa.t003[t].splice(+i, 1); mudou(true); return; }
+  if (el.dataset.lmodo) { LMODO = el.dataset.lmodo; renderLumi(); renderTrilha(); return; }
+  if (el.dataset.xsel) { XSEL = el.dataset.xsel; renderLumiExtLista(); renderLumiExtEditor(); if (window.innerWidth < 900) $('#lumx-ed').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.lsel) { LSEL = el.dataset.lsel; renderLumiLista(); renderLumiEditor(); if (window.innerWidth < 900) $('#lumi-ed').scrollIntoView({ block: 'start' }); return; }
   if (el.dataset.potlumi) { const c = PROJ.circuitos.find(x => x.id === el.dataset.potlumi); if (c) { c.potLumi = true; mudou(true); toast(`Circuito ${c.num} passa a usar a potência da luminotécnica.`); } return; }
   if (el.dataset.delq) { delete PROJ.quadros[el.dataset.delq]; PROJ.circuitos.forEach(c => { if (c.alimenta === el.dataset.delq) c.alimenta = ''; }); mudou(true); return; }
   switch (el.id) {
     case 'bt-add': return addCircuito($('#novo-tipo').value);
     case 'bt-dup': { const c = circSel(); if (!c) return; const n = JSON.parse(JSON.stringify(c)); n.id = uid(); n.num = proxNum(); n.desc = (c.desc || '') + ' (cópia)'; PROJ.circuitos.splice(PROJ.circuitos.indexOf(c) + 1, 0, n); SEL = n.id; mudou(true); return; }
-    case 'bt-exc': return confirmar2(el, 'Confirmar exclusão', () => { const i = PROJ.circuitos.findIndex(c => c.id === SEL); if (i < 0) return; const [rm] = PROJ.circuitos.splice(i, 1); delete PROJ.trechos['#' + rm.id]; (PROJ.lumi || []).forEach(a => { if (a.circuito === rm.id) a.circuito = ''; }); SEL = (PROJ.circuitos[i] || PROJ.circuitos[i - 1] || {}).id || null; mudou(true); toast(`Circuito ${rm.num} excluído.`); });
+    case 'bt-exc': return confirmar2(el, 'Confirmar exclusão', () => { const i = PROJ.circuitos.findIndex(c => c.id === SEL); if (i < 0) return; const [rm] = PROJ.circuitos.splice(i, 1); delete PROJ.trechos['#' + rm.id]; [...(PROJ.lumi || []), ...(PROJ.lumiExt || [])].forEach(a => { if (a.circuito === rm.id) a.circuito = ''; }); SEL = (PROJ.circuitos[i] || PROJ.circuitos[i - 1] || {}).id || null; mudou(true); toast(`Circuito ${rm.num} excluído.`); });
     case 'bt-sobe': case 'bt-desce': { const i = PROJ.circuitos.findIndex(c => c.id === SEL), j = i + (el.id === 'bt-sobe' ? -1 : 1); if (i < 0 || j < 0 || j >= PROJ.circuitos.length) return; [PROJ.circuitos[i], PROJ.circuitos[j]] = [PROJ.circuitos[j], PROJ.circuitos[i]]; mudou(true); return; }
     case 'bt-add-camb': { const a = ambClimaPadrao(PROJ.clima.amb.length + 1); PROJ.clima.amb.push(a); CSEL = a.id; mudou(true); return; }
     case 'bt-dup-camb': { const a = ambCSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = a.nome + ' (cópia)'; PROJ.clima.amb.splice(PROJ.clima.amb.indexOf(a) + 1, 0, n); CSEL = n.id; mudou(true); return; }
@@ -939,11 +951,15 @@ document.addEventListener('click', ev => {
     case 'bt-add-amb': { const a = defaultsAmbiente((PROJ.lumi || []).length + 1); const b = ambSel(); if (b) Object.assign(a, { pd: b.pd, hwp: b.hwp, susp: b.susp, rc: b.rc, rw: b.rw, rf: b.rf, prod: b.prod, corpo: b.corpo, nLamp: b.nLamp, fm: b.fm }); PROJ.lumi = PROJ.lumi || []; PROJ.lumi.push(a); LSEL = a.id; mudou(true); const n = $('#a-nome'); if (n) { n.focus(); n.select(); } return; }
     case 'bt-dup-amb': { const a = ambSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = (a.nome || '') + ' (cópia)'; PROJ.lumi.splice(PROJ.lumi.indexOf(a) + 1, 0, n); LSEL = n.id; mudou(true); return; }
     case 'bt-exc-amb': return confirmar2(el, 'Confirmar exclusão', () => { const i = PROJ.lumi.findIndex(a => a.id === LSEL); if (i < 0) return; const [rm] = PROJ.lumi.splice(i, 1); LSEL = (PROJ.lumi[i] || PROJ.lumi[i - 1] || {}).id || null; mudou(true); toast(`Ambiente ${rm.nome} excluído.`); });
+    case 'bt-add-ext': { const a = ambExtPadrao((PROJ.lumiExt || []).length + 1), b = areaXSel(); if (b) Object.assign(a, { req: b.req, arranjo: b.arranjo, k: b.k, h: b.h, tilt: b.tilt, recuo: b.recuo, prod: b.prod, cW: b.cW, clm: b.clm, cFacho: b.cFacho, fu: b.fu, fd: b.fd }); PROJ.lumiExt.push(a); XSEL = a.id; mudou(true); const n = $('#x-nome'); if (n) { n.focus(); n.select(); } return; }
+    case 'bt-dup-ext': { const a = areaXSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = (a.nome || '') + ' (cópia)'; PROJ.lumiExt.splice(PROJ.lumiExt.indexOf(a) + 1, 0, n); XSEL = n.id; mudou(true); return; }
+    case 'bt-exc-ext': return confirmar2(el, 'Confirmar exclusão', () => { const X = PROJ.lumiExt, i = X.findIndex(a => a.id === XSEL); if (i < 0) return; const [rm] = X.splice(i, 1); XSEL = (X[i] || X[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluída.`); });
+    case 'bt-sug-ext': return aplicarSugestaoExt();
     case 'bt-add-q': { const inp = $('#novo-quadro'); const n = (inp.value || '').trim(); if (!n) { toast('Informe o nome do quadro.'); inp.focus(); return; } if (PROJ.quadros[n]) { toast(`Já existe o quadro ${n}.`); return; } PROJ.quadros[n] = { desc: '', fd: null, icc: PROJ.params.icc, dvMont: 0 }; mudou(true); toast(`Quadro ${n} criado. Atribua circuitos a ele no campo "Quadro de origem".`); return; }
     case 'bt-cat-reset': PROJ.catalogo = {}; mudou(true); toast('Valores típicos restaurados.'); return;
     case 'bt-salvar': return oferecerArquivo(`${slug()}.dimensiona5410.json`, JSON.stringify(PROJ, null, 2), 'application/json');
     case 'bt-abrir': return $('#arquivo').click();
-    case 'bt-novo': return confirmar2(el, 'Apagar e começar?', () => { PROJ = projetoVazio(); SEL = null; LSEL = null; mudou(true); irPara('projeto'); toast('Projeto em branco criado.'); });
+    case 'bt-novo': return confirmar2(el, 'Apagar e começar?', () => { PROJ = projetoVazio(); SEL = null; LSEL = null; XSEL = null; mudou(true); irPara('projeto'); toast('Projeto em branco criado.'); });
     case 'bt-banner-ok': PROJ.exemplo = false; mudou(false); return;
     case 'bt-banner-novo': PROJ = projetoVazio(); SEL = null; mudou(true); irPara('projeto'); return;
     case 'bt-print': document.body.classList.add('imprimindo'); setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); }, 50); return;
@@ -959,6 +975,7 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target
   let t = null; try { t = (location.hash || '').slice(1) || localStorage.getItem(LS_TAB); } catch (e) { }
   try { PROJ = carregar(); recalc(); }
   catch (e) { console.error(e); PROJ = projetoExemplo(); recalc(); toast('O projeto salvo neste navegador não pôde ser lido; o exemplo foi carregado.'); }
+  renderMenubar();
   SEL = PROJ.circuitos[0]?.id || null;
   try { irPara(ABAS.includes(t) ? t : 'circuitos'); }
   catch (e) { console.error(e); const m = document.querySelector('main'); if (m) m.insertAdjacentHTML('afterbegin', `<p class="banner">Erro ao abrir a página: ${esc(e.message)}. Recarregue a página.</p>`); }

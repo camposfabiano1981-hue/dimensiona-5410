@@ -474,6 +474,14 @@ async function gerarXLSX(proj, calc, so) {
     [[2, '0.00', A.reduce((s, a) => s + calc.lumi[a.id].A, 0)], [13, '0', A.reduce((s, a) => s + calc.lumi[a.id].N, 0)], [18, '#,##0', A.reduce((s, a) => s + calc.lumi[a.id].P, 0)]].forEach(([j, f, v]) => { const cell = tot.getCell(j + 1); cell.value = { formula: `SUM(${L(j)}${r0 + 1}:${L(j)}${r1})`, result: r2(v) }; cell.numFmt = f; });
     for (let j = 0; j < cols.length; j++) { const cell = tot.getCell(j + 1); cell.font = { bold: true, size: 10 }; cell.border = BOX; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CAB } }; }
   }
+  /* iluminação de exteriores */
+  const AX = proj.lumiExt || [];
+  if (AX.length && calc.lumiExt) {
+    const cols = [{ h: 'Área', w: 22, al: 'l' }, { h: 'Requisito', w: 40, al: 'l' }, { h: 'L (m)', w: 7, fmt: '0.0' }, { h: 'W (m)', w: 7, fmt: '0.0' }, { h: 'Área (m²)', w: 9, fmt: '#,##0' }, { h: 'Eméd exig. (lx)', w: 9, fmt: '0' }, { h: 'U0 exig.', w: 7, fmt: '0.00' }, { h: 'Projetor', w: 36, al: 'l' }, { h: 'P (W)', w: 7, fmt: '0' }, { h: 'Fluxo (lm)', w: 9, fmt: '#,##0' }, { h: 'Facho (°)', w: 7, fmt: '0' }, { h: 'Arranjo', w: 30, al: 'l' }, { h: 'Postes', w: 7, fmt: '0' }, { h: 'h (m)', w: 6, fmt: '0.0' }, { h: 'Incl. (°)', w: 7, fmt: '0' }, { h: 'Fu', w: 6, fmt: '0.00' }, { h: 'Fd', w: 6, fmt: '0.00' }, { h: 'N calc.', w: 7, fmt: '0.00' }, { h: 'N', w: 5, fmt: '0' }, { h: 'Eméd pp (lx)', w: 9, fmt: '0' }, { h: 'Emín (lx)', w: 9, fmt: '0' }, { h: 'U0', w: 6, fmt: '0.00' }, { h: 'P total (W)', w: 9, fmt: '#,##0' }, { h: 'Circuito', w: 8, al: 'c' }, { h: 'Situação', w: 14, al: 'c' }, { h: 'Observações', w: 60, al: 'l' }];
+    const ws = wb.addWorksheet(nomeAba('Iluminação externa'));
+    const r0 = cabecalho(ws, 'Iluminação de exteriores — método dos lúmens e ponto a ponto (NBR 5101 / EN 12464-2)', cols.length);
+    tabela(ws, r0, cols, AX.map(a => { const r = calc.lumiExt[a.id], c = proj.circuitos.find(x => x.id === a.circuito); return [a.nome, r.req.n, r2(r.L), r2(r.W), r2(r.A), r.Em, r2(r.U0req), r.prod.nome, r.Wlum, r.phi, r.prod.facho, ARRANJOS_EXT[a.arranjo], r.nPostes, r2(r.h), +a.tilt || 0, r2(r.Fu), r2(r.Fd), r2(r.Nreq), r.N, Math.round(r.EmedPP), Math.round(r.EminPP), r2(r.U0), r.P, c ? c.num : '—', statusTxt(r.status), r.falhas.concat(r.avisos).join(' | ')]; }));
+  }
   /* demanda Energisa (NDU 001 / NDU 003) */
   if (calc.energisa && (proj.energisa || {}).ucs) {
     const ce = calc.energisa, E = ce.E, R = E.ucs.map(u => ce.ucs[u.id]);

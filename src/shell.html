@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: prancha técnica — carimbo no topo, abas fixas, bancada em duas colunas (lista de circuitos | editor com resultado) */
+/* Layout: prancha técnica — carimbo no topo, barra de menus suspensos fixa, bancada em duas colunas (lista de circuitos | editor com resultado) */
 :root{
   --paper:#EDF1F3; --sheet:#FFFFFF; --sunk:#F5F7F8; --ink:#16212A; --muted:#5A6873; --line:#CBD4DA; --line-strong:#97A6B1;
   --accent:#0B6A84; --accent-ink:#FFFFFF; --accent-soft:#DDEEF3;
@@ -16,16 +16,19 @@
   --f-body:'IBM Plex Sans','Segoe UI',Roboto,Arial,sans-serif;
   --f-mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
   --r:4px;
+  --mb-bg1:#F8FAFB; --mb-bg2:#E2EAEE; --mb-hover:#D5EFCB; --mb-hover-line:#97C987; --mb-faixa1:#0B6A84; --mb-faixa2:#E6F1F4;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#0D1419; --sheet:#141E25; --sunk:#10181E; --ink:#E3EBF0; --muted:#97A6B1; --line:#283640; --line-strong:#425361;
   --accent:#4DB3CF; --accent-ink:#04212A; --accent-soft:#12313B;
   --ok:#5CC98A; --ok-soft:#10301E; --warn:#E3B04B; --warn-soft:#33270C; --fail:#F2786B; --fail-soft:#3A1613; --copper:#D98B52; --c-capa:#8E99A1;
+  --mb-bg1:#1A262E; --mb-bg2:#121B21; --mb-hover:#1F3B27; --mb-hover-line:#3F7A4C; --mb-faixa1:#2F8EA8; --mb-faixa2:#16252C;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#0D1419; --sheet:#141E25; --sunk:#10181E; --ink:#E3EBF0; --muted:#97A6B1; --line:#283640; --line-strong:#425361;
   --accent:#4DB3CF; --accent-ink:#04212A; --accent-soft:#12313B;
   --ok:#5CC98A; --ok-soft:#10301E; --warn:#E3B04B; --warn-soft:#33270C; --fail:#F2786B; --fail-soft:#3A1613; --copper:#D98B52; --c-capa:#8E99A1;
+  --mb-bg1:#1A262E; --mb-bg2:#121B21; --mb-hover:#1F3B27; --mb-hover-line:#3F7A4C; --mb-faixa1:#2F8EA8; --mb-faixa2:#16252C;
   color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);font:14px/1.5 var(--f-body)}
@@ -57,13 +60,44 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn:disabled{opacity:.5;cursor:default}
 .banner{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;border:1px dashed var(--line-strong);background:var(--sunk);padding:8px 12px;margin-bottom:12px;font-size:13px}
 
-/* abas */
-.abas{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);display:flex;flex-wrap:wrap;gap:0 2px;border-bottom:1px solid var(--line-strong);margin-bottom:18px}
-.abas button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px 8px;cursor:pointer;font:600 15px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.abas button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-.abas button:hover{color:var(--ink)}
-.abas .cnt{font:500 11px var(--f-mono);margin-left:6px;padding:1px 5px;border-radius:3px;background:var(--line);color:var(--ink);vertical-align:1px}
-.abas .cnt.fail{background:var(--fail);color:var(--sheet)}
+/* barra de menus suspensos — itens numerados, atalhos à direita, submenus e faixa lateral */
+.menubar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;flex-wrap:wrap;align-items:center;background:linear-gradient(var(--mb-bg1),var(--mb-bg2));border:1px solid var(--line-strong);border-radius:var(--r) var(--r) 0 0;padding:2px 4px;user-select:none;-webkit-user-select:none}
+.mb-item{position:relative}
+.mb-top{background:none;border:1px solid transparent;border-radius:3px;padding:7px 14px;margin:1px 0;cursor:pointer;font:500 14px/1.2 var(--f-body);color:var(--ink);position:relative}
+.mb-top:hover,.mb-top[aria-expanded="true"]{background:var(--mb-hover);border-color:var(--mb-hover-line)}
+.mb-top.atual{font-weight:700;color:var(--accent)}
+.mb-top.atual::after{content:"";position:absolute;left:12px;right:12px;bottom:2px;height:2px;background:var(--accent);border-radius:1px}
+.mb-drop{position:absolute;top:calc(100% + 2px);left:0;z-index:30;width:max-content;min-width:260px;max-width:min(560px,calc(100vw - 24px));padding:3px 3px 3px 30px;background:var(--sheet) linear-gradient(var(--mb-faixa1),var(--mb-faixa2)) no-repeat 0 0/24px 100%;border:1px solid var(--line-strong);box-shadow:4px 6px 16px rgba(10,25,35,.22)}
+.mb-drop.mb-sub{top:-4px;left:calc(100% - 2px)}
+.mb-drop.mb-sub.esq{left:auto;right:calc(100% - 2px)}
+.mb-li{position:relative}
+.mb-op{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:6px;align-items:center;width:100%;min-height:30px;padding:4px 10px 4px 2px;text-align:left;background:none;border:1px solid transparent;border-radius:2px;cursor:pointer;font-size:13.5px;line-height:1.3;color:var(--ink);white-space:nowrap}
+.mb-op:hover,.mb-op:focus-visible,.mb-li.aberto>.mb-op{background:var(--mb-hover);border-color:var(--mb-hover-line);outline:none}
+.mb-op[aria-disabled="true"]{color:var(--muted);opacity:.55;cursor:default}
+.mb-op[aria-disabled="true"]:hover{background:none;border-color:transparent}
+.mb-rot{overflow:hidden;text-overflow:ellipsis}
+.mb-k{font:12px var(--f-mono);color:var(--muted);padding-left:28px}
+.mb-seta{color:var(--muted);padding-left:28px;font-size:11px}
+.mb-chk{font-weight:700;color:var(--accent);text-align:center}
+.mb-sep{height:1px;background:var(--line-strong);opacity:.6;margin:4px 4px 4px 0}
+.mb-op.armado .mb-rot{color:var(--fail);font-weight:600}
+.trilha{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;justify-content:space-between;background:var(--sheet);border:1px solid var(--line-strong);border-top:0;border-radius:0 0 var(--r) var(--r);padding:5px 12px;margin-bottom:18px;font-size:12.5px;color:var(--muted)}
+.tr-cam b{color:var(--ink);font-weight:600}
+.tr-sep{margin:0 7px;color:var(--line-strong)}
+.tr-st{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.tr-chip{border:1px solid var(--line-strong);background:var(--sunk);border-radius:3px;padding:2px 8px;font:500 11.5px var(--f-mono);cursor:pointer;color:var(--ink)}
+.tr-chip.fail{background:var(--fail);border-color:var(--fail);color:var(--sheet)}
+.tr-at{font:11px var(--f-mono)}
+@media (max-width:700px){
+  .mb-item{position:static}
+  .mb-top{padding:7px 9px;font-size:13.5px}
+  .mb-drop{left:-1px!important;right:-1px;width:auto;min-width:0;max-width:none;top:100%}
+  .mb-drop.mb-sub{position:static;margin:0 0 4px 18px;padding:0;border:0;border-left:2px solid var(--line);box-shadow:none;background:none}
+  .mb-op{white-space:normal;min-height:38px}
+  .mb-k{display:none}
+  .mb-li.aberto>.mb-op .mb-seta{transform:rotate(90deg)}
+  .tr-at{display:none}
+}
 
 /* painéis */
 h2.tit{font:700 20px/1.15 var(--f-display);text-transform:uppercase;letter-spacing:.03em;margin:0 0 4px}
@@ -226,7 +260,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 @media (max-width:900px){.bancada{grid-template-columns:minmax(0,1fr)}.lista{position:static;max-height:340px}}
 @media (max-width:700px){.met-bloco{grid-template-columns:minmax(0,1fr)}.met-fig{max-width:260px}}
 @media (max-width:700px){.planta{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:600px){.trecho-corpo.calha{grid-template-columns:minmax(0,1fr)}.folha{padding:22px 16px}.trecho-corpo{grid-template-columns:minmax(0,1fr)}.campo.w2{grid-column:auto}.abas button{padding:9px 9px 7px;font-size:13.5px}.marca h1{font-size:22px}.bar{grid-template-columns:44px minmax(0,1fr) 92px}.mem-item{grid-template-columns:auto minmax(0,1fr) auto}.mem-exp{grid-column:2/4}}
+@media (max-width:600px){.trecho-corpo.calha{grid-template-columns:minmax(0,1fr)}.folha{padding:22px 16px}.trecho-corpo{grid-template-columns:minmax(0,1fr)}.campo.w2{grid-column:auto}.marca h1{font-size:22px}.bar{grid-template-columns:44px minmax(0,1fr) 92px}.mem-item{grid-template-columns:auto minmax(0,1fr) auto}.mem-exp{grid-column:2/4}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -253,33 +287,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <span><b>Projeto de exemplo.</b> Os dados abaixo são ilustrativos: substitua pelos da sua obra ou comece um projeto novo.</span>
     <span style="display:flex;gap:8px"><button class="btn sm" id="bt-banner-ok" type="button">Usar como ponto de partida</button><button class="btn sm" id="bt-banner-novo" type="button">Começar em branco</button></span>
   </div>
-  <nav class="abas" role="tablist" aria-label="Seções">
-    <button role="tab" data-tab="projeto" id="tab-b-projeto">Projeto</button>
-    <button role="tab" data-tab="circuitos" id="tab-b-circuitos">Circuitos <span class="cnt" id="cnt-circ"></span></button>
-    <button role="tab" data-tab="eletrodutos" id="tab-b-eletrodutos">Eletrodutos</button>
-    <button role="tab" data-tab="eletrocalhas" id="tab-b-eletrocalhas">Eletrocalhas</button>
-    <button role="tab" data-tab="quadros" id="tab-b-quadros">Quadros de carga</button>
-    <button role="tab" data-tab="energisa" id="tab-b-energisa">Demanda Energisa</button>
-    <button role="tab" data-tab="lumi" id="tab-b-lumi">Luminotécnica</button>
-    <button role="tab" data-tab="clima" id="tab-b-clima">Climatização</button>
-    <button role="tab" data-tab="aterr" id="tab-b-aterr">Aterramento</button>
-    <button role="tab" data-tab="materiais" id="tab-b-materiais">Materiais</button>
-    <button role="tab" data-tab="memoria" id="tab-b-memoria">Memória de cálculo</button>
-    <button role="tab" data-tab="tabelas" id="tab-b-tabelas">Tabelas da norma</button>
-  </nav>
+  <nav class="menubar" id="menubar" role="menubar" aria-label="Menu principal"></nav>
+  <div class="trilha" id="trilha"></div>
   <main>
-    <section class="painel" id="tab-projeto" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-circuitos" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-eletrodutos" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-eletrocalhas" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-quadros" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-energisa" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-lumi" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-clima" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-aterr" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-materiais" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-memoria" role="tabpanel" hidden></section>
-    <section class="painel" id="tab-tabelas" role="tabpanel" hidden></section>
+    <section class="painel" id="tab-projeto" role="region" hidden></section>
+    <section class="painel" id="tab-circuitos" role="region" hidden></section>
+    <section class="painel" id="tab-eletrodutos" role="region" hidden></section>
+    <section class="painel" id="tab-eletrocalhas" role="region" hidden></section>
+    <section class="painel" id="tab-quadros" role="region" hidden></section>
+    <section class="painel" id="tab-energisa" role="region" hidden></section>
+    <section class="painel" id="tab-lumi" role="region" hidden></section>
+    <section class="painel" id="tab-clima" role="region" hidden></section>
+    <section class="painel" id="tab-aterr" role="region" hidden></section>
+    <section class="painel" id="tab-materiais" role="region" hidden></section>
+    <section class="painel" id="tab-memoria" role="region" hidden></section>
+    <section class="painel" id="tab-tabelas" role="region" hidden></section>
   </main>
   <input type="file" id="arquivo" accept=".json,application/json" hidden>
   <div id="toast" role="status" aria-live="polite"></div>

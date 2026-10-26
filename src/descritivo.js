@@ -109,7 +109,7 @@ function construirMemorialDescritivo(proj, calc, ids, opt = {}) {
   const letra = id => { const i = anexos.findIndex(m => m.id === id); return i < 0 ? null : String.fromCharCode(65 + i); };
   const refA = id => letra(id) ? ` (Anexo ${letra(id)})` : '';
   const f0 = v => nfmt(v, 0), f1 = v => nfmt(v, 1), f2 = v => nfmt(v, 2);
-  const temL = (proj.lumi || []).length > 0, temK = proj.clima.amb.length > 0, temE = (proj.energisa.ucs || []).length > 0, temT = (proj.aterr.arr || []).some(a => calc.aterr && !calc.aterr.arr[a.id].excluido);
+  const temL = (proj.lumi || []).length + (proj.lumiExt || []).length > 0, temK = proj.clima.amb.length > 0, temE = (proj.energisa.ucs || []).length > 0, temT = (proj.aterr.arr || []).some(a => calc.aterr && !calc.aterr.arr[a.id].excluido);
   B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 — Instalações elétricas de baixa tensão', text: 'Memorial descritivo', sub: 'Projeto das instalações elétricas de baixa tensão — descrição da instalação, influências externas, critérios de projeto, especificação dos materiais e anexos' });
   B.push({ t: 'meta', rows: [['Obra', I.obra || '—'], ['Proprietário / cliente', I.cliente || '—'], ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'],
     ['Uso / área / pavimentos', [D.uso || EDIFICACAO[P.edificacao], +D.area > 0 ? `${f2(+D.area)} m²` : '', +D.pavimentos > 0 ? `${D.pavimentos} pavimento(s)` : ''].filter(Boolean).join(' — ')],
@@ -201,9 +201,15 @@ function construirMemorialDescritivo(proj, calc, ids, opt = {}) {
     'Condutores identificados por cores (6.1.5.3): neutro azul-claro, proteção verde-amarelo ou verde, fases em preto, vermelho e branco. Não é permitida emenda de condutores no interior de eletrodutos.'
   ] });
   if (temL) {
-    const N = proj.lumi.reduce((s, a) => s + calc.lumi[a.id].N, 0), Pl = proj.lumi.reduce((s, a) => s + calc.lumi[a.id].P, 0);
+    const LI = proj.lumi || [], LX = proj.lumiExt || [], RX = calc.lumiExt || {};
+    const N = LI.reduce((s, a) => s + calc.lumi[a.id].N, 0), Pl = LI.reduce((s, a) => s + calc.lumi[a.id].P, 0);
     sub('Iluminação');
-    B.push({ t: 'p', text: `Iluminação de ${proj.lumi.length} ambiente(s) dimensionada pela ABNT NBR ISO/CIE 8995-1 (iluminância mantida, UGR, Ra e uniformidade), com ${N} luminária(s) LED e potência total de ${f0(Pl)} W${refA('lumi')}.` });
+    if (LI.length) B.push({ t: 'p', text: `Iluminação de ${LI.length} ambiente(s) interno(s) dimensionada pela ABNT NBR ISO/CIE 8995-1 (iluminância mantida, UGR, Ra e uniformidade), com ${N} luminária(s) LED e potência total de ${f0(Pl)} W${refA('lumi')}.` });
+    if (LX.length) {
+      const Nx = LX.reduce((s, a) => s + RX[a.id].N, 0), Px = LX.reduce((s, a) => s + RX[a.id].P, 0), Npo = LX.reduce((s, a) => s + RX[a.id].nPostes, 0);
+      const cx = [...new Set(LX.map(a => a.circuito).filter(Boolean))].map(id => calc.res[id]).filter(Boolean), comDR = cx.length > 0 && cx.every(r => r.drUsado);
+      B.push({ t: 'p', text: `Iluminação externa de ${LX.length} área(s) (${LX.map(a => a.nome).join(', ')}) com ${Nx} projetor(es) ou luminária(s) LED em ${Npo} poste(s), potência total de ${f0(Px)} W, dimensionada pelo método dos lúmens e verificada ponto a ponto quanto à iluminância média e à uniformidade, com níveis da ABNT NBR 5101 e da EN 12464-2${refA('lumi')}. Os equipamentos externos têm grau de proteção mínimo IP65, os postes são ligados ao condutor de proteção, ${comDR ? 'os circuitos de iluminação externa são protegidos por dispositivo DR de 30 mA' : 'recomenda-se proteger os circuitos de iluminação externa por dispositivo DR de 30 mA'} e o comando é feito por relé fotoelétrico ou temporizador.` });
+    }
   }
   if (temK) {
     const eq = proj.clima.amb.map(a => calc.clima.amb[a.id]).filter(Boolean);

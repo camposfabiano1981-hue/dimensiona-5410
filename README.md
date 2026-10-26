@@ -3,12 +3,14 @@
 Plataforma web para **projetos elétricos de baixa tensão**:
 - dimensionamento de condutores, proteção, eletrodutos e eletrocalhas pela **ABNT NBR 5410:2004**;
 - quadro de cargas;
-- cálculo luminotécnico pela **NBR ISO/CIE 8995-1**;
+- cálculo luminotécnico de interiores pela **NBR ISO/CIE 8995-1** e de exteriores (projetores em postes) pela **NBR 5101 / EN 12464-2**;
 - demanda para a concessionária pelas normas **Energisa NDU 001 / NDU 003**;
 - carga térmica de climatização pela **ABNT NBR 16401**;
 - aterramento, da haste única à malha, pelas **NBR 5410, NBR 7117-1 e NBR 15751 / IEEE Std 80**.
 
 O documento principal é o **memorial descritivo** da instalação (NBR 5410), com influências externas, especificação dos materiais e normas de fabricação, tendo como **anexos** as memórias de cálculo escolhidas pelo profissional e a **lista de materiais**. Cada memória também sai separadamente ou num **relatório consolidado**, em **PDF**, **Word (.docx)** e **HTML**. O quadro de cargas e a lista de materiais saem em **Excel (.xlsx)**.
+
+A navegação é feita por uma **barra de menus suspensos** no estilo dos aplicativos de escritório: itens numerados, submenus (▸), atalhos de teclado e o caminho da tela atual logo abaixo.
 
 Funciona 100% no navegador: **não precisa de servidor, banco de dados nem instalação**. Está publicada gratuitamente no **GitHub Pages**.
 
@@ -17,6 +19,11 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
 ---
 
 ## Funcionalidades
+
+**Menu**
+- **Barra de menus:** Projeto · Instalações · Sistemas · Materiais · Documentos · Tabelas, com itens numerados, separadores, submenus e marca ✓ na opção ativa (interiores/exteriores, aterramento simplificado/completo).
+- **Teclado:** setas para navegar, número do item para escolhê-lo, Esc para fechar; atalhos F2 (projeto), F4 (circuitos), F8 (quadros), F9 (memorial descritivo), Ctrl+S (salvar) e Ctrl+O (abrir).
+- **Celular:** os menus ocupam a largura da tela e os submenus abrem dentro do próprio menu.
 
 **Projeto e circuitos (NBR 5410)**
 - **Dados da obra:** identificação, sistema de alimentação, esquema de aterramento, temperatura ambiente e do solo, e fator de demanda editável (padrão 100 %).
@@ -43,6 +50,14 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
 - **Relatório:** planta com o mapa de iluminâncias e locação cotada, além do desenho de cada luminária (vista inferior e corte).
 - **Integração:** a potência calculada pode alimentar os circuitos de iluminação.
 
+**Iluminação de exteriores (NBR 5101 / EN 12464-2 / EN 12193)**
+- **Áreas:** pátios, estacionamentos, vias internas e quadras, com projetores ou luminárias viárias em postes.
+- **Arranjos:** postes em um lado, nos dois lados (frente a frente ou alternados), nos quatro cantos ou em grade; altura, inclinação, recuo e projetores por poste.
+- **Método dos lúmens:** N = E × S / (Φ × Fu × Fd), como em Mamede Filho (*Instalações Elétricas Industriais*), com sugestão de quantidade que também respeita o espaçamento de 3 × a altura.
+- **Ponto a ponto:** E = Σ I(θ) · h / d³ em malha de pontos, com I(θ) = I0 · cosᵐθ em torno do eixo de mira de cada projetor; resultam Eméd, Emín, Emáx, U0 = Emín/Eméd e o Fu efetivo.
+- **Requisitos:** classes V1–V5 e P1–P4 da NBR 5101 (valores por iluminância da edição 2018), locais de trabalho e estacionamentos da EN 12464-2 e quadras da EN 12193.
+- **Saídas:** planta com mapa de iluminância, postes e setas de mira no relatório luminotécnico; projetores, postes e relé fotoelétrico na lista de materiais; potência no circuito de iluminação.
+
 **Demanda Energisa (NDU 001 v7.0 e NDU 003 v8.1)**
 - **Unidades consumidoras individuais e agrupadas:** demanda D = (d1 + … + d7) / 0,92 pelas Tabelas 4 a 15 da NDU 001.
 - **Enquadramento de categoria:** Tabela 16 (220/127 V) e Tabela 21 (254/127 V), com o padrão de entrada, o disjuntor e os condutores.
@@ -62,11 +77,11 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
   - gráfico de 24 h;
   - carga simultânea máxima do conjunto;
   - equipamento indicado.
-- **Integração:** cria os circuitos dos aparelhos na aba Circuitos.
+- **Integração:** cria os circuitos dos aparelhos na seção Circuitos.
 
 **Aterramento (NBR 5410, NBR 7117-1, NBR 15751 / IEEE 80)**
 
-Dois modos, escolhidos no topo da aba:
+Dois modos, escolhidos no topo da seção ou em Sistemas › Aterramento:
 - **Simplificado (só hastes):**
   - resistividade por tipo de solo (valores típicos da literatura), informada ou pela média das medições de Wenner;
   - haste única ou conjuntos de hastes, com o número mínimo de hastes para atingir o limite (botão "Usar N hastes") e gráfico da resistência em função do número de hastes;
@@ -128,8 +143,8 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 1. **Projeto:** dados da obra, tensão, esquema de aterramento e temperaturas.
 2. **Circuitos:** cadastre as cargas, o esquema de ligação e a maneira de instalar. O resultado é recalculado a cada alteração.
 3. **Eletrodutos / Eletrocalhas / Quadros de carga:** confira ocupação, balanceamento e demanda.
-4. **Luminotécnica, Demanda Energisa e Climatização:** quando o projeto exigir.
-5. **Memória de cálculo:** escolha o documento e emita em PDF, Word, HTML ou Excel.
+4. **Sistemas → Luminotécnica (interiores e exteriores), Climatização e Aterramento; Instalações → Demanda Energisa:** quando o projeto exigir.
+5. **Documentos:** memorial descritivo, memórias separadas ou relatório consolidado, em PDF, Word, HTML ou Excel.
 
 > **Onde ficam os dados?** No armazenamento local do navegador (localStorage). Use **Salvar projeto** para gravar um arquivo `.dimensiona5410.json` e **Abrir projeto** para carregá-lo em outro computador. Os dados digitados **não** vão para o GitHub.
 
@@ -140,7 +155,8 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 | Módulo | Referência |
 |---|---|
 | Condutores, proteção e eletrodutos | ABNT NBR 5410:2004 (versão corrigida 2008); tabelas conferidas com o Guia de Dimensionamento de Cabos para Baixa Tensão (Prysmian, Rev. 9) |
-| Iluminação | ABNT NBR ISO/CIE 8995-1:2013; catálogos dos fabricantes (conferir a ficha técnica oficial pelo código) |
+| Iluminação de interiores | ABNT NBR ISO/CIE 8995-1:2013; catálogos dos fabricantes (conferir a ficha técnica oficial pelo código) |
+| Iluminação de exteriores | ABNT NBR 5101 (classes por iluminância da edição 2018); EN 12464-2 / CIE S 015; EN 12193; Mamede Filho, *Instalações Elétricas Industriais* (métodos dos lúmens e ponto a ponto) |
 | Demanda | Energisa NDU 001 v7.0 e NDU 003 v8.1 (Tabelas 03 e 04 da NDU 003 a preencher pelo projetista) |
 | Carga térmica | ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008; NBR 15220-2; ISO 7730; ASHRAE Handbook — Fundamentals |
 | Aterramento | ABNT NBR 5410:2004 (6.4); NBR 7117-1:2020; NBR 15749:2009; NBR 15751:2013; IEEE Std 80-2013; Energisa NDU 001 v7.0 (8.10); Kindermann & Campagnolo, *Aterramento Elétrico* |
@@ -149,6 +165,9 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 - **Dados climáticos de projeto:** use o Anexo A da NBR 16401-1:2024 para a localidade. Os valores do exemplo são ilustrativos.
 - **Vazões de ar exterior (Fp, Fa):** confira na Tabela 1 da NBR 16401-3:2008.
 - **Propriedades de produtos:** catálogo de luminárias, fator solar de vidros e capacidades de equipamentos devem ser conferidos com o fabricante.
+- **Iluminação externa:**
+  - os níveis da NBR 5101 são os da edição 2018 (a edição 2024 usa as classes M, C e P, com requisitos de luminância) e os da EN 12464-2 são de referência; confirme na edição vigente e nas exigências da prefeitura ou da distribuidora;
+  - os projetores do catálogo são genéricos e o modelo de intensidade é simétrico em torno do eixo de mira; para luminárias viárias assimétricas e projetos executivos, confirme com a fotometria do fabricante (IES/LDT) em software de cálculo.
 - **Aterramento:**
   - a resistividade deve vir de medição em campo, de preferência em época seca;
   - as equações simplificadas da IEEE 80 valem para malhas regulares em solo homogêneo; em solo fortemente estratificado ou geometria irregular, confirme com software de malha;
@@ -168,12 +187,13 @@ src/tables.js         Tabelas da NBR 5410 (33, 35 a 48, resistências, diâmetro
 src/engine.js         Motor NBR 5410: circuitos, eletrodutos, quadros e demanda
 src/calhas.js         Eletrocalhas, perfilados, bandejas e leitos
 src/lumi.js           Requisitos da 8995-1, catálogo e cálculo luminotécnico
+src/lumiext.js        Iluminação de exteriores: requisitos, projetores, lúmens e ponto a ponto
 src/energisa.js       Tabelas e cálculo de demanda das NDU 001 / NDU 003
 src/clima.js          Carga térmica: clima, sol, condução periódica, psicrometria, PMV/PPD
 src/aterr.js          Aterramento: solo (Wenner, duas camadas), hastes, cabo, malha, toque e passo
 src/pictos.js         Desenhos da Tabela 33 e cortes de eletrodutos
 src/memorial.js       Memória de cálculo NBR 5410
-src/lumidoc.js        Relatório luminotécnico (plantas e desenhos das luminárias)
+src/lumidoc.js        Relatório luminotécnico (plantas, desenhos das luminárias e áreas externas)
 src/energisadoc.js    Memorial de demanda para a concessionária
 src/climadoc.js       Memorial de carga térmica
 src/aterrdoc.js       Memorial de aterramento (planta, corte e curva do solo)
@@ -181,7 +201,8 @@ src/materiais.js      Cadastro de materiais, quantitativo automático e lista de
 src/descritivo.js     Memorial descritivo (influências externas, especificações) e lista de materiais
 src/memorias.js       Memórias separadas, relatório consolidado e anexos
 src/export.js         Saída em PDF (jsPDF), Word (docx), HTML e Excel (ExcelJS)
-src/ui*.js            Interface (abas, formulários, bancadas)
+src/ui_menu.js        Barra de menus suspensos, atalhos de teclado e caminho da tela
+src/ui*.js            Interface (seções, formulários, bancadas)
 src/sample.js         Projeto de exemplo
 fonts/                DejaVu Sans (subconjunto) embutida nos PDFs
 exemplo/              Documentos gerados a partir do projeto de exemplo
@@ -195,7 +216,7 @@ python3 build.py                 # gera index.html depois de editar src/
 node --test test/motor.test.js   # testes do motor de cálculo (Node 18+)
 
 npm install --no-save playwright && npx playwright install chromium
-node test/navegador.js           # percorre todas as abas, gera os documentos em exemplo/ e verifica erros
+node test/navegador.js           # navega pelo menu (mouse e teclado), percorre as seções, gera os documentos em exemplo/ e verifica erros
 ```
 
 Os testes do motor conferem o projeto de exemplo com valores verificados à mão:
