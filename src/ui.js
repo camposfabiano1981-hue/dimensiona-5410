@@ -3,6 +3,7 @@
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
 const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'materiais', 'memoria', 'tabelas'];
+const QDIAG = {};
 let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, DESC_ABERTO = false, MEMSEL = 'descritivo', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
 const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
 const $ = (s, el = document) => el.querySelector(s);
@@ -247,7 +248,7 @@ function renderParcial() {
   else if (TAB === 'materiais') renderMatResumo();
   else if (TAB === 'memoria') { clearTimeout(renderParcial._t); renderParcial._t = setTimeout(() => { const f = $('#folha'); if (f && TAB === 'memoria') f.innerHTML = renderHTMLDoc(docAtual(MEMSEL).blocos); }, 400); }
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
-  else if (TAB === 'quadros') Object.values(CALC.quadros).forEach(q => { const r = $('#q-' + safeId(q.q) + '-res'); if (r) r.innerHTML = quadroRes(q); });
+  else if (TAB === 'quadros') Object.values(CALC.quadros).forEach(q => { const r = $('#q-' + safeId(q.q) + '-res'); if (r) r.innerHTML = quadroRes(q); const g = $('#q-' + safeId(q.q) + '-diag'); if (g) g.innerHTML = diagramaHTML(q); });
 }
 
 /* ---------- PROJETO ---------- */
@@ -580,12 +581,17 @@ function quadroRes(q) {
     <div class="demanda num"><span>Carga instalada <b>${nfmt(d.Sterm, 0)} VA</b></span>${d.Sjus ? `<span>Quadros a jusante <b>${nfmt(d.Sjus, 0)} VA</b></span>` : ''}<span>Demanda ${d.manual ? '(informada)' : `(FD ${nfmt(d.fd * 100, 0)} %)`} <b>${nfmt(d.S, 0)} VA</b></span><span>Corrente de demanda <b>${nfmt(correnteDem(d.S), 1)} A</b></span>${q.alim ? `<span>Alimentado por <b>${esc(q.alim.num)}</b> (${condutoresTxt(CALC.res[q.alim.id])})</span>` : ''}</div>
     ${us.length > 1 ? `<div class="balanco">${us.map(l => `<div class="bar"><span>Fase ${l}</span><span class="trilho"><span class="enc" style="display:block;width:${(q.fases[l] / mx * 100).toFixed(1)}%"></span></span><span class="v">${nfmt(q.fases[l], 0)} VA</span></div>`).join('')}<div class="mini">Desequilíbrio entre fases: <b>${nfmt(q.deseq, 1)} %</b> — (Smáx − Smín) / Smáx</div></div>` : ''}`;
 }
+function diagramaHTML(q) {
+  const m = QDIAG[q.q] || 'uni', d = dadosQuadro(PROJ, CALC, q.q);
+  return `<div class="ref-sel" role="group" aria-label="Diagrama do quadro ${esc(q.q)}" style="margin:12px 0 8px">${[['uni', 'Diagrama unifilar'], ['multi', 'Diagrama multifilar'], ['off', 'Ocultar diagrama']].map(([k, l]) => `<button class="btn sm" type="button" data-qdiag="${esc(q.q)}" data-modo="${k}" aria-pressed="${k === m}">${l}</button>`).join('')}</div>
+    ${m === 'off' ? '' : `<div class="diag-folha">${partesDiagrama(d, m).join('')}</div>`}`;
+}
 function renderQuadros() {
   const Q = CALC.quadros, P = PROJ.params;
   $('#tab-quadros').innerHTML = `
   <div class="mem-bar"><div><h2 class="tit">Quadros de carga</h2>
   <p class="sub" style="margin:0">Resumo por quadro, demanda e equilíbrio de fases. O fator de demanda padrão é 100 %; ajuste-o por quadro ou informe a demanda em kVA — o alimentador é recalculado em seguida. Clique numa linha para editar o circuito.</p></div>
-  <div class="mem-bt"><button class="btn pri" type="button" data-exp="xlsx">Baixar quadro de cargas (Excel)</button></div></div>
+  <div class="mem-bt"><button class="btn pri" type="button" data-exp="xlsx">Quadro de cargas (Excel)</button><span class="mini" style="align-self:center;margin-left:6px">Diagramas:</span><button class="btn" type="button" data-exp="pdf" data-doc="diagramas">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="diagramas">Word</button><button class="btn" type="button" data-exp="html" data-doc="diagramas">HTML</button></div></div>
   <div class="banner" style="border-style:solid"><span>Novo quadro:</span><span style="display:flex;gap:8px;flex:1 1 260px"><input type="text" id="novo-quadro" placeholder="ex.: QD-2" aria-label="Nome do novo quadro" style="max-width:220px"><button class="btn" type="button" id="bt-add-q">Criar quadro</button></span></div>
   ${Object.values(Q).map(q => {
     const pre = 'q-' + safeId(q.q), Qd = PROJ.quadros[q.q] || {};
@@ -596,10 +602,12 @@ function renderQuadros() {
         ${fNum(pre, 'fd', 'Fator de demanda', Qd.fd, { u: '%', pct: true, ph: P.fdPadrao })}
         ${fNum(pre, 'demManual', 'Demanda informada', Qd.demManual, { u: 'kVA', ph: 'calculada' })}
         ${fNum(pre, 'icc', 'Icc presumida', Qd.icc, { u: 'kA' })}
+        ${fNum(pre, 'dgIn', 'Disjuntor geral', Qd.dgIn, { u: 'A', ph: q.alim ? CALC.res[q.alim.id].In : 'definir', dica: q.alim ? `Vazio = ${CALC.res[q.alim.id].In} A (proteção do alimentador).` : 'Usado nos diagramas.' })}
+        ${fChk(pre, 'dps', 'DPS classe II no quadro', Qd.dps !== false, { struct: true })}
         ${q.alim ? `<div class="campo"><span class="lbl">ΔV a montante</span><b class="num" style="padding-top:6px">${nfmt(CALC.res[q.alim.id].dvTotal, 2)} % (de ${esc(q.alim.num)})</b></div>` : fNum(pre, 'dvMont', 'ΔV a montante', Qd.dvMont, { u: '%' }) + (P.origem !== 'entrega' && P.supLongo ? fNum(pre, 'Lmont', 'Linha a montante', Qd.Lmont, { u: 'm' }) : '')}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${q.usadas.length > 1 && q.cs.length ? `<button class="btn sm" type="button" data-bal="${esc(q.q)}">Equilibrar fases</button>` : ''}${!q.cs.length ? `<button class="btn sm" type="button" data-delq="${esc(q.q)}">Remover quadro</button>` : ''}</div>
-    </div><div id="${pre}-res">${quadroRes(q)}</div></article>`;
+    </div><div id="${pre}-res">${quadroRes(q)}</div>${q.cs.length ? `<div class="diag" id="${pre}-diag">${diagramaHTML(q)}</div>` : ''}</article>`;
   }).join('')}`;
 }
 
@@ -896,6 +904,7 @@ document.addEventListener('click', ev => {
   if (el.dataset.dellocal) { PROJ.descritivo.locais.splice(+el.dataset.dellocal, 1); DESC_ABERTO = true; mudou(true); return; }
   if (el.dataset.delmed) { PROJ.aterr.solo.med.splice(+el.dataset.delmed, 1); mudou(true); return; }
   if (el.dataset.amodo) { PROJ.aterr.modo = el.dataset.amodo; if (el.dataset.amodo === 'simplificado' && PROJ.aterr.solo.modelo === '2c') PROJ.aterr.solo.modelo = 'homog'; mudou(true); return; }
+  if (el.dataset.qdiag) { QDIAG[el.dataset.qdiag] = el.dataset.modo; const q = CALC.quadros[el.dataset.qdiag], g = q && $('#q-' + safeId(q.q) + '-diag'); if (g) g.innerHTML = diagramaHTML(q); return; }
   if (el.dataset.planta) { LPLANTA = el.dataset.planta; renderLumiRes(); return; }
   if (el.dataset.ref) { REFTAB = el.dataset.ref; renderTabelas(); renderTrilha(); return; }
   if (el.dataset.mat) { REFMAT = el.dataset.mat; renderTabelas(); return; }

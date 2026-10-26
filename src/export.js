@@ -109,7 +109,7 @@ function loadScript(src) {
 async function rasterizarFiguras(blocks) {
   const m = new Map();
   for (const b of blocks) {
-    if (b.t === 'fig') m.set(b.svg, await svgParaPNG(b.svg, 480, Math.round(480 * (b.ar || 0.625))));
+    if (b.t === 'fig') { const px = b.px || 480; m.set(b.svg, await svgParaPNG(b.svg, px, Math.round(px * (b.ar || 0.625)))); }
     if (b.t === 'figs') for (const f of b.itens) m.set(f.svg, await svgParaPNG(f.svg));
   }
   return m;
@@ -193,7 +193,7 @@ async function gerarPDF(blocks, meta) {
       }
       case 'h1': { font(true, 12.5, C.acc); const ls = doc.splitTextToSize(b.text.toUpperCase(), W), ex = (ls.length - 1) * lh(12.5); ensure(26 + ex); y += 3; font(true, 12.5, C.acc); doc.text(ls, M.l, y + 5); y += 7 + ex; doc.setDrawColor(...C.line); doc.setLineWidth(0.3); doc.line(M.l, y, M.l + W, y); y += 4; break; }
       case 'h2': {
-        ensure(34); y += 3; font(true, 10.2, C.ink); const ls = doc.splitTextToSize(b.text, W - 6); const h = ls.length * lh(10.2) + 3;
+        ensure(Math.max(34, b.keep || 0)); y += 3; font(true, 10.2, C.ink); const ls = doc.splitTextToSize(b.text, W - 6); const h = ls.length * lh(10.2) + 3;
         doc.setFillColor(...C.head); doc.rect(M.l, y, W, h, 'F'); doc.setFillColor(...C.acc); doc.rect(M.l, y, 1, h, 'F');
         doc.text(ls, M.l + 4, y + 1.5 + lh(10.2) * 0.75); y += h + 3; break;
       }
@@ -230,6 +230,11 @@ async function gerarPDF(blocks, meta) {
         font(true, 9.5); doc.text(b.name, PW / 2, y, { align: 'center' }); y += 4.5; font(false, 8.8, C.muted); doc.text(b.reg, PW / 2, y, { align: 'center' }); y += 6; break;
       }
       case 'fig': {
+        if (b.full) {
+          font(false, 8.2, C.muted); const ls = doc.splitTextToSize(b.caption, W), h = W * (b.ar || 0.625); ensure(h + 4 + ls.length * lh(8.2));
+          doc.addImage(imgs.get(b.svg), 'PNG', M.l, y, W, h); doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.rect(M.l, y, W, h);
+          y += h + 3.5; font(false, 8.2, C.muted); ls.forEach(l => { y += lh(8.2) * 0.8; doc.text(l, M.l, y); y += lh(8.2) * 0.2; }); y += 4; break;
+        }
         const w = b.w || 46, h = w * (b.ar || 0.625); ensure(h + 3);
         doc.addImage(imgs.get(b.svg), 'PNG', M.l, y, w, h); doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.rect(M.l, y, w, h);
         font(false, 8.2, C.muted); const ls = doc.splitTextToSize(b.caption, W - w - 6); doc.text(ls, M.l + w + 5, y + h / 2 - (ls.length - 1) * lh(8.2) / 2 + 1);
@@ -337,7 +342,7 @@ async function gerarDOCX(blocks, meta) {
         out.push(P(b.name, { align: D.AlignmentType.CENTER, bold: true, after: 20 }));
         out.push(P(b.reg, { align: D.AlignmentType.CENTER, color: MUT })); break;
       case 'fig':
-        { const wpx = Math.round((b.w || 46) * 4.17); out.push(new D.Paragraph({ keepNext: true, spacing: { before: 60, after: 20 }, children: [new D.ImageRun({ data: pngBytes(imgs.get(b.svg)), transformation: { width: wpx, height: Math.round(wpx * (b.ar || 0.625)) } })] })); }
+        { const wpx = b.full ? 640 : Math.round((b.w || 46) * 4.17); out.push(new D.Paragraph({ keepNext: true, spacing: { before: 60, after: 20 }, children: [new D.ImageRun({ data: pngBytes(imgs.get(b.svg)), transformation: { width: wpx, height: Math.round(wpx * (b.ar || 0.625)) } })] })); }
         out.push(P(b.caption, { size: 16, color: MUT, after: 100 })); break;
       case 'figs': {
         const nb = { style: D.BorderStyle.SINGLE, size: 4, color: LINE };

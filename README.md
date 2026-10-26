@@ -2,7 +2,7 @@
 
 Plataforma web para **projetos elétricos de baixa tensão**:
 - dimensionamento de condutores, proteção, eletrodutos e eletrocalhas pela **ABNT NBR 5410:2004**;
-- quadro de cargas;
+- quadro de cargas, com **diagramas unifilar e multifilar** de cada quadro;
 - cálculo luminotécnico de interiores pela **NBR ISO/CIE 8995-1** e de exteriores (projetores em postes) pela **NBR 5101 / EN 12464-2**;
 - demanda para a concessionária pelas normas **Energisa NDU 001 / NDU 003**;
 - carga térmica de climatização pela **ABNT NBR 16401**;
@@ -42,6 +42,13 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
   - balanceamento de fases e demanda do alimentador;
   - colunas de ligação, FCA, FCT e fator de potência;
   - exportação para Excel com fórmulas.
+
+**Diagramas unifilar e multifilar dos quadros**
+- **Gerados automaticamente** a partir dos circuitos: alimentação, disjuntor geral, DPS, disjuntores, DR (IDR ou DDR), condutores com as seções e distribuição entre as fases.
+- **Unifilar:** barramento vertical com um ramal por circuito, marcas de fase, neutro e PE, reserva da Tabela 59 e resumo de carga, demanda e equilíbrio de fases.
+- **Multifilar:** barramentos A, B, C, N e PE com as cores dos condutores, cada polo dos disjuntores e dos DR, toróide do DR e ligação dos DPS ao PE.
+- **Onde aparecem:** na seção Quadros de carga (botões unifilar/multifilar) e no documento *Diagramas unifilares e multifilares* (PDF, Word e HTML), que também pode ser anexado ao memorial descritivo. O DPS de cada quadro entra na lista de materiais.
+- **Símbolos:** IEC 60617 (prática usual da antiga NBR 5444); cores do neutro e do PE pela NBR 5410, 6.1.5.3.
 
 **Luminotécnica (NBR ISO/CIE 8995-1)**
 - **Requisitos por ambiente:** iluminância mantida, UGR, Ra e uniformidade.
@@ -124,7 +131,7 @@ Dois modos, escolhidos no topo da seção ou em Sistemas › Aterramento:
 - **Anexos:** as memórias de cálculo e a lista de materiais marcadas pelo profissional entram como Anexo A, B, C…, com uma única assinatura.
 
 **Memórias de cálculo**
-- **Memórias separadas:** condutores e proteção, eletrodutos, eletrocalhas, quadros de carga, luminotécnica, demanda Energisa, carga térmica e aterramento, cada uma em PDF, Word e HTML.
+- **Memórias separadas:** condutores e proteção, eletrodutos, eletrocalhas, quadros de carga, diagramas dos quadros, luminotécnica, demanda Energisa, carga térmica e aterramento, cada uma em PDF, Word e HTML.
 - **Relatório consolidado:** reúne as memórias marcadas, com sumário, partes A, B, C… (numeração prefixada pela letra da parte) e uma única assinatura do responsável técnico. A declaração de carga do titular, exigida pela Energisa, é mantida.
 - **Formatação comum:** todos os documentos têm cabeçalho, rodapé, paginação e bloco de assinatura.
 - **Tabelas da norma:** consulta às tabelas da NBR 5410, da NBR ISO/CIE 8995-1 e da NDU 001 dentro da plataforma.
@@ -193,6 +200,7 @@ src/clima.js          Carga térmica: clima, sol, condução periódica, psicrom
 src/aterr.js          Aterramento: solo (Wenner, duas camadas), hastes, cabo, malha, toque e passo
 src/pictos.js         Desenhos da Tabela 33 e cortes de eletrodutos
 src/memorial.js       Memória de cálculo NBR 5410
+src/diagramas.js      Diagramas unifilar e multifilar dos quadros
 src/lumidoc.js        Relatório luminotécnico (plantas, desenhos das luminárias e áreas externas)
 src/energisadoc.js    Memorial de demanda para a concessionária
 src/climadoc.js       Memorial de carga térmica

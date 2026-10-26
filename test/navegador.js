@@ -20,7 +20,7 @@ const LOCAL = LIBS && {
 const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'materiais', 'memoria', 'tabelas'];
 // memorial descritivo com anexos e relatório consolidado (PDF, Word e HTML), memórias separadas e lista de materiais (PDF e Word),
 // quadro de cargas (Excel, aba Memória) e lista de materiais (Excel, aba Materiais)
-const SEPARADAS = ['circuitos', 'eletrodutos', 'calhas', 'quadros', 'lumi', 'energisa', 'clima', 'aterr', 'materiais'];
+const SEPARADAS = ['circuitos', 'eletrodutos', 'calhas', 'quadros', 'diagramas', 'lumi', 'energisa', 'clima', 'aterr', 'materiais'];
 const DOCS = [['memoria', 'descritivo', ['pdf', 'docx', 'html']], ...SEPARADAS.map(d => ['memoria', d, ['pdf', 'docx']]), ['memoria', 'consolidado', ['pdf', 'docx', 'html']], ['memoria', null, ['xlsx']], ['materiais', null, ['xlsxmat']]];
 
 (async () => {
@@ -52,8 +52,9 @@ const DOCS = [['memoria', 'descritivo', ['pdf', 'docx', 'html']], ...SEPARADAS.m
   await page.click('#mb-sist'); await page.hover('#menubar .mb-drop > .mb-li:nth-child(1) > .mb-op'); await page.click('#menubar .mb-sub:not([hidden]) [data-act="lumi:ext"]'); await page.waitForTimeout(150);
   confere(await estado(), { TAB: 'lumi', LMODO: 'ext' }, 'Sistemas › Luminotécnica › Exteriores');
   await page.focus('#mb-projeto'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('ArrowDown'); await page.keyboard.press('2'); await page.keyboard.press('5'); await page.waitForTimeout(150);
-  confere(await estado(), { TAB: 'memoria', MEMSEL: 'lumi' }, 'teclado: Documentos › 2 › 5');
+  const nLumi = String(await page.evaluate(() => MEMORIAS.findIndex(m => m.id === 'lumi') + 1));
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('2'); await page.keyboard.press(nLumi); await page.waitForTimeout(150);
+  confere(await estado(), { TAB: 'memoria', MEMSEL: 'lumi' }, `teclado: Documentos › 2 › ${nLumi}`);
   await page.keyboard.press('F4'); await page.waitForTimeout(100); confere(await estado(), { TAB: 'circuitos' }, 'atalho F4');
   await page.keyboard.press('F9'); await page.waitForTimeout(100); confere(await estado(), { TAB: 'memoria', MEMSEL: 'descritivo' }, 'atalho F9');
   await page.click('#mb-tab'); await page.keyboard.press('Escape'); if (await page.$('#menubar .mb-drop')) erros.push('Esc não fechou o menu');

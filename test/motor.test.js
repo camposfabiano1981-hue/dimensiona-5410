@@ -6,12 +6,12 @@ const assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const SRC = path.join(__dirname, '..', 'src');
-const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'materiais', 'pictos', 'sample', 'memorial', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'descritivo', 'memorias', 'export'];
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'materiais', 'pictos', 'sample', 'memorial', 'diagramas', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'descritivo', 'memorias', 'export'];
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
-  calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi,
+  calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
   WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS };`, ctx);
 const A = ctx.api;
 
@@ -66,6 +66,25 @@ test('Iluminação de exteriores — ponto a ponto confere com a solução anal�
   const b = Object.assign(A.ambExtPadrao(2), { L: 60, W: 10, arranjo: 'lado', n: 1, h: 8 });
   const rb = A.calcAreaExt(b);
   assert.ok(60 / rb.sugestao.n <= 3 * 8 + 1e-9, 'espaçamento da sugestão');
+});
+
+test('Diagramas — unifilar e multifilar refletem os circuitos de cada quadro', () => {
+  const d = A.dadosQuadro(P, K, 'QD-1'), q = K.quadros['QD-1'];
+  assert.equal(d.cs.length, q.cs.length);
+  assert.equal(d.dg.In, K.res[q.alim.id].In, 'disjuntor geral = proteção do alimentador');
+  const uni = A.unifilarSVG(d), multi = A.partesDiagrama(d, 'multi');
+  for (const c of q.cs) assert.ok(uni.includes(`>${c.num}</text>`), `circuito ${c.num} no unifilar`);
+  assert.equal(multi.length, Math.ceil(q.cs.length / A.DIAG_MULTI), 'blocos do multifilar');
+  // cada condutor do circuito chega à carga: fases + neutro + PE
+  const c1 = d.cs[0], r1 = K.res[q.cs[0].id];
+  assert.equal(c1.fs.length + (c1.N ? 1 : 0) + (c1.PE ? 1 : 0), r1.nVias, 'condutores do circuito 1');
+  assert.equal(d.cs.filter(c => c.dr).length, q.cs.filter(c => K.res[c.id].drUsado).length, 'DR nos diagramas');
+  // DPS no quadro e na lista de materiais (fases + neutro)
+  const dps = MT.auto.find(i => i.key.startsWith('dps|'));
+  assert.ok(d.dps && dps && dps.q === Object.values(K.quadros).filter(x => x.cs.length).reduce((s, x) => s + x.usadas.length + 1, 0), 'DPS no quantitativo');
+  const B = A.construirDiagramas(P, K);
+  assert.ok(B.filter(b => b.t === 'fig' && b.full).length >= 4, 'figuras dos diagramas');
+  for (const b of B.filter(b => b.t === 'fig')) assert.ok(b.ar > 0.2 && b.ar <= 1.3, `proporção da figura ${b.ar}`);
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

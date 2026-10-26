@@ -101,6 +101,12 @@ function materiaisAuto(proj, calc) {
     const std = MODULOS_STD.find(x => x >= n) || n;
     add(`quad|${q.q}`, 'quad', `Quadro de distribuição ${q.q}${(proj.quadros[q.q] || {}).desc ? ' (' + proj.quadros[q.q].desc + ')' : ''} — ${std} módulos DIN, com barramentos de fase, neutro e proteção; ${q.cs.length} circuitos + reserva para ${res} circuitos (Tabela 59)`, 'un', 'ABNT NBR IEC 61439-3', 1, q.q);
   });
+  // DPS classe II em cada quadro (fases e neutro ao PE)
+  Object.values(calc.quadros).forEach(q => {
+    if (!q.cs.length || (proj.quadros[q.q] || {}).dps === false) return;
+    const uc = ucDPS(proj.params.U0);
+    add(`dps|II|${uc}`, 'prot', `DPS classe II — Uc ${uc} V, In 20 kA, Imáx 40 kA`, 'un', 'ABNT NBR IEC 61643-11', q.usadas.length + 1, q.q);
+  });
   // eletrodutos
   Object.values(calc.trechos).forEach(t => {
     if (!t.aplica || !t.esc || (calc.calhas || {})[t.key]) return;
