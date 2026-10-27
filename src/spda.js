@@ -25,6 +25,95 @@ const fp = v => String(v).replace('.', ',');
 const minusc = s => s.charAt(0).toLowerCase() + s.slice(1);
 const ordemDPS = d => ({ nenhum: 0, IV: 1, III: 1, II: 2, I: 3 })[d] ?? 0;
 const npBase = np => (np === 'Inat' || np === 'metal') ? 'I' : np;
+/* densidade de descargas atmosféricas NG (descargas/km²/ano) por município — ABNT NBR 5419-2:2026, Anexo F */
+const NG_ANEXO_F = {
+  MS: { nome: 'Mato Grosso do Sul', mun: {
+    'Água Clara': 26,
+    'Alcinópolis': 24,
+    'Amambai': 24,
+    'Anastácio': 22,
+    'Anaurilândia': 24,
+    'Angélica': 22,
+    'Antônio João': 24,
+    'Aparecida do Taboado': 18,
+    'Aquidauana': 24,
+    'Aral Moreira': 26,
+    'Bandeirantes': 20,
+    'Bataguassu': 24,
+    'Batayporã': 22,
+    'Bela Vista': 30,
+    'Bodoquena': 22,
+    'Bonito': 22,
+    'Brasilândia': 26,
+    'Caarapó': 24,
+    'Camapuã': 22,
+    'Campo Grande': 30,
+    'Caracol': 26,
+    'Cassilândia': 20,
+    'Chapadão do Sul': 24,
+    'Corguinho': 18,
+    'Coronel Sapucaia': 24,
+    'Corumbá': 26,
+    'Costa Rica': 24,
+    'Coxim': 22,
+    'Deodápolis': 22,
+    'Dois Irmãos do Buriti': 20,
+    'Douradina': 20,
+    'Dourados': 24,
+    'Eldorado': 22,
+    'Fátima do Sul': 24,
+    'Figueirão': 24,
+    'Glória de Dourados': 22,
+    'Guia Lopes da Laguna': 22,
+    'Iguatemi': 24,
+    'Inocência': 20,
+    'Itaporã': 20,
+    'Itaquiraí': 24,
+    'Ivinhema': 24,
+    'Japorã': 24,
+    'Jaraguari': 24,
+    'Jardim': 22,
+    'Jateí': 22,
+    'Juti': 22,
+    'Ladário': 16,
+    'Laguna Carapã': 24,
+    'Maracaju': 24,
+    'Miranda': 20,
+    'Mundo Novo': 20,
+    'Naviraí': 24,
+    'Nioaque': 24,
+    'Nova Alvorada do Sul': 28,
+    'Nova Andradina': 26,
+    'Novo Horizonte do Sul': 22,
+    'Paraíso das Águas': 24,
+    'Paranaíba': 18,
+    'Paranhos': 22,
+    'Pedro Gomes': 24,
+    'Ponta Porã': 26,
+    'Porto Murtinho': 26,
+    'Ribas do Rio Pardo': 28,
+    'Rio Brilhante': 26,
+    'Rio Negro': 20,
+    'Rio Verde de Mato Grosso': 24,
+    'Rochedo': 20,
+    'Santa Rita do Pardo': 28,
+    'São Gabriel do Oeste': 22,
+    'Selvíria': 20,
+    'Sete Quedas': 26,
+    'Sidrolândia': 24,
+    'Sonora': 24,
+    'Tacuru': 24,
+    'Taquarussu': 22,
+    'Terenos': 20,
+    'Três Lagoas': 22,
+    'Vicentina': 22
+  } }
+};
+/* NG adotado: tabela do Anexo F quando o município é escolhido; senão, o valor informado */
+function ngSPDA(sp) {
+  const T = NG_ANEXO_F[sp.ngUF], v = T && sp.ngMun && T.mun[sp.ngMun];
+  return v ? { valor: v, tabela: true, mun: sp.ngMun, uf: sp.ngUF, fonte: `ABNT NBR 5419-2:2026, Anexo F — ${sp.ngMun}/${sp.ngUF}` } : { valor: Math.max(0, +sp.Ng || 0), tabela: false, fonte: sp.ngFonte || 'valor informado pelo projetista' };
+}
 /* fatores e probabilidades da análise de risco: [valor, descrição] */
 const CD_LOC = { cercada: [0.25, 'Cercada por objetos mais altos'], menores: [0.5, 'Cercada por objetos da mesma altura ou mais baixos'], isolada: [1, 'Isolada — sem outros objetos nas vizinhanças'], colina: [2, 'Isolada no topo de colina ou monte'] };
 const CI_LIN = { aerea: [1, 'Aérea'], enterrada: [0.5, 'Enterrada'], malha: [0.01, 'Enterrada, inteiramente dentro de malha de aterramento'] };
@@ -66,7 +155,7 @@ function linhaSPDA(tipo = 'energia') {
   return { id: uid(), nome: tipo === 'energia' ? 'Linha de energia' : 'Linha de telecomunicações', tipo, ativa: true, inst: tipo === 'energia' ? 'aerea' : 'aerea', LL: 1000, ce: 'urbano', ct: 'bt', blind: tipo === 'energia' ? 'neutro' : 'aereaSem', rs: 'ate20', uw: 2.5 };
 }
 function spdaPadrao() {
-  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', Ng: null, ngFonte: '',
+  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', ngUF: 'MS', ngMun: '', ngTabela: true, Ng: null, ngFonte: '',
     ocup: 'residencial', piso: 'concreto', rp: 'nenhuma', rf: 'normal', hz: 'nenhum', nzNt: 100, tz: 8760, vida: 'nao', patrimonio: false, czCt: 100, critico: false,
     linhas: [linhaSPDA('energia'), linhaSPDA('telecom')],
     np: 'auto', dps: 'auto', pta: 'nenhuma', ptu: 'nenhuma', ks3: 'semCuidado', wm: null,
@@ -208,9 +297,10 @@ function projetoSPDA(sp, np, proj, calc) {
 }
 
 function calcSPDA(proj, calc) {
-  const sp = proj.spda || spdaPadrao(), out = { ativo: !!sp.ativo, falhas: [], avisos: [] };
-  if (!sp.ativo) return out;
-  if (!(+sp.Ng > 0)) out.falhas.push('Informe a densidade de descargas atmosféricas NG do município (Anexo F da NBR 5419-2:2026).');
+  const sp0 = proj.spda || spdaPadrao(), out = { ativo: !!sp0.ativo, falhas: [], avisos: [] };
+  if (!sp0.ativo) return out;
+  out.ng = ngSPDA(sp0); const sp = { ...sp0, Ng: out.ng.valor };
+  if (!(out.ng.valor > 0)) out.falhas.push('Escolha o município ou informe a densidade de descargas atmosféricas NG (Anexo F da NBR 5419-2:2026).');
   // combinações de nível de proteção e DPS: com SPDA, os DPS da entrada devem ser compatíveis com o NP
   const dpsDe = np => DPS_OPCOES.filter(d => np === 'nenhum' || ordemDPS(d) >= ordemDPS(npBase(np)));
   out.matriz = NP_OPCOES.map(np => ({ np, cel: DPS_OPCOES.map(d => dpsDe(np).includes(d) ? calcRiscoSPDA(sp, np, d) : null) }));

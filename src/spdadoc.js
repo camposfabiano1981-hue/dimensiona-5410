@@ -121,7 +121,7 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   sec('Caracterização da estrutura');
   B.push({ t: 'table', head: ['Parâmetro', 'Valor adotado'], widths: [42, 58], rows: [
     ['Dimensões (L × W × H)', `${f2(+sp.L)} × ${f2(+sp.W)} × ${f2(+sp.H)} m`], ['Localização relativa (CD)', `${CD_LOC[sp.cd][1]} — CD = ${fp(CD_LOC[sp.cd][0])}`],
-    ['Densidade de descargas NG', `${f2(+sp.Ng || 0)} descargas/km²/ano${sp.ngFonte ? ' — ' + sp.ngFonte : ''}`], ['Ocupação (perda LF)', `${OCUP_SPDA[sp.ocup][1]} — LF = ${fp(OCUP_SPDA[sp.ocup][0])}`],
+    ['Densidade de descargas NG', `${nfmt(c.ng.valor, c.ng.valor % 1 ? 2 : 0)} descargas/km²/ano — ${c.ng.fonte}`], ['Ocupação (perda LF)', `${OCUP_SPDA[sp.ocup][1]} — LF = ${fp(OCUP_SPDA[sp.ocup][0])}`],
     ['Piso / solo junto às descidas (rt)', `${RT_PISO[sp.piso][1]} — rt = ${fp(RT_PISO[sp.piso][0])}`], ['Providências contra incêndio (rp)', `${RP_OP[sp.rp][1]} — rp = ${fp(RP_OP[sp.rp][0])}`],
     ['Risco de incêndio ou explosão (rf)', `${RF_OP[sp.rf][1]} — rf = ${fp(RF_OP[sp.rf][0])}`], ['Perigo especial (hz)', `${HZ_OP[sp.hz][1]} — hz = ${fp(HZ_OP[sp.hz][0])}`],
     ['Pessoas na zona / total e permanência', `${f0(+sp.nzNt)} % · ${f0(+sp.tz)} h/ano`], ['Falha de sistemas internos põe a vida em risco', `${VIDA_OP[sp.vida][1]}${sp.vida !== 'nao' ? ` — LO = ${fp(VIDA_OP[sp.vida][0])}` : ''}`],
@@ -132,7 +132,7 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   else B.push({ t: 'p', text: 'A estrutura não possui linhas externas de energia ou de telecomunicações conectadas.' });
   const sR = sec('Análise de risco (NBR 5419-2:2026)');
   B.push({ t: 'h2', text: `${sR}.1 Áreas de exposição e número anual de eventos perigosos` });
-  B.push({ t: 'eq', lines: [`AD = L × W + 2 × (3H) × (L + W) + π × (3H)² = ${f0(r.AD)} m²;   ND = NG × AD × CD × 10⁻⁶ = ${f2(+sp.Ng)} × ${f0(r.AD)} × ${fp(r.CD)} × 10⁻⁶ = ${nfmt(r.ND, 4)} /ano`,
+  B.push({ t: 'eq', lines: [`AD = L × W + 2 × (3H) × (L + W) + π × (3H)² = ${f0(r.AD)} m²;   ND = NG × AD × CD × 10⁻⁶ = ${nfmt(c.ng.valor, c.ng.valor % 1 ? 2 : 0)} × ${f0(r.AD)} × ${fp(r.CD)} × 10⁻⁶ = ${nfmt(r.ND, 4)} /ano`,
     `AM = 2 × 500 × (L + W) + π × 500² = ${f0(r.AM)} m²;   NM = NG × AM × 10⁻⁶ = ${nfmt(r.NM, 3)} /ano`,
     ...r.linhas.map(l => `${l.nome}: AL = 40 × LL = ${f0(l.AL)} m²; NL = NG × AL × CI × CE × CT × 10⁻⁶ = ${nfmt(l.NL, 4)} /ano; AI = 4 000 × LL; NI = ${nfmt(l.NI, 3)} /ano`)] });
   B.push({ t: 'h2', text: `${sR}.2 Perdas` });
@@ -196,5 +196,12 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   B.push({ t: 'p', text: `${r.okR1 && r.okR3 ? 'Com as medidas adotadas, o risco de perda de vida humana atende ao valor tolerável da ABNT NBR 5419-2:2026' : 'As medidas adotadas não atendem ao risco tolerável; revise o nível de proteção e as medidas complementares'}${r.okF ? '' : ', e a frequência de danos aos sistemas internos exige medidas de proteção contra surtos (MPS)'}. ${p ? `O SPDA nível ${p.base} tem ${p.nDesc} descidas, ${p.mastros ? `${p.mx * p.my} captor(es) Franklin` : 'captação em malha'} e anel de aterramento de ${f0(p.Lanel)} m.` : ''}` });
   if (sp.obs) B.push({ t: 'note', text: sp.obs });
   if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
+  if (c.ng.tabela && sp.ngTabela) {
+    const T = NG_ANEXO_F[c.ng.uf], L = Object.entries(T.mun), m = Math.ceil(L.length / 2);
+    B.push({ t: 'h1', text: `Anexo — Densidade de descargas atmosféricas NG em ${T.nome}` });
+    B.push({ t: 'p', text: `Valores de NG (descargas atmosféricas por km² por ano) dos ${L.length} municípios de ${T.nome}, conforme a tabela municipal do Anexo F da ABNT NBR 5419-2:2026. Valor adotado neste memorial: ${c.ng.mun}, NG = ${c.ng.valor}.` });
+    B.push({ t: 'table', small: true, head: ['Município', 'NG', 'Município', 'NG'], widths: [38, 12, 38, 12], align: 'lrlr',
+      rows: Array.from({ length: m }, (_, i) => { const a = L[i], b = L[i + m]; const mk = x => x ? [x[0] === c.ng.mun ? `${x[0]} (adotado)` : x[0], String(x[1])] : ['', '']; return [...mk(a), ...mk(b)]; }) });
+  }
   return B;
 }

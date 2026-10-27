@@ -2458,6 +2458,95 @@ const fp = v => String(v).replace('.', ',');
 const minusc = s => s.charAt(0).toLowerCase() + s.slice(1);
 const ordemDPS = d => ({ nenhum: 0, IV: 1, III: 1, II: 2, I: 3 })[d] ?? 0;
 const npBase = np => (np === 'Inat' || np === 'metal') ? 'I' : np;
+/* densidade de descargas atmosféricas NG (descargas/km²/ano) por município — ABNT NBR 5419-2:2026, Anexo F */
+const NG_ANEXO_F = {
+  MS: { nome: 'Mato Grosso do Sul', mun: {
+    'Água Clara': 26,
+    'Alcinópolis': 24,
+    'Amambai': 24,
+    'Anastácio': 22,
+    'Anaurilândia': 24,
+    'Angélica': 22,
+    'Antônio João': 24,
+    'Aparecida do Taboado': 18,
+    'Aquidauana': 24,
+    'Aral Moreira': 26,
+    'Bandeirantes': 20,
+    'Bataguassu': 24,
+    'Batayporã': 22,
+    'Bela Vista': 30,
+    'Bodoquena': 22,
+    'Bonito': 22,
+    'Brasilândia': 26,
+    'Caarapó': 24,
+    'Camapuã': 22,
+    'Campo Grande': 30,
+    'Caracol': 26,
+    'Cassilândia': 20,
+    'Chapadão do Sul': 24,
+    'Corguinho': 18,
+    'Coronel Sapucaia': 24,
+    'Corumbá': 26,
+    'Costa Rica': 24,
+    'Coxim': 22,
+    'Deodápolis': 22,
+    'Dois Irmãos do Buriti': 20,
+    'Douradina': 20,
+    'Dourados': 24,
+    'Eldorado': 22,
+    'Fátima do Sul': 24,
+    'Figueirão': 24,
+    'Glória de Dourados': 22,
+    'Guia Lopes da Laguna': 22,
+    'Iguatemi': 24,
+    'Inocência': 20,
+    'Itaporã': 20,
+    'Itaquiraí': 24,
+    'Ivinhema': 24,
+    'Japorã': 24,
+    'Jaraguari': 24,
+    'Jardim': 22,
+    'Jateí': 22,
+    'Juti': 22,
+    'Ladário': 16,
+    'Laguna Carapã': 24,
+    'Maracaju': 24,
+    'Miranda': 20,
+    'Mundo Novo': 20,
+    'Naviraí': 24,
+    'Nioaque': 24,
+    'Nova Alvorada do Sul': 28,
+    'Nova Andradina': 26,
+    'Novo Horizonte do Sul': 22,
+    'Paraíso das Águas': 24,
+    'Paranaíba': 18,
+    'Paranhos': 22,
+    'Pedro Gomes': 24,
+    'Ponta Porã': 26,
+    'Porto Murtinho': 26,
+    'Ribas do Rio Pardo': 28,
+    'Rio Brilhante': 26,
+    'Rio Negro': 20,
+    'Rio Verde de Mato Grosso': 24,
+    'Rochedo': 20,
+    'Santa Rita do Pardo': 28,
+    'São Gabriel do Oeste': 22,
+    'Selvíria': 20,
+    'Sete Quedas': 26,
+    'Sidrolândia': 24,
+    'Sonora': 24,
+    'Tacuru': 24,
+    'Taquarussu': 22,
+    'Terenos': 20,
+    'Três Lagoas': 22,
+    'Vicentina': 22
+  } }
+};
+/* NG adotado: tabela do Anexo F quando o município é escolhido; senão, o valor informado */
+function ngSPDA(sp) {
+  const T = NG_ANEXO_F[sp.ngUF], v = T && sp.ngMun && T.mun[sp.ngMun];
+  return v ? { valor: v, tabela: true, mun: sp.ngMun, uf: sp.ngUF, fonte: `ABNT NBR 5419-2:2026, Anexo F — ${sp.ngMun}/${sp.ngUF}` } : { valor: Math.max(0, +sp.Ng || 0), tabela: false, fonte: sp.ngFonte || 'valor informado pelo projetista' };
+}
 /* fatores e probabilidades da análise de risco: [valor, descrição] */
 const CD_LOC = { cercada: [0.25, 'Cercada por objetos mais altos'], menores: [0.5, 'Cercada por objetos da mesma altura ou mais baixos'], isolada: [1, 'Isolada — sem outros objetos nas vizinhanças'], colina: [2, 'Isolada no topo de colina ou monte'] };
 const CI_LIN = { aerea: [1, 'Aérea'], enterrada: [0.5, 'Enterrada'], malha: [0.01, 'Enterrada, inteiramente dentro de malha de aterramento'] };
@@ -2499,7 +2588,7 @@ function linhaSPDA(tipo = 'energia') {
   return { id: uid(), nome: tipo === 'energia' ? 'Linha de energia' : 'Linha de telecomunicações', tipo, ativa: true, inst: tipo === 'energia' ? 'aerea' : 'aerea', LL: 1000, ce: 'urbano', ct: 'bt', blind: tipo === 'energia' ? 'neutro' : 'aereaSem', rs: 'ate20', uw: 2.5 };
 }
 function spdaPadrao() {
-  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', Ng: null, ngFonte: '',
+  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', ngUF: 'MS', ngMun: '', ngTabela: true, Ng: null, ngFonte: '',
     ocup: 'residencial', piso: 'concreto', rp: 'nenhuma', rf: 'normal', hz: 'nenhum', nzNt: 100, tz: 8760, vida: 'nao', patrimonio: false, czCt: 100, critico: false,
     linhas: [linhaSPDA('energia'), linhaSPDA('telecom')],
     np: 'auto', dps: 'auto', pta: 'nenhuma', ptu: 'nenhuma', ks3: 'semCuidado', wm: null,
@@ -2641,9 +2730,10 @@ function projetoSPDA(sp, np, proj, calc) {
 }
 
 function calcSPDA(proj, calc) {
-  const sp = proj.spda || spdaPadrao(), out = { ativo: !!sp.ativo, falhas: [], avisos: [] };
-  if (!sp.ativo) return out;
-  if (!(+sp.Ng > 0)) out.falhas.push('Informe a densidade de descargas atmosféricas NG do município (Anexo F da NBR 5419-2:2026).');
+  const sp0 = proj.spda || spdaPadrao(), out = { ativo: !!sp0.ativo, falhas: [], avisos: [] };
+  if (!sp0.ativo) return out;
+  out.ng = ngSPDA(sp0); const sp = { ...sp0, Ng: out.ng.valor };
+  if (!(out.ng.valor > 0)) out.falhas.push('Escolha o município ou informe a densidade de descargas atmosféricas NG (Anexo F da NBR 5419-2:2026).');
   // combinações de nível de proteção e DPS: com SPDA, os DPS da entrada devem ser compatíveis com o NP
   const dpsDe = np => DPS_OPCOES.filter(d => np === 'nenhum' || ordemDPS(d) >= ordemDPS(npBase(np)));
   out.matriz = NP_OPCOES.map(np => ({ np, cel: DPS_OPCOES.map(d => dpsDe(np).includes(d) ? calcRiscoSPDA(sp, np, d) : null) }));
@@ -3056,7 +3146,7 @@ function projetoExemplo() {
   const qtd = (ini, q) => { const x = proj.materiais.itens.find(m => m.desc.startsWith(ini)); if (x) x.qtd = q; };
   [['DPS classe II', 4], ['Barramento de neutro', 1], ['Barramento de proteção', 1], ['Caixa de embutir 4×2', 30], ['Caixa octogonal', 14], ['Tomada 2P+T 10 A', 18], ['Tomada 2P+T 20 A', 4],
     ['Interruptor simples 10 A', 8], ['Interruptor paralelo', 2], ['Saída de fio', 3], ['Barramento de equipotencialização', 1], ['Conector de emenda', 40], ['Fita isolante', 5], ['Anilhas', 1]].forEach(([i, q]) => qtd(i, q));
-  Object.assign(proj.spda, { ativo: true, nome: 'Residência unifamiliar térrea', L: 15, W: 8, H: 5.5, cd: 'menores', Ng: 10, ngFonte: 'valor ilustrativo — substitua pelo NG do Anexo F da NBR 5419-2:2026 para o município',
+  Object.assign(proj.spda, { ativo: true, nome: 'Residência unifamiliar térrea', L: 15, W: 8, H: 5.5, cd: 'menores', ngUF: 'MS', ngMun: 'Campo Grande',
     ocup: 'residencial', piso: 'ceramica', rp: 'manual', rf: 'normal', np: 'III', dps: 'auto', metodo: 'malha', matCapt: 'aluminio70', matAterr: 'cobre50', dParede: 1, prof: 0.5 });
   return proj;
 }
@@ -4683,7 +4773,7 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   sec('Caracterização da estrutura');
   B.push({ t: 'table', head: ['Parâmetro', 'Valor adotado'], widths: [42, 58], rows: [
     ['Dimensões (L × W × H)', `${f2(+sp.L)} × ${f2(+sp.W)} × ${f2(+sp.H)} m`], ['Localização relativa (CD)', `${CD_LOC[sp.cd][1]} — CD = ${fp(CD_LOC[sp.cd][0])}`],
-    ['Densidade de descargas NG', `${f2(+sp.Ng || 0)} descargas/km²/ano${sp.ngFonte ? ' — ' + sp.ngFonte : ''}`], ['Ocupação (perda LF)', `${OCUP_SPDA[sp.ocup][1]} — LF = ${fp(OCUP_SPDA[sp.ocup][0])}`],
+    ['Densidade de descargas NG', `${nfmt(c.ng.valor, c.ng.valor % 1 ? 2 : 0)} descargas/km²/ano — ${c.ng.fonte}`], ['Ocupação (perda LF)', `${OCUP_SPDA[sp.ocup][1]} — LF = ${fp(OCUP_SPDA[sp.ocup][0])}`],
     ['Piso / solo junto às descidas (rt)', `${RT_PISO[sp.piso][1]} — rt = ${fp(RT_PISO[sp.piso][0])}`], ['Providências contra incêndio (rp)', `${RP_OP[sp.rp][1]} — rp = ${fp(RP_OP[sp.rp][0])}`],
     ['Risco de incêndio ou explosão (rf)', `${RF_OP[sp.rf][1]} — rf = ${fp(RF_OP[sp.rf][0])}`], ['Perigo especial (hz)', `${HZ_OP[sp.hz][1]} — hz = ${fp(HZ_OP[sp.hz][0])}`],
     ['Pessoas na zona / total e permanência', `${f0(+sp.nzNt)} % · ${f0(+sp.tz)} h/ano`], ['Falha de sistemas internos põe a vida em risco', `${VIDA_OP[sp.vida][1]}${sp.vida !== 'nao' ? ` — LO = ${fp(VIDA_OP[sp.vida][0])}` : ''}`],
@@ -4694,7 +4784,7 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   else B.push({ t: 'p', text: 'A estrutura não possui linhas externas de energia ou de telecomunicações conectadas.' });
   const sR = sec('Análise de risco (NBR 5419-2:2026)');
   B.push({ t: 'h2', text: `${sR}.1 Áreas de exposição e número anual de eventos perigosos` });
-  B.push({ t: 'eq', lines: [`AD = L × W + 2 × (3H) × (L + W) + π × (3H)² = ${f0(r.AD)} m²;   ND = NG × AD × CD × 10⁻⁶ = ${f2(+sp.Ng)} × ${f0(r.AD)} × ${fp(r.CD)} × 10⁻⁶ = ${nfmt(r.ND, 4)} /ano`,
+  B.push({ t: 'eq', lines: [`AD = L × W + 2 × (3H) × (L + W) + π × (3H)² = ${f0(r.AD)} m²;   ND = NG × AD × CD × 10⁻⁶ = ${nfmt(c.ng.valor, c.ng.valor % 1 ? 2 : 0)} × ${f0(r.AD)} × ${fp(r.CD)} × 10⁻⁶ = ${nfmt(r.ND, 4)} /ano`,
     `AM = 2 × 500 × (L + W) + π × 500² = ${f0(r.AM)} m²;   NM = NG × AM × 10⁻⁶ = ${nfmt(r.NM, 3)} /ano`,
     ...r.linhas.map(l => `${l.nome}: AL = 40 × LL = ${f0(l.AL)} m²; NL = NG × AL × CI × CE × CT × 10⁻⁶ = ${nfmt(l.NL, 4)} /ano; AI = 4 000 × LL; NI = ${nfmt(l.NI, 3)} /ano`)] });
   B.push({ t: 'h2', text: `${sR}.2 Perdas` });
@@ -4758,6 +4848,13 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   B.push({ t: 'p', text: `${r.okR1 && r.okR3 ? 'Com as medidas adotadas, o risco de perda de vida humana atende ao valor tolerável da ABNT NBR 5419-2:2026' : 'As medidas adotadas não atendem ao risco tolerável; revise o nível de proteção e as medidas complementares'}${r.okF ? '' : ', e a frequência de danos aos sistemas internos exige medidas de proteção contra surtos (MPS)'}. ${p ? `O SPDA nível ${p.base} tem ${p.nDesc} descidas, ${p.mastros ? `${p.mx * p.my} captor(es) Franklin` : 'captação em malha'} e anel de aterramento de ${f0(p.Lanel)} m.` : ''}` });
   if (sp.obs) B.push({ t: 'note', text: sp.obs });
   if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
+  if (c.ng.tabela && sp.ngTabela) {
+    const T = NG_ANEXO_F[c.ng.uf], L = Object.entries(T.mun), m = Math.ceil(L.length / 2);
+    B.push({ t: 'h1', text: `Anexo — Densidade de descargas atmosféricas NG em ${T.nome}` });
+    B.push({ t: 'p', text: `Valores de NG (descargas atmosféricas por km² por ano) dos ${L.length} municípios de ${T.nome}, conforme a tabela municipal do Anexo F da ABNT NBR 5419-2:2026. Valor adotado neste memorial: ${c.ng.mun}, NG = ${c.ng.valor}.` });
+    B.push({ t: 'table', small: true, head: ['Município', 'NG', 'Município', 'NG'], widths: [38, 12, 38, 12], align: 'lrlr',
+      rows: Array.from({ length: m }, (_, i) => { const a = L[i], b = L[i + m]; const mk = x => x ? [x[0] === c.ng.mun ? `${x[0]} (adotado)` : x[0], String(x[1])] : ['', '']; return [...mk(a), ...mk(b)]; }) });
+  }
   return B;
 }
 
@@ -6267,11 +6364,13 @@ function normalizarSPDA(s) {
   if (out.np !== 'auto' && PB_SPDA[out.np] == null) out.np = 'auto';
   if (out.dps !== 'auto' && PSPD_NIV[out.dps] == null) out.dps = 'auto';
   if (!['malha', 'franklin'].includes(out.metodo)) out.metodo = 'malha';
+  if (!NG_ANEXO_F[out.ngUF]) out.ngUF = 'MS';
+  if (out.ngMun && !NG_ANEXO_F[out.ngUF].mun[out.ngMun]) out.ngMun = '';
   out.linhas.forEach(l => { if (!CI_LIN[l.inst]) l.inst = 'aerea'; if (!CE_LIN[l.ce]) l.ce = 'urbano'; if (!CT_LIN[l.ct]) l.ct = 'bt'; if (!BLIND_LIN[l.blind]) l.blind = 'aereaSem'; if (!PLD_RS[l.rs]) l.rs = 'ate20'; if (!UW_LISTA.includes(+l.uw)) l.uw = 2.5; });
   return out;
 }
 const opSPDA = T => Object.entries(T).map(([k, v]) => [k, `${v[1]} (${fp(v[0])})`]);
-function efeitosSPDA(k) { return ['metodo', 'rhoFonte', 'patrimonio', 'np', 'natural'].includes(k); }
+function efeitosSPDA(k) { return ['metodo', 'rhoFonte', 'patrimonio', 'np', 'natural', 'ngMun'].includes(k); }
 function renderSPDA() {
   const S = PROJ.spda;
   const cab = `<div class="mem-bar"><div><h2 class="tit">SPDA — proteção contra descargas atmosféricas</h2><p class="sub" style="margin:0">ABNT NBR 5419:2026 — análise de risco (Parte 2), projeto do SPDA (Parte 3) e DPS na entrada das linhas (Parte 4).</p></div>
@@ -6294,12 +6393,14 @@ function renderSPDA() {
         ${l.blind === 'ligada' ? `<select data-k="rs" aria-label="Resistência da blindagem" style="margin-top:4px">${opts(Object.entries(PLD_RS).map(([k, v]) => [k, v[1]]), l.rs)}</select>` : ''}</td>
       <td><select data-k="uw" data-type="numsel" aria-label="Tensão suportável UW" style="min-width:84px">${opts(UW_LISTA.map(u => [u, `${nfmt(u, 1)} kV`]), l.uw)}</select></td></tr>`).join('');
   $('#tab-spda').innerHTML = cab + `
-  <div class="banner" style="border-style:solid"><span><b>NBR 5419:2026.</b> Use a densidade de descargas NG do Anexo F da Parte 2 para o município — a edição de 2026 recalibrou os valores. Probabilidades e perdas adotadas ficam listadas no memorial para conferência.</span><button class="btn sm" type="button" id="bt-spda-retirar">Retirar SPDA do projeto</button></div>
+  <div class="banner" style="border-style:solid"><span><b>NBR 5419:2026.</b> NG pela tabela municipal do Anexo F da Parte 2 (municípios de Mato Grosso do Sul incluídos; para outros estados, informe o valor). Probabilidades e perdas adotadas ficam listadas no memorial para conferência.</span><button class="btn sm" type="button" id="bt-spda-retirar">Retirar SPDA do projeto</button></div>
   <div id="spda-resumo"></div>
   <fieldset data-scope="spda"><legend>Estrutura e densidade de descargas</legend><div class="grade">
     ${fTxt('sp', 'nome', 'Estrutura', S.nome, { cls: 'w2' })}${fNum('sp', 'L', 'Comprimento L', S.L, { u: 'm' })}${fNum('sp', 'W', 'Largura W', S.W, { u: 'm' })}${fNum('sp', 'H', 'Altura H', S.H, { u: 'm' })}
     ${fSel('sp', 'cd', 'Localização relativa (CD)', S.cd, opSPDA(CD_LOC), { cls: 'w2' })}
-    ${fNum('sp', 'Ng', 'Densidade de descargas NG', S.Ng, { u: '/km²/ano', ph: 'Anexo F' })}${fTxt('sp', 'ngFonte', 'Fonte do NG', S.ngFonte, { cls: 'w2', ph: 'ex.: Anexo F — município de …' })}
+    ${fSel('sp', 'ngMun', `Município — Anexo F (${NG_ANEXO_F[S.ngUF] ? NG_ANEXO_F[S.ngUF].nome : 'UF'})`, S.ngMun, [['', 'Outro município — informar NG'], ...Object.entries((NG_ANEXO_F[S.ngUF] || { mun: {} }).mun).map(([k, v]) => [k, `${k} — NG ${v}`])], { cls: 'w2', struct: true })}
+    ${S.ngMun && NG_ANEXO_F[S.ngUF] && NG_ANEXO_F[S.ngUF].mun[S.ngMun] ? fInfo('Densidade de descargas NG', `${NG_ANEXO_F[S.ngUF].mun[S.ngMun]} /km²/ano`) + fChk('sp', 'ngTabela', 'Reproduzir a tabela do Anexo F do estado no memorial', S.ngTabela, { cls: 'w2' })
+      : fNum('sp', 'Ng', 'Densidade de descargas NG', S.Ng, { u: '/km²/ano', ph: 'Anexo F' }) + fTxt('sp', 'ngFonte', 'Fonte do NG', S.ngFonte, { cls: 'w2', ph: 'ex.: Anexo F — município de …' })}
   </div></fieldset>
   <fieldset data-scope="spda"><legend>Ocupação e perdas (vida humana e patrimônio)</legend><div class="grade">
     ${fSel('sp', 'ocup', 'Tipo de ocupação (LF)', S.ocup, opSPDA(OCUP_SPDA), { cls: 'w2' })}${fSel('sp', 'piso', 'Piso ou solo junto às descidas (rt)', S.piso, opSPDA(RT_PISO), { cls: 'w2' })}
@@ -7425,6 +7526,7 @@ function renderTabelas() {
       + h3t('Ângulo de proteção α (graus) pela altura do captor acima do plano de referência') + tabelaHTML(['Altura h (m)', ...nps.map(k => `NP ${k}`)], hs.map(h => [String(h), ...nps.map(k => { const a = anguloProtecao(h, NP_SPDA[k].r); return a == null ? '—' : nfmt(a, 1); })]))
       + h3t('Seções mínimas dos materiais (NBR 5419-3:2026)') + tabelaHTML(['Material', 'Captação e descidas', 'Aterramento'], [['Cobre', '35 mm²', '50 mm² (cabo de 7 ou 19 fios)'], ['Aço cobreado', '35 mm²', '50 mm²'], ['Alumínio', '70 mm²', 'não utilizar'], ['Alumínio cobreado', '70 mm²', '—'], ['Aço zincado a quente', '50 mm²', 'conforme a norma — não usar na transição concreto–solo'], ['Captor vertical maciço', '200 mm² (Ø 16 mm)', '—'], ['Captor vertical tubular', '100 mm², parede de 1,2 mm', '—']], false)
       + h3t('Comprimento mínimo do eletrodo l1 (arranjo B)') + tabelaHTML(['ρ (Ω·m)', 'NP I', 'NP II', 'NP III e IV'], [100, 500, 800, 1000, 1500, 2000, 3000].map(r => [String(r), nfmt(l1Aterr('I', r), 1), nfmt(l1Aterr('II', r), 1), nfmt(l1Aterr('III', r), 1)]))
+      + h3t('Densidade de descargas NG — Mato Grosso do Sul (Anexo F da NBR 5419-2:2026, descargas/km²/ano)') + (() => { const L = Object.entries(NG_ANEXO_F.MS.mun), m = Math.ceil(L.length / 2); return tabelaHTML(['Município', 'NG', 'Município', 'NG'], Array.from({ length: m }, (_, i) => [...(L[i] ? [esc(L[i][0]), String(L[i][1])] : ['', '']), ...(L[i + m] ? [esc(L[i + m][0]), String(L[i + m][1])] : ['', ''])]), true, 'nt'); })()
       + h3t('Distância de segurança s = ki × (kc / km) × l') + tabelaHTML(['Coeficiente', 'Valores'], [['ki', 'NP I: 0,08 · NP II: 0,06 · NP III e IV: 0,04'], ['kc', '1 descida: 1 · 2 descidas: 0,66 · 3 ou mais: 0,44'], ['km', 'ar: 1 · concreto ou alvenaria: 0,5']], false);
     nota = 'ABNT NBR 5419:2026. O ângulo de proteção é calculado pela equivalência de área com a esfera rolante, que reproduz as curvas da Parte 3; acima do raio da esfera só se aplicam a esfera rolante e as malhas. Distância entre descidas: valor típico, admitidos 20 % a mais. A edição de 2026 trocou "classe do SPDA" por "nível de proteção (NP)", manteve apenas o arranjo B (anel) no aterramento, equiparou o aço cobreado ao cobre e passou a verificar a eficácia do aterramento pela continuidade elétrica. As seções da tabela vêm de resumos técnicos da revisão; confira-as no texto oficial da ABNT. Inspeção: visual anual; completa a cada 3 anos (1 ano para explosivos, corrosão severa ou serviços essenciais).';
   } else if (REFTAB === 'ext') {

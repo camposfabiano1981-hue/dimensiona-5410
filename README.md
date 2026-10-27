@@ -185,7 +185,7 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
   - os níveis da NBR 5101 são os da edição 2018 (a edição 2024 usa as classes M, C e P, com requisitos de luminância) e os da EN 12464-2 são de referência; confirme na edição vigente e nas exigências da prefeitura ou da distribuidora;
   - os projetores do catálogo são genéricos e o modelo de intensidade é simétrico em torno do eixo de mira; para luminárias viárias assimétricas e projetos executivos, confirme com a fotometria do fabricante (IES/LDT) em software de cálculo.
 - **SPDA:**
-  - informe a densidade NG do Anexo F da NBR 5419-2:2026 para o município (a edição 2026 recalibrou os valores; o NG do exemplo é ilustrativo);
+  - a densidade NG vem da tabela municipal do Anexo F da NBR 5419-2:2026: os 79 municípios de Mato Grosso do Sul já estão cadastrados (o exemplo usa Campo Grande, NG = 30); para outros estados, informe o valor;
   - as probabilidades e perdas seguem as tabelas da Parte 2 e ficam listadas no memorial; os limites da frequência de danos (1 e 0,1 por ano) e as seções de materiais da revisão foram obtidos de resumos técnicos — confira-os no texto oficial da ABNT.
 - **Aterramento:**
   - a resistividade deve vir de medição em campo, de preferência em época seca;

@@ -74,7 +74,7 @@ function projetoExemplo() {
   const qtd = (ini, q) => { const x = proj.materiais.itens.find(m => m.desc.startsWith(ini)); if (x) x.qtd = q; };
   [['DPS classe II', 4], ['Barramento de neutro', 1], ['Barramento de proteção', 1], ['Caixa de embutir 4×2', 30], ['Caixa octogonal', 14], ['Tomada 2P+T 10 A', 18], ['Tomada 2P+T 20 A', 4],
     ['Interruptor simples 10 A', 8], ['Interruptor paralelo', 2], ['Saída de fio', 3], ['Barramento de equipotencialização', 1], ['Conector de emenda', 40], ['Fita isolante', 5], ['Anilhas', 1]].forEach(([i, q]) => qtd(i, q));
-  Object.assign(proj.spda, { ativo: true, nome: 'Residência unifamiliar térrea', L: 15, W: 8, H: 5.5, cd: 'menores', Ng: 10, ngFonte: 'valor ilustrativo — substitua pelo NG do Anexo F da NBR 5419-2:2026 para o município',
+  Object.assign(proj.spda, { ativo: true, nome: 'Residência unifamiliar térrea', L: 15, W: 8, H: 5.5, cd: 'menores', ngUF: 'MS', ngMun: 'Campo Grande',
     ocup: 'residencial', piso: 'ceramica', rp: 'manual', rf: 'normal', np: 'III', dps: 'auto', metodo: 'malha', matCapt: 'aluminio70', matAterr: 'cobre50', dParede: 1, prof: 0.5 });
   return proj;
 }

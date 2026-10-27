@@ -12,7 +12,7 @@ vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -98,7 +98,13 @@ test('SPDA — ângulo de proteção, análise de risco e projeto (NBR 5419:2026
   // risco do exemplo: componentes conferidos com as expressões da Parte 2
   const S = P.spda, c = K.spda, r = c.semProt, H = +S.H;
   perto(r.AD, S.L * S.W + 6 * H * (S.L + S.W) + Math.PI * 9 * H * H, 1e-6, 'área de exposição AD');
-  perto(r.ND, S.Ng * r.AD * 0.5 * 1e-6, 1e-12, 'ND');
+  // NG do Anexo F da NBR 5419-2:2026 (tabela municipal de Mato Grosso do Sul)
+  const MS = A.NG_ANEXO_F.MS.mun;
+  assert.equal(Object.keys(MS).length, 79, '79 municípios de MS');
+  assert.equal(MS['Campo Grande'], 30); assert.equal(MS['Ladário'], 16); assert.equal(MS['Bela Vista'], 30); assert.equal(MS['Três Lagoas'], 22);
+  assert.equal(c.ng.valor, 30, 'exemplo em Campo Grande'); assert.ok(c.ng.tabela && /Anexo F — Campo Grande\/MS/.test(c.ng.fonte));
+  assert.equal(A.ngSPDA({ ngUF: 'MS', ngMun: '', Ng: 12.5 }).valor, 12.5, 'NG informado quando o município não é escolhido');
+  perto(r.ND, 30 * r.AD * 0.5 * 1e-6, 1e-12, 'ND');
   perto(r.R1, r.RA + r.RB + r.RU + r.RV, 1e-15, 'R1 = RA + RB + RU + RV');
   perto(r.RA, r.ND * 1 * 1e-3 * 1e-2, 1e-15, 'RA = ND × PA × LA (cerâmica, sem medidas)');
   assert.ok(c.risco.okR1, 'medidas adotadas atendem ao risco tolerável');

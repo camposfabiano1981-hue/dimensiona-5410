@@ -9,11 +9,13 @@ function normalizarSPDA(s) {
   if (out.np !== 'auto' && PB_SPDA[out.np] == null) out.np = 'auto';
   if (out.dps !== 'auto' && PSPD_NIV[out.dps] == null) out.dps = 'auto';
   if (!['malha', 'franklin'].includes(out.metodo)) out.metodo = 'malha';
+  if (!NG_ANEXO_F[out.ngUF]) out.ngUF = 'MS';
+  if (out.ngMun && !NG_ANEXO_F[out.ngUF].mun[out.ngMun]) out.ngMun = '';
   out.linhas.forEach(l => { if (!CI_LIN[l.inst]) l.inst = 'aerea'; if (!CE_LIN[l.ce]) l.ce = 'urbano'; if (!CT_LIN[l.ct]) l.ct = 'bt'; if (!BLIND_LIN[l.blind]) l.blind = 'aereaSem'; if (!PLD_RS[l.rs]) l.rs = 'ate20'; if (!UW_LISTA.includes(+l.uw)) l.uw = 2.5; });
   return out;
 }
 const opSPDA = T => Object.entries(T).map(([k, v]) => [k, `${v[1]} (${fp(v[0])})`]);
-function efeitosSPDA(k) { return ['metodo', 'rhoFonte', 'patrimonio', 'np', 'natural'].includes(k); }
+function efeitosSPDA(k) { return ['metodo', 'rhoFonte', 'patrimonio', 'np', 'natural', 'ngMun'].includes(k); }
 function renderSPDA() {
   const S = PROJ.spda;
   const cab = `<div class="mem-bar"><div><h2 class="tit">SPDA — proteção contra descargas atmosféricas</h2><p class="sub" style="margin:0">ABNT NBR 5419:2026 — análise de risco (Parte 2), projeto do SPDA (Parte 3) e DPS na entrada das linhas (Parte 4).</p></div>
@@ -36,12 +38,14 @@ function renderSPDA() {
         ${l.blind === 'ligada' ? `<select data-k="rs" aria-label="Resistência da blindagem" style="margin-top:4px">${opts(Object.entries(PLD_RS).map(([k, v]) => [k, v[1]]), l.rs)}</select>` : ''}</td>
       <td><select data-k="uw" data-type="numsel" aria-label="Tensão suportável UW" style="min-width:84px">${opts(UW_LISTA.map(u => [u, `${nfmt(u, 1)} kV`]), l.uw)}</select></td></tr>`).join('');
   $('#tab-spda').innerHTML = cab + `
-  <div class="banner" style="border-style:solid"><span><b>NBR 5419:2026.</b> Use a densidade de descargas NG do Anexo F da Parte 2 para o município — a edição de 2026 recalibrou os valores. Probabilidades e perdas adotadas ficam listadas no memorial para conferência.</span><button class="btn sm" type="button" id="bt-spda-retirar">Retirar SPDA do projeto</button></div>
+  <div class="banner" style="border-style:solid"><span><b>NBR 5419:2026.</b> NG pela tabela municipal do Anexo F da Parte 2 (municípios de Mato Grosso do Sul incluídos; para outros estados, informe o valor). Probabilidades e perdas adotadas ficam listadas no memorial para conferência.</span><button class="btn sm" type="button" id="bt-spda-retirar">Retirar SPDA do projeto</button></div>
   <div id="spda-resumo"></div>
   <fieldset data-scope="spda"><legend>Estrutura e densidade de descargas</legend><div class="grade">
     ${fTxt('sp', 'nome', 'Estrutura', S.nome, { cls: 'w2' })}${fNum('sp', 'L', 'Comprimento L', S.L, { u: 'm' })}${fNum('sp', 'W', 'Largura W', S.W, { u: 'm' })}${fNum('sp', 'H', 'Altura H', S.H, { u: 'm' })}
     ${fSel('sp', 'cd', 'Localização relativa (CD)', S.cd, opSPDA(CD_LOC), { cls: 'w2' })}
-    ${fNum('sp', 'Ng', 'Densidade de descargas NG', S.Ng, { u: '/km²/ano', ph: 'Anexo F' })}${fTxt('sp', 'ngFonte', 'Fonte do NG', S.ngFonte, { cls: 'w2', ph: 'ex.: Anexo F — município de …' })}
+    ${fSel('sp', 'ngMun', `Município — Anexo F (${NG_ANEXO_F[S.ngUF] ? NG_ANEXO_F[S.ngUF].nome : 'UF'})`, S.ngMun, [['', 'Outro município — informar NG'], ...Object.entries((NG_ANEXO_F[S.ngUF] || { mun: {} }).mun).map(([k, v]) => [k, `${k} — NG ${v}`])], { cls: 'w2', struct: true })}
+    ${S.ngMun && NG_ANEXO_F[S.ngUF] && NG_ANEXO_F[S.ngUF].mun[S.ngMun] ? fInfo('Densidade de descargas NG', `${NG_ANEXO_F[S.ngUF].mun[S.ngMun]} /km²/ano`) + fChk('sp', 'ngTabela', 'Reproduzir a tabela do Anexo F do estado no memorial', S.ngTabela, { cls: 'w2' })
+      : fNum('sp', 'Ng', 'Densidade de descargas NG', S.Ng, { u: '/km²/ano', ph: 'Anexo F' }) + fTxt('sp', 'ngFonte', 'Fonte do NG', S.ngFonte, { cls: 'w2', ph: 'ex.: Anexo F — município de …' })}
   </div></fieldset>
   <fieldset data-scope="spda"><legend>Ocupação e perdas (vida humana e patrimônio)</legend><div class="grade">
     ${fSel('sp', 'ocup', 'Tipo de ocupação (LF)', S.ocup, opSPDA(OCUP_SPDA), { cls: 'w2' })}${fSel('sp', 'piso', 'Piso ou solo junto às descidas (rt)', S.piso, opSPDA(RT_PISO), { cls: 'w2' })}
