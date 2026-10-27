@@ -6,13 +6,13 @@ const assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const SRC = path.join(__dirname, '..', 'src');
-const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'spda', 'materiais', 'pictos', 'sample', 'memorial', 'diagramas', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'spdadoc', 'descritivo', 'memorias', 'export'];
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'spda', 'dps', 'materiais', 'pictos', 'sample', 'memorial', 'diagramas', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'spdadoc', 'dpsdoc', 'descritivo', 'memorias', 'export'];
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, construirMemorialDPS };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -22,6 +22,7 @@ const C = A.calcClima(P, K);
 K.energisa = E; K.clima = C;
 const T = A.calcAterramento(P, K); K.aterr = T;
 K.spda = A.calcSPDA(P, K);
+K.dps = A.calcDPS(P, K);
 const MT = A.calcMateriais(P, K); K.materiais = MT;
 const perto = (v, ref, tol, msg) => assert.ok(Math.abs(v - ref) <= tol, `${msg}: ${v} ≠ ${ref} ± ${tol}`);
 
@@ -117,6 +118,25 @@ test('SPDA — ângulo de proteção, análise de risco e projeto (NBR 5419:2026
   assert.ok(MT.auto.some(i => i.cat === 'spda'), 'materiais do SPDA no quantitativo');
   const B = A.construirMemorialSPDA(P, K);
   assert.ok(B.filter(b => b.t === 'fig').length >= 3 && B.some(b => b.t === 'ver'), 'memorial com figuras e verificações');
+});
+
+test('DPS — seleção por quadro (NBR 5410 6.3.5, NBR 5419-4:2026 e faixas de fabricantes)', () => {
+  assert.equal(A.uwTab31(127, 'II'), 1.5); assert.equal(A.uwTab31(127, 'IV'), 4); assert.equal(A.uwTab31(220, 'II'), 2.5); assert.equal(A.uwTab31(220, 'IV'), 6);
+  assert.equal(A.ucDPS(127), 175); assert.equal(A.ucDPS(220), 275);
+  const qm = K.dps.quadros.QM, qd = K.dps.quadros['QD-1'];
+  // entrada com SPDA NP III: classe I+II, 4+0 no TN-S, Iimp 12,5 kA por modo, condutores de 16 mm²
+  assert.equal(qm.classe, 'I+II'); assert.equal(qm.lig, 'pe'); assert.equal(qm.nPolos, 4);
+  perto(qm.Iimp, 12.5, 1e-9, 'Iimp'); assert.equal(qm.Smin, 16); perto(qm.Upf, qm.Up + qm.L, 1e-9, 'Up/f = Up + 1 kV/m × L');
+  assert.notEqual(qm.status, 'fail', qm.verifs.filter(v => v[0] === 'fail').map(v => v[1]).join(' | '));
+  // quadro de distribuição: classe II, Imáx pela exposição média, 4 mm²
+  assert.equal(qd.classe, 'II'); assert.equal(qd.Imax, 40); assert.ok(qd.In >= 5); assert.equal(qd.Smin, 4); assert.ok(qd.Up <= 1.5);
+  assert.notEqual(qd.status, 'fail', qd.verifs.filter(v => v[0] === 'fail').map(v => v[1]).join(' | '));
+  // esquema TT: ligação n+1 e centelhador N–PE com a soma das correntes
+  const P2 = JSON.parse(JSON.stringify(P)); P2.params.aterramento = 'TT';
+  const K2 = A.calcularProjeto(P2); K2.aterr = A.calcAterramento(P2, K2); K2.spda = A.calcSPDA(P2, K2); const d2 = A.calcDPS(P2, K2);
+  assert.equal(d2.quadros.QM.lig, 'npe'); perto(d2.quadros.QM.IimpNPE, 50, 1e-9, 'Iimp N–PE');
+  const B = A.construirMemorialDPS(P, K);
+  assert.ok(B.filter(b => b.t === 'ver').length >= 10, 'verificações no memorial');
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

@@ -38,6 +38,7 @@ const DOC_CSS = `
 .doc .d-kv{width:100%;border-collapse:collapse;font-size:9pt;margin:4px 0 6px}
 .doc .d-kv th{width:14%;font-weight:600;color:var(--doc-muted);text-align:left;padding:2px 8px 2px 0;vertical-align:top;white-space:nowrap}
 .doc .d-kv td{padding:2px 14px 2px 0;vertical-align:top;width:36%}
+@media (max-width:600px){.doc .d-kv th{white-space:normal}.doc .d-kv td{padding-right:8px;overflow-wrap:anywhere}}
 .doc ul{margin:0 0 10px;padding-left:20px}.doc li{margin:2px 0}
 .doc .d-ver{margin:2px 0 4px;font-weight:500}
 .doc .d-ver.ok{color:var(--doc-ok)}.doc .d-ver.fail{color:var(--doc-fail)}

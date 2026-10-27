@@ -44,6 +44,12 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
   - colunas de ligação, FCA, FCT e fator de potência;
   - exportação para Excel com fórmulas.
 
+**Proteção contra surtos — DPS (NBR 5410 6.3.5 e NBR 5419-4:2026)**
+- **Por quadro:** classe (I+II na entrada com SPDA ou exposição alta; II nos quadros), ligação pelo esquema de aterramento (n+0 ao PE ou n+1 com centelhador N–PE; TT a montante do DR em n+1), Uc pela Tabela 49 e valor comercial (175 V em 127/220 V; 275 V em 220/380 V).
+- **Correntes:** In ≥ 5 kA; Imáx pela exposição segundo as faixas usuais de fabricantes (20, 40 ou 65 kA); Iimp ≥ 12,5 kA ou o do nível do SPDA (25 / 18,75 / 12,5 kA por polo; N–PE com a soma).
+- **Verificações:** Up ≤ categoria II da Tabela 31, nível efetivo Up/f = Up + ΔU (1 kV/m na classe I) contra a suportabilidade dos equipamentos, condutores de ligação (≤ 0,5 m; 4 ou 16 mm²), retaguarda e Isccr do fabricante, coordenação entre estágios e indicação de DPS classe III.
+- **Saídas:** memória própria (PDF, Word e HTML) anexável ao memorial descritivo; especificação nos diagramas unifilar e multifilar (com o desenho da ligação n+1) e na lista de materiais.
+
 **SPDA — proteção contra descargas atmosféricas (ABNT NBR 5419:2026)**
 - **Análise de risco (Parte 2):** áreas de exposição AD e AM, eventos perigosos ND, NM, NL e NI, componentes RA, RB, RC, RM, RU, RV, RW e RZ, risco R1 (vida humana), R3 (patrimônio cultural) e frequência de danos F aos sistemas internos, novidade da edição 2026 (tolerável 1 por ano, ou 0,1 para sistemas críticos).
 - **Escolha das medidas:** tabela de combinações nível de proteção × DPS, com o nível mínimo exigido; com SPDA, os DPS da entrada ficam compatíveis com o mesmo nível.
@@ -184,8 +190,9 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 - **Iluminação externa:**
   - os níveis da NBR 5101 são os da edição 2018 (a edição 2024 usa as classes M, C e P, com requisitos de luminância) e os da EN 12464-2 são de referência; confirme na edição vigente e nas exigências da prefeitura ou da distribuidora;
   - os projetores do catálogo são genéricos e o modelo de intensidade é simétrico em torno do eixo de mira; para luminárias viárias assimétricas e projetos executivos, confirme com a fotometria do fabricante (IES/LDT) em software de cálculo.
+- **DPS:** confira na sua NBR 5410 os valores das Tabelas 31 e 49 e dos itens 6.3.5.2 usados no motor, e informe Up, Iimp, retaguarda e Isccr do produto escolhido (os valores-padrão são típicos de catálogo).
 - **SPDA:**
-  - a densidade NG vem da tabela municipal do Anexo F da NBR 5419-2:2026: os 79 municípios de Mato Grosso do Sul já estão cadastrados (o exemplo usa Campo Grande, NG = 30); para outros estados, informe o valor;
+  - a densidade NG vem da tabela municipal do Anexo F da NBR 5419-2:2026: os 79 municípios de Mato Grosso do Sul estão no motor de cálculo (o memorial cita só o município escolhido; o exemplo usa Campo Grande, NG = 30); para outros estados, informe o valor;
   - as probabilidades e perdas seguem as tabelas da Parte 2 e ficam listadas no memorial; os limites da frequência de danos (1 e 0,1 por ano) e as seções de materiais da revisão foram obtidos de resumos técnicos — confira-os no texto oficial da ABNT.
 - **Aterramento:**
   - a resistividade deve vir de medição em campo, de preferência em época seca;
@@ -212,6 +219,8 @@ src/clima.js          Carga térmica: clima, sol, condução periódica, psicrom
 src/aterr.js          Aterramento: solo (Wenner, duas camadas), hastes, cabo, malha, toque e passo
 src/spda.js           SPDA: análise de risco (NBR 5419-2) e projeto (NBR 5419-3 e 5419-4)
 src/spdadoc.js        SPDA: planta, elevação, gráfico de risco e memorial
+src/dps.js            DPS: seleção e verificações por quadro (NBR 5410 6.3.5, NBR 5419-4)
+src/dpsdoc.js         DPS: memória de cálculo
 src/pictos.js         Desenhos da Tabela 33 e cortes de eletrodutos
 src/memorial.js       Memória de cálculo NBR 5410
 src/diagramas.js      Diagramas unifilar e multifilar dos quadros

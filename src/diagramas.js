@@ -7,8 +7,6 @@
    ================================================================ */
 const DG_COR = { ink: '#1b1f23', mut: '#5b6670', line: '#9aa6b0', face: '#ffffff', acc: '#0b5a70' };
 const COR_COND = { A: '#1f1f1f', B: '#c62828', C: '#ffffff', N: '#3b8ed8', PE: '#2e9d4f' };
-const UC_DPS = [175, 275, 320, 385, 440, 460, 600];
-const ucDPS = U0 => UC_DPS.find(v => v >= 1.1 * U0) || Math.ceil(1.1 * U0);
 const DIAG_UNI = 15, DIAG_MULTI = 12;
 const escD = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const cortaD = (s, n) => (s = String(s ?? '')).length > n ? s.slice(0, Math.max(1, n - 1)) + '…' : s;
@@ -32,7 +30,8 @@ function dadosQuadro(proj, calc, nome) {
   const sist = { monofasico: 'monofásico', bifasico: 'bifásico', trifasico: 'trifásico' }[P.fornecimento] || '';
   return { nome, desc: Qd.desc || '', usadas: q.usadas, cs, ent, q,
     dg: { In: +Qd.dgIn > 0 ? +Qd.dgIn : ent.In, polos: q.usadas.length },
-    dps: Qd.dps !== false ? (!alim && calc.spda && calc.spda.projeto ? { classe: 'I+II', Uc: ucDPS(P.U0), In: 20, Iimp: calc.spda.projeto.Iimp } : { classe: 'II', Uc: ucDPS(P.U0), In: 20 }) : null,
+    dps: (() => { const x = calc.dps && calc.dps.quadros[nome]; if (x) return x.ativo ? { classe: x.classe, Uc: x.Uc, UcN: x.UcN, In: x.In, Iimp: x.classe === 'I+II' ? x.Iimp : null, Up: x.Up, lig: x.lig, ligTxt: x.ligTxt } : null;
+      return Qd.dps !== false ? { classe: 'II', Uc: ucDPS(P.U0), In: 20, Up: P.U0 <= 150 ? 1.2 : 1.5, lig: 'pe' } : null; })(),
     reserva: reservaTab59(cs.length), sistemaTxt: `${P.U0}/${P.U} V · ${sist} · esquema ${P.aterramento} · ${cs.length} circuito${cs.length === 1 ? '' : 's'}` };
 }
 
@@ -76,7 +75,8 @@ function unifilarSVG(d, ini = 0, fim = d.cs.length) {
     g += lD(xb, 132, xb, 156);
     if (d.dps) {
       g += `<circle cx="${xb}" cy="166" r="2.8" fill="${DG_COR.ink}"/>` + lD(xb, 166, xb - 52, 166) + lD(xb - 52, 166, xb - 52, 178) + dpsD(xb - 52, 178) + lD(xb - 52, 200, xb - 52, 210) + terraD(xb - 52, 210);
-      g += tD(xb - 12, 236, `DPS classe ${d.dps.classe}`, { fs: 9.5, anc: 'end' }) + tD(xb - 12, 248, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${d.dps.In} kA`, { fs: 9, anc: 'end', cor: DG_COR.mut }) + tD(xb - 12, 260, `${d.usadas.length}F + N → PE`, { fs: 9, anc: 'end', cor: DG_COR.mut });
+      g += tD(xb - 12, 236, `DPS classe ${d.dps.classe}`, { fs: 9.5, anc: 'end' }) + tD(xb - 12, 248, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, anc: 'end', cor: DG_COR.mut })
+        + tD(xb - 12, 260, `${d.dps.lig === 'npe' ? `${d.usadas.length}+1 (N–PE centelhador)` : `${d.usadas.length + 1}+0 → PE`}${d.dps.Up ? ` · Up ${nfmt(d.dps.Up, 1)} kV` : ''}`, { fs: 9, anc: 'end', cor: DG_COR.mut });
     }
   }
   g += lD(xb, ini ? 56 : 156, xb, yEnd, { w: 5 }) + (ini ? lD(xb, 50, xb, 60, { w: 5, dash: '3 3' }) : '');
@@ -134,10 +134,20 @@ function multifilarSVG(d, ini = 0, fim = Math.min(d.cs.length, DIAG_MULTI)) {
   });
   g += lD(63, yb[fases[0]] - 5, 63, yb[fases[fases.length - 1]] - 4, { w: 1, dash: '2 2' }) + tD(64, yb[fases[0]] - 13, d.dg.In ? `DG ${d.dg.polos}P ${d.dg.In} A` : 'DG', { fs: 9.5, anc: 'middle' });
   if (d.dps) {
-    const vivos = [...fases, 'N'], yD = yBot + 26, yC = yD + 34, xs = vivos.map((k, i) => 124 + i * 14);
-    vivos.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
-    g += fioD(114, yC, xs[xs.length - 1], yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
-    g += tD(110, yC + 18, `DPS classe ${d.dps.classe}`, { fs: 9.5 }) + tD(110, yC + 30, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${d.dps.In} kA`, { fs: 9, cor: DG_COR.mut });
+    const vivos = [...fases, 'N'], yD = yBot + 26, xs = vivos.map((k, i) => 124 + i * 14);
+    let yC = yD + 34;
+    if (d.dps.lig === 'npe') {
+      // n+1: fases ao neutro por varistores; neutro ao PE por centelhador
+      const xN = xs[xs.length - 1], yG = yC + 6;
+      fases.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
+      g += lD(xs[0], yC, xN, yC) + fioD(xN, yb.N, xN, yC, 'N') + noD(xN, yb.N, 'N') + `<circle cx="${xN}" cy="${yC}" r="2.6" fill="${DG_COR.ink}"/>`;
+      g += `<rect x="${xN - 7}" y="${yG}" width="14" height="20" fill="${DG_COR.face}" stroke="${DG_COR.ink}" stroke-width="1.3"/><polygon points="${xN - 3},${yG + 6} ${xN + 3},${yG + 6} ${xN},${yG + 10}" fill="${DG_COR.ink}"/><polygon points="${xN - 3},${yG + 15} ${xN + 3},${yG + 15} ${xN},${yG + 11}" fill="${DG_COR.ink}"/>`;
+      yC = yG + 30; g += lD(xN, yG + 20, xN, yC) + fioD(114, yC, xN, yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
+    } else {
+      vivos.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
+      g += fioD(114, yC, xs[xs.length - 1], yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
+    }
+    g += tD(110, yC + 18, `DPS classe ${d.dps.classe} · ${d.dps.lig === 'npe' ? `${fases.length}+1` : `${fases.length + 1}+0`}`, { fs: 9.5 }) + tD(110, yC + 30, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, cor: DG_COR.mut });
   }
   // legenda das cores
   [['A', 'fase A — preto'], ['B', 'fase B — vermelho'], ['C', 'fase C — branco'], ['N', 'neutro — azul-claro'], ['PE', 'proteção — verde-amarelo']].filter(([k]) => cond.includes(k)).forEach(([k, l], i) => {
@@ -212,7 +222,7 @@ function construirDiagramas(proj, calc, opt = {}) {
   Q.forEach(q => {
     const d = dadosQuadro(proj, calc, q.q), s = sec(`Quadro ${q.q}${d.desc ? ' — ' + d.desc : ''}`);
     B.push({ t: 'kv4', rows: [['Alimentação', [d.ent.txt, d.ent.cabo].filter(Boolean).join(' — ')], ['Dispositivo geral', d.dg.In ? `Disjuntor ${d.dg.polos}P ${d.dg.In} A` : 'a definir'],
-      ['DPS', d.dps ? `Classe ${d.dps.classe}, ${d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA (10/350 µs), ` : ''}Uc ${d.dps.Uc} V, In ${d.dps.In} kA — ${d.usadas.length} fase(s) e neutro ao PE` : 'não previsto neste quadro'], ['Demanda', `${f0(q.dem.S)} VA${q.dem.manual ? ' (informada)' : ` — FD ${f0(q.dem.fd * 100)} %`}`]].reduce((a, r, i) => (i % 2 ? a[a.length - 1].push(...r) : a.push([...r]), a), []) });
+      ['DPS', d.dps ? `Classe ${d.dps.classe}, ${d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA (10/350 µs), ` : ''}Uc ${d.dps.Uc} V, In ${nfmt(d.dps.In, 0)} kA${d.dps.Up ? `, Up ≤ ${nfmt(d.dps.Up, 1)} kV` : ''} — ${d.dps.ligTxt || `${d.usadas.length} fase(s) e neutro ao PE`}` : 'não previsto neste quadro'], ['Demanda', `${f0(q.dem.S)} VA${q.dem.manual ? ' (informada)' : ` — FD ${f0(q.dem.fd * 100)} %`}`]].reduce((a, r, i) => (i % 2 ? a[a.length - 1].push(...r) : a.push([...r]), a), []) });
     const uni = partesDiagrama(d, 'uni'), multi = partesDiagrama(d, 'multi'), alt = svg => Math.min(250, 172 * arDe(svg) + 22);
     B.push({ t: 'h2', text: `${s}.1 Diagrama unifilar`, keep: alt(uni[0]) });
     uni.forEach((svg, i, l) => B.push(figDiag(svg, `Diagrama unifilar do quadro ${q.q}${l.length > 1 ? ` — parte ${i + 1} de ${l.length}` : ''}.`)));

@@ -2,7 +2,7 @@
    INTERFACE
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'dps', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
 const QDIAG = {};
 let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, DESC_ABERTO = false, MEMSEL = 'descritivo', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
 const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
@@ -67,6 +67,7 @@ function normalizarProjeto(p) {
   out.clima = normalizarClima(p.clima);
   out.aterr = normalizarAterr(p.aterr);
   out.spda = normalizarSPDA(p.spda);
+  out.dps = normalizarDPS(p.dps);
   out.materiais = normalizarMateriais(p.materiais);
   out.descritivo = normalizarDescritivo(p.descritivo, out.params.edificacao);
   out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
@@ -88,7 +89,7 @@ function carregar() {
 }
 
 /* ---------- ciclo de atualização ---------- */
-function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.spda) PROJ.spda = spdaPadrao(); CALC.spda = calcSPDA(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
+function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.spda) PROJ.spda = spdaPadrao(); CALC.spda = calcSPDA(PROJ, CALC); if (!PROJ.dps) PROJ.dps = dpsPadrao(); CALC.dps = calcDPS(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
 function circSel() { return PROJ.circuitos.find(c => c.id === SEL) || null; }
 function ambSel() { return (PROJ.lumi || []).find(a => a.id === LSEL) || null; }
 function mudou(struct) { recalc(); salvarLocal(); renderCabecalho(); if (struct) renderAba(); else renderParcial(); }
@@ -129,6 +130,8 @@ function onCampo(ev, isChange) {
   else if (sc === 'descinf') { const D = PROJ.descritivo, inf = box.dataset.inf; if (k === 'cod') D.influencias[inf] = v; else { D.medidas = D.medidas || {}; if (v) D.medidas[inf] = v; else delete D.medidas[inf]; } }
   else if (sc === 'desclocal') { const l = PROJ.descritivo.locais[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
+  else if (sc === 'dpsg') { PROJ.dps[k] = v; }
+  else if (sc === 'dpsq') { const q = PROJ.quadros[box.dataset.q] = PROJ.quadros[box.dataset.q] || {}; q[k] = v; }
   else if (sc === 'spda') { PROJ.spda[k] = v; struct = efeitosSPDA(k) || struct; }
   else if (sc === 'spdalin') { const l = PROJ.spda.linhas[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'aarr') { const a = arrSel(); if (!a) return; a[k] = v; struct = efeitosArranjo(a, k) || struct; }
@@ -239,7 +242,7 @@ function irPara(tab) {
   ABAS.forEach(a => { $('#tab-' + a).hidden = a !== TAB; });
   renderCabecalho(); renderAba();
 }
-function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, spda: renderSPDA, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
+function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, spda: renderSPDA, dps: renderDPS, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
 function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
@@ -249,6 +252,7 @@ function renderParcial() {
   else if (TAB === 'clima') atualizarClimaParcial();
   else if (TAB === 'aterr') atualizarAterrParcial();
   else if (TAB === 'spda') renderSPDARes();
+  else if (TAB === 'dps') atualizarDPSParcial();
   else if (TAB === 'materiais') renderMatResumo();
   else if (TAB === 'memoria') { clearTimeout(renderParcial._t); renderParcial._t = setTimeout(() => { const f = $('#folha'); if (f && TAB === 'memoria') f.innerHTML = renderHTMLDoc(docAtual(MEMSEL).blocos); }, 400); }
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
@@ -874,6 +878,12 @@ function renderTabelas() {
       + h3t('Tabela 14 — solda a transformador, raios X e galvanização') + tabelaHTML(['Equipamento', 'Fatores'], [['Solda a arco e galvanização', '1º maior 100 % · 2º maior 70 % · 3º maior 40 % · demais 30 %'], ['Solda a resistência', 'maior 100 % · demais 60 %'], ['Raios X', 'maior 100 % · demais 70 %']], false)
       + h3t('Tabela 16 — categorias de atendimento, 220/127 V') + cat(CAT_T16) + h3t('Tabela 21 — categorias de atendimento, 254/127 V (rede monofásica)') + cat(CAT_T21);
     nota = `Energisa ${NDU001_VER}. D (kVA) = (d1 + … + d7) / 0,92. Tipos M e B enquadrados pela carga instalada (kW); tipo T pela demanda (kVA). Valores "a (b)": cabo embutido (subterrâneo). Disjuntor dimensionado para o limite superior da faixa. A Tabela 16 vale para EAC, EMR, EMS, EMT, ERO, ESE e ESS. As tabelas da NDU 003 (agrupamentos e edifícios) são informadas na aba Demanda Energisa.`;
+  } else if (REFTAB === 'dps') {
+    corpo = h3t('Suportabilidade a impulso exigível — Tabela 31 da NBR 5410 (kV)', 0) + tabelaHTML(['Tensão nominal', 'IV — origem', 'III — distribuição', 'II — utilização', 'I — especialmente protegidos'], UW_TAB31.map(([, s, v]) => [s, ...v.map(x => nfmt(x, 1))]))
+      + h3t('Tensão de operação contínua mínima Uc — Tabela 49') + tabelaHTML(['Modo de proteção', 'TN-S / TN-C-S', 'TT'], [['Fase–neutro', '1,1 × U0', '1,1 × U0'], ['Fase–PE', '1,1 × U0', '1,1 × U0 (a jusante do DR)'], ['Neutro–PE', 'U0', 'U0 (centelhador, ligação n+1 a montante do DR)']], false)
+      + h3t('Correntes de descarga') + tabelaHTML(['Parâmetro', 'Critério'], [['In (8/20 µs) — classe II', '≥ 5 kA por modo (NBR 5410)'], ['Iimp (10/350 µs) — classe I', '≥ 12,5 kA por modo; com SPDA: NP I 25 kA · NP II 18,75 kA · NP III e IV 12,5 kA (3F+N)'], ['Iimp N–PE na ligação n+1', 'soma dos modos: NP I 100 kA · NP II 75 kA · NP III e IV 50 kA'], ...Object.values(EXPO_DPS).map(([v, t]) => [`Imáx classe II — ${t.split(' — ')[0].toLowerCase()}`, `${v} kA · ${t.split(' — ')[1]}`])], false)
+      + h3t('Instalação') + tabelaHTML(['Item', 'Critério'], [['Condutores de ligação', 'comprimento total ≤ 0,5 m; ligação em V quando maior'], ['Seção mínima', '4 mm² Cu; 16 mm² Cu para DPS classe I ou estrutura com SPDA'], ['Nível efetivo', 'Up/f = Up + ΔU; ΔU ≈ 1 kV/m na classe I (IEC 62305-4)'], ['Retaguarda', 'fusível ou disjuntor máximo indicado pelo fabricante'], ['Coordenação', 'DPS declarados coordenados pelo fabricante ou distância entre estágios conforme o catálogo']], false);
+    nota = 'NBR 5410:2004 (vigente; revisão em andamento) e NBR 5419-4:2026. As faixas de Imáx por exposição e os valores de Iimp por polo seguem catálogos de fabricantes do mercado (ex.: DEHN, Clamper, Schneider, Finder, MarGirius). Confirme os valores da Tabela 31, da Tabela 49 e dos itens 6.3.5.2 no seu exemplar da norma, e os dados de Up, retaguarda e Isccr na ficha técnica do produto escolhido.';
   } else if (REFTAB === 'spda') {
     const nps = ['I', 'II', 'III', 'IV'], hs = [2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
     corpo = tabelaHTML(['Nível de proteção', 'Esfera rolante (m)', 'Malha (m)', 'Descidas e anéis (m)', 'ki', 'Corrente de pico (kA)', 'PB', 'PEB / PSPD'], nps.map(k => { const P = NP_SPDA[k]; return [`NP ${k}`, String(P.r), `${P.malha} × ${P.malha}`, String(P.desc), fp(P.ki), String(P.Ip), fp(P.PB), fp(PSPD_NIV[k])]; }))

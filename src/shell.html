@@ -212,7 +212,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 .verif{list-style:none;margin:0;padding:8px 14px 12px;display:grid;gap:6px;font-size:13px}
 .verif li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px}
 .verif li b{font-family:var(--f-mono)}
-.verif li.ok::before{content:"✓";color:var(--ok);font-weight:700}.verif li.fail::before{content:"✗";color:var(--fail);font-weight:700}.verif li.info::before{content:"i";color:var(--muted);font:italic 700 13px Georgia,serif;text-align:center}
+.verif li.warn::before{content:"!";color:var(--warn);font-weight:700;text-align:center}.verif li.ok::before{content:"✓";color:var(--ok);font-weight:700}.verif li.fail::before{content:"✗";color:var(--fail);font-weight:700}.verif li.info::before{content:"i";color:var(--muted);font:italic 700 13px Georgia,serif;text-align:center}
 
 /* quadros */
 .quadro{border:1px solid var(--line);background:var(--sheet);border-radius:var(--r);margin-bottom:18px;min-width:0}
@@ -297,6 +297,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <section class="painel" id="tab-eletrodutos" role="region" hidden></section>
     <section class="painel" id="tab-eletrocalhas" role="region" hidden></section>
     <section class="painel" id="tab-quadros" role="region" hidden></section>
+    <section class="painel" id="tab-dps" role="region" hidden></section>
     <section class="painel" id="tab-energisa" role="region" hidden></section>
     <section class="painel" id="tab-lumi" role="region" hidden></section>
     <section class="painel" id="tab-clima" role="region" hidden></section>

@@ -102,14 +102,12 @@ function materiaisAuto(proj, calc) {
     const std = MODULOS_STD.find(x => x >= n) || n;
     add(`quad|${q.q}`, 'quad', `Quadro de distribuição ${q.q}${(proj.quadros[q.q] || {}).desc ? ' (' + proj.quadros[q.q].desc + ')' : ''} — ${std} módulos DIN, com barramentos de fase, neutro e proteção; ${q.cs.length} circuitos + reserva para ${res} circuitos (Tabela 59)`, 'un', 'ABNT NBR IEC 61439-3', 1, q.q);
   });
-  // DPS em cada quadro (fases e neutro ao PE): classe I+II no quadro de entrada quando há SPDA (NBR 5419-4)
+  // DPS de cada quadro, pelo motor de proteção contra surtos (NBR 5410 6.3.5 e NBR 5419-4)
   const ps = calc.spda && calc.spda.projeto;
-  Object.values(calc.quadros).forEach(q => {
-    if (!q.cs.length || (proj.quadros[q.q] || {}).dps === false) return;
-    const uc = ucDPS(proj.params.U0);
-    if (ps && !q.alim) add(`dps|I|${uc}|${ps.Iimp}`, 'prot', `DPS classe I+II — Uc ${uc} V, Iimp ${nfmt(ps.Iimp, 1)} kA (10/350 µs), In 20 kA`, 'un', 'ABNT NBR IEC 61643-11; NBR 5419-4', q.usadas.length + 1, q.q);
-    else add(`dps|II|${uc}`, 'prot', `DPS classe II — Uc ${uc} V, In 20 kA, Imáx 40 kA`, 'un', 'ABNT NBR IEC 61643-11', q.usadas.length + 1, q.q);
-  });
+  if (calc.dps) {
+    Object.values(calc.dps.quadros).filter(r => r.ativo).forEach(r => r.materiais.forEach(([d, q, u, n]) => add(`${/condutor/i.test(d) ? 'dpscond' : /retaguarda/i.test(d) ? 'dpsback' : 'dps'}|${d}`, 'prot', d, u, n, q, r.q)));
+    if (calc.dps.classe3) add(`dps|III|${calc.dps.classe3.Uc}`, 'prot', `DPS classe III junto ao equipamento sensível — Uc ${calc.dps.classe3.Uc} V`, 'un', 'ABNT NBR IEC 61643-11', calc.dps.classe3.n, 'equipamentos sensíveis');
+  }
   // SPDA (NBR 5419-3)
   if (ps) ps.materiais.forEach(([d, q, u, n]) => add(`spda|${d}`, 'spda', d, u, n, q, 'SPDA'));
   // eletrodutos

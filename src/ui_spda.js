@@ -44,7 +44,7 @@ function renderSPDA() {
     ${fTxt('sp', 'nome', 'Estrutura', S.nome, { cls: 'w2' })}${fNum('sp', 'L', 'Comprimento L', S.L, { u: 'm' })}${fNum('sp', 'W', 'Largura W', S.W, { u: 'm' })}${fNum('sp', 'H', 'Altura H', S.H, { u: 'm' })}
     ${fSel('sp', 'cd', 'Localização relativa (CD)', S.cd, opSPDA(CD_LOC), { cls: 'w2' })}
     ${fSel('sp', 'ngMun', `Município — Anexo F (${NG_ANEXO_F[S.ngUF] ? NG_ANEXO_F[S.ngUF].nome : 'UF'})`, S.ngMun, [['', 'Outro município — informar NG'], ...Object.entries((NG_ANEXO_F[S.ngUF] || { mun: {} }).mun).map(([k, v]) => [k, `${k} — NG ${v}`])], { cls: 'w2', struct: true })}
-    ${S.ngMun && NG_ANEXO_F[S.ngUF] && NG_ANEXO_F[S.ngUF].mun[S.ngMun] ? fInfo('Densidade de descargas NG', `${NG_ANEXO_F[S.ngUF].mun[S.ngMun]} /km²/ano`) + fChk('sp', 'ngTabela', 'Reproduzir a tabela do Anexo F do estado no memorial', S.ngTabela, { cls: 'w2' })
+    ${S.ngMun && NG_ANEXO_F[S.ngUF] && NG_ANEXO_F[S.ngUF].mun[S.ngMun] ? fInfo('Densidade de descargas NG', `${NG_ANEXO_F[S.ngUF].mun[S.ngMun]} /km²/ano`)
       : fNum('sp', 'Ng', 'Densidade de descargas NG', S.Ng, { u: '/km²/ano', ph: 'Anexo F' }) + fTxt('sp', 'ngFonte', 'Fonte do NG', S.ngFonte, { cls: 'w2', ph: 'ex.: Anexo F — município de …' })}
   </div></fieldset>
   <fieldset data-scope="spda"><legend>Ocupação e perdas (vida humana e patrimônio)</legend><div class="grade">

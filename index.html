@@ -218,7 +218,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
 .verif{list-style:none;margin:0;padding:8px 14px 12px;display:grid;gap:6px;font-size:13px}
 .verif li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px}
 .verif li b{font-family:var(--f-mono)}
-.verif li.ok::before{content:"✓";color:var(--ok);font-weight:700}.verif li.fail::before{content:"✗";color:var(--fail);font-weight:700}.verif li.info::before{content:"i";color:var(--muted);font:italic 700 13px Georgia,serif;text-align:center}
+.verif li.warn::before{content:"!";color:var(--warn);font-weight:700;text-align:center}.verif li.ok::before{content:"✓";color:var(--ok);font-weight:700}.verif li.fail::before{content:"✗";color:var(--fail);font-weight:700}.verif li.info::before{content:"i";color:var(--muted);font:italic 700 13px Georgia,serif;text-align:center}
 
 /* quadros */
 .quadro{border:1px solid var(--line);background:var(--sheet);border-radius:var(--r);margin-bottom:18px;min-width:0}
@@ -305,6 +305,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;
     <section class="painel" id="tab-eletrodutos" role="region" hidden></section>
     <section class="painel" id="tab-eletrocalhas" role="region" hidden></section>
     <section class="painel" id="tab-quadros" role="region" hidden></section>
+    <section class="painel" id="tab-dps" role="region" hidden></section>
     <section class="painel" id="tab-energisa" role="region" hidden></section>
     <section class="painel" id="tab-lumi" role="region" hidden></section>
     <section class="painel" id="tab-clima" role="region" hidden></section>
@@ -2588,7 +2589,7 @@ function linhaSPDA(tipo = 'energia') {
   return { id: uid(), nome: tipo === 'energia' ? 'Linha de energia' : 'Linha de telecomunicações', tipo, ativa: true, inst: tipo === 'energia' ? 'aerea' : 'aerea', LL: 1000, ce: 'urbano', ct: 'bt', blind: tipo === 'energia' ? 'neutro' : 'aereaSem', rs: 'ate20', uw: 2.5 };
 }
 function spdaPadrao() {
-  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', ngUF: 'MS', ngMun: '', ngTabela: true, Ng: null, ngFonte: '',
+  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', ngUF: 'MS', ngMun: '', Ng: null, ngFonte: '',
     ocup: 'residencial', piso: 'concreto', rp: 'nenhuma', rf: 'normal', hz: 'nenhum', nzNt: 100, tz: 8760, vida: 'nao', patrimonio: false, czCt: 100, critico: false,
     linhas: [linhaSPDA('energia'), linhaSPDA('telecom')],
     np: 'auto', dps: 'auto', pta: 'nenhuma', ptu: 'nenhuma', ks3: 'semCuidado', wm: null,
@@ -2756,6 +2757,103 @@ function calcSPDA(proj, calc) {
 }
 
 /* ================================================================
+   DPS — PROTEÇÃO CONTRA SURTOS
+   ABNT NBR 5410:2004 (6.3.5, Tabelas 31 e 49), ABNT NBR 5419-4:2026,
+   ABNT NBR IEC 61643-11 / IEC 61643-12, IEC 62305-4 e critérios usuais
+   de catálogos de fabricantes (Imáx por exposição, Iimp por nível de proteção)
+   ================================================================ */
+const UC_DPS = [175, 275, 320, 385, 440, 460, 600];
+const ucDPS = U0 => UC_DPS.find(v => v >= 1.1 * U0 - 1e-9) || Math.ceil(1.1 * U0);
+/* suportabilidade a impulso exigível (Tabela 31): [U0 máx, sistemas, [IV, III, II, I] kV] */
+const UW_TAB31 = [[150, '115–230 / 120–240 / 127–220 V', [4, 2.5, 1.5, 0.8]], [300, '220/380 / 230/400 / 277/480 V', [6, 4, 2.5, 1.5]], [600, '400/690 V', [8, 6, 4, 2.5]], [Infinity, '1 000 V', [12, 8, 6, 4]]];
+const CAT_UW = { IV: 0, III: 1, II: 2, I: 3 };
+const CAT_UW_TXT = { IV: 'IV — origem da instalação', III: 'III — distribuição e circuitos terminais', II: 'II — equipamentos de utilização', I: 'I — equipamentos especialmente protegidos (eletrônicos sensíveis)' };
+const uwTab31 = (U0, cat) => UW_TAB31.find(x => U0 <= x[0])[2][CAT_UW[cat]];
+/* exposição a surtos: faixas usuais de catálogos de fabricantes para DPS classe II (Imáx 8/20 µs) */
+const EXPO_DPS = {
+  baixa: [20, 'Baixa — área urbana central, entorno com edificações mais altas ou protegidas por SPDA, linhas subterrâneas'],
+  media: [40, 'Média — periferia urbana, poucas edificações protegidas no entorno'],
+  alta: [65, 'Alta — área rural, edificação isolada ou em elevação, linha aérea longa']
+};
+const LIG_DPS = { auto: 'Pelo esquema de aterramento', pe: 'Fases e neutro ao PE (n+0)', npe: 'Fases ao neutro e centelhador N–PE (n+1)' };
+function dpsPadrao() { return { exposicao: 'media', catEq: 'II', nSens: 0 }; }
+
+function calcDPS(proj, calc) {
+  const P = proj.params, D = { ...dpsPadrao(), ...(proj.dps || {}) }, ps = calc.spda && calc.spda.projeto, out = { quadros: {}, falhas: [], avisos: [] };
+  const exp = EXPO_DPS[D.exposicao] ? D.exposicao : 'media', catEq = CAT_UW[D.catEq] != null ? D.catEq : 'II';
+  Object.assign(out, { exp, catEq, nSens: Math.max(0, Math.round(+D.nSens || 0)), Uw: UW_TAB31.find(x => P.U0 <= x[0]) });
+  Object.values(calc.quadros).forEach(q => {
+    if (!q.cs.length) return;
+    const Qd = proj.quadros[q.q] || {}, r = out.quadros[q.q] = { q: q.q, desc: Qd.desc || '', ativo: Qd.dps !== false, verifs: [], materiais: [] };
+    if (!r.ativo) { r.status = 'off'; return; }
+    const nF = q.usadas.length, origem = !q.alim, v = (st, t) => r.verifs.push([st, t]);
+    r.origem = origem; r.nF = nF;
+    // classe: I+II na entrada quando há SPDA ou exposição alta; II nos demais quadros
+    r.classeAuto = origem && (ps || exp === 'alta') ? 'I+II' : 'II';
+    r.classe = ['I+II', 'II'].includes(Qd.dpsClasse) ? Qd.dpsClasse : r.classeAuto;
+    const cl1 = r.classe === 'I+II';
+    // modos de proteção pela ligação
+    r.lig = Qd.dpsLig === 'pe' || Qd.dpsLig === 'npe' ? Qd.dpsLig : (P.aterramento === 'TT' ? 'npe' : 'pe');
+    r.ligTxt = r.lig === 'pe' ? `${nF + 1}+0 — fases e neutro ao PE` : `${nF}+1 — fases ao neutro e centelhador N–PE`;
+    r.nPolos = nF + 1;
+    // tensão de operação contínua (Tabela 49)
+    r.UcMinF = 1.1 * P.U0; r.UcMinN = P.U0; r.Uc = ucDPS(P.U0); r.UcN = r.lig === 'npe' ? Math.max(255, ucDPS(P.U0 / 1.1)) : r.Uc;
+    // correntes: In ≥ 5 kA (NBR 5410); Imáx pela exposição (fabricantes); Iimp ≥ 12,5 kA ou o do nível do SPDA
+    r.Imax = EXPO_DPS[exp][0]; r.In = Math.max(5, r.Imax / 2, cl1 ? 20 : 0);
+    if (cl1) { r.IimpMin = Math.max(12.5, ps ? ps.Iimp : 0); r.Iimp = Math.max(12.5, +Qd.dpsIimp || 0, r.IimpMin); r.IimpNPE = r.lig === 'npe' ? r.Iimp * (nF + 1) : r.Iimp; }
+    // nível de proteção (Tabela 31) e nível efetivo com os condutores de ligação
+    r.Uw2 = uwTab31(P.U0, 'II'); r.Uw3 = uwTab31(P.U0, 'III'); r.UwEq = uwTab31(P.U0, catEq);
+    r.Up = +Qd.dpsUp > 0 ? +Qd.dpsUp : (cl1 ? 1.5 : (P.U0 <= 150 ? 1.2 : 1.5)); r.UpPadrao = !(+Qd.dpsUp > 0);
+    r.L = +Qd.dpsL > 0 ? +Qd.dpsL : 0.5; r.dU = cl1 ? r.L * 1 : 0; r.Upf = r.Up + r.dU;
+    r.soDist = q.cs.every(c => c.tipo === 'dist'); r.UwRef = r.soDist ? r.Uw3 : r.UwEq; r.catRef = r.soDist ? 'III' : catEq;
+    // condutores de ligação, retaguarda e curto-circuito
+    r.Smin = cl1 || (ps && origem) ? 16 : 4; r.S = +Qd.dpsS > 0 ? +Qd.dpsS : r.Smin;
+    r.back = +Qd.dpsBack > 0 ? +Qd.dpsBack : null; r.isccr = +Qd.dpsIsccr > 0 ? +Qd.dpsIsccr : null; r.icc = +Qd.icc || +P.icc || null;
+    r.Imont = q.alim ? calc.res[q.alim.id].In : (+Qd.dgIn > 0 ? +Qd.dgIn : null);
+    // verificações
+    v(r.Uc >= r.UcMinF - 1e-9 ? 'ok' : 'fail', `Uc = ${r.Uc} V ≥ 1,1 × U0 = ${nfmt(r.UcMinF, 0)} V nos modos das fases (Tabela 49)`);
+    v(r.UcN >= r.UcMinN - 1e-9 ? 'ok' : 'fail', `Uc N–PE = ${r.UcN} V ≥ U0 = ${P.U0} V${r.lig === 'npe' ? ' (centelhador)' : ''}`);
+    v(r.Up <= r.Uw2 + 1e-9 ? 'ok' : 'fail', `Up = ${nfmt(r.Up, 2)} kV ≤ ${nfmt(r.Uw2, 1)} kV (categoria II da Tabela 31)${r.UpPadrao ? ' — valor típico; confirme no catálogo' : ''}`);
+    if (cl1) {
+      v(r.Iimp >= r.IimpMin - 1e-9 ? 'ok' : 'fail', `Iimp = ${nfmt(r.Iimp, 2)} kA (10/350 µs) por modo ≥ ${nfmt(r.IimpMin, 2)} kA${ps && origem ? ` (NP ${ps.base} do SPDA)` : ' (mínimo de 12,5 kA)'}`);
+      if (r.lig === 'npe') v('info', `Centelhador N–PE: Iimp ≥ ${nfmt(r.IimpNPE, 1)} kA (soma das correntes dos ${nF + 1} condutores)`);
+    }
+    v(r.In >= 5 ? 'ok' : 'fail', `In = ${nfmt(r.In, 0)} kA (8/20 µs) ≥ 5 kA por modo; Imáx = ${r.Imax} kA para exposição ${EXPO_DPS[exp][1].split(' — ')[0].toLowerCase()}`);
+    v(r.L <= 0.5 + 1e-9 ? 'ok' : 'fail', `Condutores de ligação: ${nfmt(r.L, 2)} m ≤ 0,5 m (comprimento total, condutor vivo → DPS → barramento PE)`);
+    v(r.S >= r.Smin - 1e-9 ? 'ok' : 'fail', `Seção dos condutores de ligação ${fS(r.S)} mm² ≥ ${r.Smin} mm² Cu${r.Smin === 16 ? ' (DPS classe I / estrutura com SPDA)' : ''}`);
+    v(r.Upf <= r.UwRef + 1e-9 ? 'ok' : 'warn', `Nível efetivo Up/f = Up + ΔU = ${nfmt(r.Up, 2)} + ${nfmt(r.dU, 2)} = ${nfmt(r.Upf, 2)} kV ${r.Upf <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV (categoria ${r.catRef}${r.soDist ? ', quadro só de distribuição' : ''})${r.Upf > r.UwRef + 1e-9 ? ': prever DPS classe III junto aos equipamentos ou ligação em V' : ''}`);
+    if (r.back == null) v('info', 'Proteção de retaguarda: informe a corrente máxima do fusível ou disjuntor indicada pelo fabricante do DPS.');
+    else if (r.Imont && r.Imont > r.back) v('warn', `A proteção a montante (${r.Imont} A) excede a retaguarda máxima do DPS (${r.back} A): instalar dispositivo de retaguarda dedicado de até ${r.back} A.`);
+    else v('ok', `Proteção a montante${r.Imont ? ` de ${r.Imont} A` : ''} dentro da retaguarda máxima do fabricante (${r.back} A)`);
+    if (r.isccr && r.icc) v(r.icc <= r.isccr + 1e-9 ? 'ok' : 'fail', `Corrente de curto-circuito presumida ${nfmt(r.icc, 1)} kA ≤ ${nfmt(r.isccr, 1)} kA suportável pelo DPS com a retaguarda (Isccr)`);
+    else v('info', 'Informe a corrente de curto-circuito suportável do DPS (Isccr) para comparar com a do quadro.');
+    if (P.aterramento === 'TT') v(r.lig === 'npe' ? 'ok' : 'warn', r.lig === 'npe' ? 'Esquema TT: DPS a montante do DR com ligação n+1 (NBR 5410, Figura 13)' : 'Esquema TT com DPS ao PE: só a jusante do DR; a montante do DR use a ligação n+1 (NBR 5410, Figura 13)');
+    if (!origem) {
+      const up = out.quadros[q.alim.quadro], Lc = +q.alim.L || 0;
+      if (up && up.ativo && Lc < 5) v('warn', `Coordenação: ${nfmt(Lc, 1)} m de cabo entre os DPS do ${q.alim.quadro} e deste quadro (< 5 m) — use DPS declarados coordenados pelo fabricante ou indutor de desacoplamento.`);
+      else if (up && up.ativo) v('ok', `Coordenação com o DPS do ${q.alim.quadro}: ${nfmt(Lc, 1)} m de cabo entre os estágios`);
+    }
+    r.status = r.verifs.some(x => x[0] === 'fail') ? 'fail' : r.verifs.some(x => x[0] === 'warn') ? 'warn' : 'ok';
+    // especificação e materiais
+    const corr = cl1 ? `Iimp ${nfmt(r.Iimp, 1)} kA (10/350 µs), In ${nfmt(r.In, 0)} kA` : `In ${nfmt(r.In, 0)} kA, Imáx ${r.Imax} kA (8/20 µs)`;
+    r.spec = `DPS classe ${r.classe}, ligação ${r.ligTxt}: Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`;
+    const nb = 'ABNT NBR IEC 61643-11';
+    if (r.lig === 'pe') r.materiais.push([`DPS classe ${r.classe} unipolar — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF + 1, 'un', nb]);
+    else {
+      r.materiais.push([`DPS classe ${r.classe} unipolar (fase–neutro) — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF, 'un', nb]);
+      r.materiais.push([`Centelhador N–PE classe ${r.classe} — Uc ${r.UcN} V, ${cl1 ? `Iimp ${nfmt(r.IimpNPE, 0)} kA (10/350 µs)` : `In ${nfmt(r.In * (nF + 1) / 2, 0)} kA (8/20 µs)`}`, 1, 'un', nb]);
+    }
+    r.materiais.push([`Condutor de cobre verde-amarelo ${fS(r.S)} mm² para ligação dos DPS`, Math.max(1, Math.ceil((nF + 2) * r.L)), 'm', 'ABNT NBR NM 247-3']);
+    if (r.back && r.Imont && r.Imont > r.back) r.materiais.push([`Disjuntor de retaguarda dos DPS ${nF + (r.lig === 'pe' ? 1 : 0)}P até ${r.back} A (conforme o fabricante)`, 1, 'un', 'ABNT NBR NM 60898']);
+  });
+  const lista = Object.values(out.quadros).filter(r => r.ativo);
+  if (out.nSens) out.classe3 = { n: out.nSens, Uc: ucDPS(P.U0) };
+  if (lista.some(r => r.status === 'warn' && r.Upf > r.UwRef) && !out.nSens) out.avisos.push('O nível de proteção efetivo excede a suportabilidade dos equipamentos em algum quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III.');
+  out.status = lista.some(r => r.status === 'fail') ? 'fail' : (lista.some(r => r.status === 'warn') || out.avisos.length ? 'warn' : 'ok');
+  return out;
+}
+
+/* ================================================================
    MATERIAIS — cadastro com normas de fabricação, quantitativo automático
    do projeto e lista de materiais (anexo do memorial descritivo)
    ================================================================ */
@@ -2859,14 +2957,12 @@ function materiaisAuto(proj, calc) {
     const std = MODULOS_STD.find(x => x >= n) || n;
     add(`quad|${q.q}`, 'quad', `Quadro de distribuição ${q.q}${(proj.quadros[q.q] || {}).desc ? ' (' + proj.quadros[q.q].desc + ')' : ''} — ${std} módulos DIN, com barramentos de fase, neutro e proteção; ${q.cs.length} circuitos + reserva para ${res} circuitos (Tabela 59)`, 'un', 'ABNT NBR IEC 61439-3', 1, q.q);
   });
-  // DPS em cada quadro (fases e neutro ao PE): classe I+II no quadro de entrada quando há SPDA (NBR 5419-4)
+  // DPS de cada quadro, pelo motor de proteção contra surtos (NBR 5410 6.3.5 e NBR 5419-4)
   const ps = calc.spda && calc.spda.projeto;
-  Object.values(calc.quadros).forEach(q => {
-    if (!q.cs.length || (proj.quadros[q.q] || {}).dps === false) return;
-    const uc = ucDPS(proj.params.U0);
-    if (ps && !q.alim) add(`dps|I|${uc}|${ps.Iimp}`, 'prot', `DPS classe I+II — Uc ${uc} V, Iimp ${nfmt(ps.Iimp, 1)} kA (10/350 µs), In 20 kA`, 'un', 'ABNT NBR IEC 61643-11; NBR 5419-4', q.usadas.length + 1, q.q);
-    else add(`dps|II|${uc}`, 'prot', `DPS classe II — Uc ${uc} V, In 20 kA, Imáx 40 kA`, 'un', 'ABNT NBR IEC 61643-11', q.usadas.length + 1, q.q);
-  });
+  if (calc.dps) {
+    Object.values(calc.dps.quadros).filter(r => r.ativo).forEach(r => r.materiais.forEach(([d, q, u, n]) => add(`${/condutor/i.test(d) ? 'dpscond' : /retaguarda/i.test(d) ? 'dpsback' : 'dps'}|${d}`, 'prot', d, u, n, q, r.q)));
+    if (calc.dps.classe3) add(`dps|III|${calc.dps.classe3.Uc}`, 'prot', `DPS classe III junto ao equipamento sensível — Uc ${calc.dps.classe3.Uc} V`, 'un', 'ABNT NBR IEC 61643-11', calc.dps.classe3.n, 'equipamentos sensíveis');
+  }
   // SPDA (NBR 5419-3)
   if (ps) ps.materiais.forEach(([d, q, u, n]) => add(`spda|${d}`, 'spda', d, u, n, q, 'SPDA'));
   // eletrodutos
@@ -3532,8 +3628,6 @@ function safeKey(k) { return String(k).replace(/[^a-zA-Z0-9]/g, ''); }
    ================================================================ */
 const DG_COR = { ink: '#1b1f23', mut: '#5b6670', line: '#9aa6b0', face: '#ffffff', acc: '#0b5a70' };
 const COR_COND = { A: '#1f1f1f', B: '#c62828', C: '#ffffff', N: '#3b8ed8', PE: '#2e9d4f' };
-const UC_DPS = [175, 275, 320, 385, 440, 460, 600];
-const ucDPS = U0 => UC_DPS.find(v => v >= 1.1 * U0) || Math.ceil(1.1 * U0);
 const DIAG_UNI = 15, DIAG_MULTI = 12;
 const escD = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const cortaD = (s, n) => (s = String(s ?? '')).length > n ? s.slice(0, Math.max(1, n - 1)) + '…' : s;
@@ -3557,7 +3651,8 @@ function dadosQuadro(proj, calc, nome) {
   const sist = { monofasico: 'monofásico', bifasico: 'bifásico', trifasico: 'trifásico' }[P.fornecimento] || '';
   return { nome, desc: Qd.desc || '', usadas: q.usadas, cs, ent, q,
     dg: { In: +Qd.dgIn > 0 ? +Qd.dgIn : ent.In, polos: q.usadas.length },
-    dps: Qd.dps !== false ? (!alim && calc.spda && calc.spda.projeto ? { classe: 'I+II', Uc: ucDPS(P.U0), In: 20, Iimp: calc.spda.projeto.Iimp } : { classe: 'II', Uc: ucDPS(P.U0), In: 20 }) : null,
+    dps: (() => { const x = calc.dps && calc.dps.quadros[nome]; if (x) return x.ativo ? { classe: x.classe, Uc: x.Uc, UcN: x.UcN, In: x.In, Iimp: x.classe === 'I+II' ? x.Iimp : null, Up: x.Up, lig: x.lig, ligTxt: x.ligTxt } : null;
+      return Qd.dps !== false ? { classe: 'II', Uc: ucDPS(P.U0), In: 20, Up: P.U0 <= 150 ? 1.2 : 1.5, lig: 'pe' } : null; })(),
     reserva: reservaTab59(cs.length), sistemaTxt: `${P.U0}/${P.U} V · ${sist} · esquema ${P.aterramento} · ${cs.length} circuito${cs.length === 1 ? '' : 's'}` };
 }
 
@@ -3601,7 +3696,8 @@ function unifilarSVG(d, ini = 0, fim = d.cs.length) {
     g += lD(xb, 132, xb, 156);
     if (d.dps) {
       g += `<circle cx="${xb}" cy="166" r="2.8" fill="${DG_COR.ink}"/>` + lD(xb, 166, xb - 52, 166) + lD(xb - 52, 166, xb - 52, 178) + dpsD(xb - 52, 178) + lD(xb - 52, 200, xb - 52, 210) + terraD(xb - 52, 210);
-      g += tD(xb - 12, 236, `DPS classe ${d.dps.classe}`, { fs: 9.5, anc: 'end' }) + tD(xb - 12, 248, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${d.dps.In} kA`, { fs: 9, anc: 'end', cor: DG_COR.mut }) + tD(xb - 12, 260, `${d.usadas.length}F + N → PE`, { fs: 9, anc: 'end', cor: DG_COR.mut });
+      g += tD(xb - 12, 236, `DPS classe ${d.dps.classe}`, { fs: 9.5, anc: 'end' }) + tD(xb - 12, 248, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, anc: 'end', cor: DG_COR.mut })
+        + tD(xb - 12, 260, `${d.dps.lig === 'npe' ? `${d.usadas.length}+1 (N–PE centelhador)` : `${d.usadas.length + 1}+0 → PE`}${d.dps.Up ? ` · Up ${nfmt(d.dps.Up, 1)} kV` : ''}`, { fs: 9, anc: 'end', cor: DG_COR.mut });
     }
   }
   g += lD(xb, ini ? 56 : 156, xb, yEnd, { w: 5 }) + (ini ? lD(xb, 50, xb, 60, { w: 5, dash: '3 3' }) : '');
@@ -3659,10 +3755,20 @@ function multifilarSVG(d, ini = 0, fim = Math.min(d.cs.length, DIAG_MULTI)) {
   });
   g += lD(63, yb[fases[0]] - 5, 63, yb[fases[fases.length - 1]] - 4, { w: 1, dash: '2 2' }) + tD(64, yb[fases[0]] - 13, d.dg.In ? `DG ${d.dg.polos}P ${d.dg.In} A` : 'DG', { fs: 9.5, anc: 'middle' });
   if (d.dps) {
-    const vivos = [...fases, 'N'], yD = yBot + 26, yC = yD + 34, xs = vivos.map((k, i) => 124 + i * 14);
-    vivos.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
-    g += fioD(114, yC, xs[xs.length - 1], yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
-    g += tD(110, yC + 18, `DPS classe ${d.dps.classe}`, { fs: 9.5 }) + tD(110, yC + 30, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${d.dps.In} kA`, { fs: 9, cor: DG_COR.mut });
+    const vivos = [...fases, 'N'], yD = yBot + 26, xs = vivos.map((k, i) => 124 + i * 14);
+    let yC = yD + 34;
+    if (d.dps.lig === 'npe') {
+      // n+1: fases ao neutro por varistores; neutro ao PE por centelhador
+      const xN = xs[xs.length - 1], yG = yC + 6;
+      fases.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
+      g += lD(xs[0], yC, xN, yC) + fioD(xN, yb.N, xN, yC, 'N') + noD(xN, yb.N, 'N') + `<circle cx="${xN}" cy="${yC}" r="2.6" fill="${DG_COR.ink}"/>`;
+      g += `<rect x="${xN - 7}" y="${yG}" width="14" height="20" fill="${DG_COR.face}" stroke="${DG_COR.ink}" stroke-width="1.3"/><polygon points="${xN - 3},${yG + 6} ${xN + 3},${yG + 6} ${xN},${yG + 10}" fill="${DG_COR.ink}"/><polygon points="${xN - 3},${yG + 15} ${xN + 3},${yG + 15} ${xN},${yG + 11}" fill="${DG_COR.ink}"/>`;
+      yC = yG + 30; g += lD(xN, yG + 20, xN, yC) + fioD(114, yC, xN, yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
+    } else {
+      vivos.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
+      g += fioD(114, yC, xs[xs.length - 1], yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
+    }
+    g += tD(110, yC + 18, `DPS classe ${d.dps.classe} · ${d.dps.lig === 'npe' ? `${fases.length}+1` : `${fases.length + 1}+0`}`, { fs: 9.5 }) + tD(110, yC + 30, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, cor: DG_COR.mut });
   }
   // legenda das cores
   [['A', 'fase A — preto'], ['B', 'fase B — vermelho'], ['C', 'fase C — branco'], ['N', 'neutro — azul-claro'], ['PE', 'proteção — verde-amarelo']].filter(([k]) => cond.includes(k)).forEach(([k, l], i) => {
@@ -3737,7 +3843,7 @@ function construirDiagramas(proj, calc, opt = {}) {
   Q.forEach(q => {
     const d = dadosQuadro(proj, calc, q.q), s = sec(`Quadro ${q.q}${d.desc ? ' — ' + d.desc : ''}`);
     B.push({ t: 'kv4', rows: [['Alimentação', [d.ent.txt, d.ent.cabo].filter(Boolean).join(' — ')], ['Dispositivo geral', d.dg.In ? `Disjuntor ${d.dg.polos}P ${d.dg.In} A` : 'a definir'],
-      ['DPS', d.dps ? `Classe ${d.dps.classe}, ${d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA (10/350 µs), ` : ''}Uc ${d.dps.Uc} V, In ${d.dps.In} kA — ${d.usadas.length} fase(s) e neutro ao PE` : 'não previsto neste quadro'], ['Demanda', `${f0(q.dem.S)} VA${q.dem.manual ? ' (informada)' : ` — FD ${f0(q.dem.fd * 100)} %`}`]].reduce((a, r, i) => (i % 2 ? a[a.length - 1].push(...r) : a.push([...r]), a), []) });
+      ['DPS', d.dps ? `Classe ${d.dps.classe}, ${d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA (10/350 µs), ` : ''}Uc ${d.dps.Uc} V, In ${nfmt(d.dps.In, 0)} kA${d.dps.Up ? `, Up ≤ ${nfmt(d.dps.Up, 1)} kV` : ''} — ${d.dps.ligTxt || `${d.usadas.length} fase(s) e neutro ao PE`}` : 'não previsto neste quadro'], ['Demanda', `${f0(q.dem.S)} VA${q.dem.manual ? ' (informada)' : ` — FD ${f0(q.dem.fd * 100)} %`}`]].reduce((a, r, i) => (i % 2 ? a[a.length - 1].push(...r) : a.push([...r]), a), []) });
     const uni = partesDiagrama(d, 'uni'), multi = partesDiagrama(d, 'multi'), alt = svg => Math.min(250, 172 * arDe(svg) + 22);
     B.push({ t: 'h2', text: `${s}.1 Diagrama unifilar`, keep: alt(uni[0]) });
     uni.forEach((svg, i, l) => B.push(figDiag(svg, `Diagrama unifilar do quadro ${q.q}${l.length > 1 ? ` — parte ${i + 1} de ${l.length}` : ''}.`)));
@@ -4848,13 +4954,56 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   B.push({ t: 'p', text: `${r.okR1 && r.okR3 ? 'Com as medidas adotadas, o risco de perda de vida humana atende ao valor tolerável da ABNT NBR 5419-2:2026' : 'As medidas adotadas não atendem ao risco tolerável; revise o nível de proteção e as medidas complementares'}${r.okF ? '' : ', e a frequência de danos aos sistemas internos exige medidas de proteção contra surtos (MPS)'}. ${p ? `O SPDA nível ${p.base} tem ${p.nDesc} descidas, ${p.mastros ? `${p.mx * p.my} captor(es) Franklin` : 'captação em malha'} e anel de aterramento de ${f0(p.Lanel)} m.` : ''}` });
   if (sp.obs) B.push({ t: 'note', text: sp.obs });
   if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
-  if (c.ng.tabela && sp.ngTabela) {
-    const T = NG_ANEXO_F[c.ng.uf], L = Object.entries(T.mun), m = Math.ceil(L.length / 2);
-    B.push({ t: 'h1', text: `Anexo — Densidade de descargas atmosféricas NG em ${T.nome}` });
-    B.push({ t: 'p', text: `Valores de NG (descargas atmosféricas por km² por ano) dos ${L.length} municípios de ${T.nome}, conforme a tabela municipal do Anexo F da ABNT NBR 5419-2:2026. Valor adotado neste memorial: ${c.ng.mun}, NG = ${c.ng.valor}.` });
-    B.push({ t: 'table', small: true, head: ['Município', 'NG', 'Município', 'NG'], widths: [38, 12, 38, 12], align: 'lrlr',
-      rows: Array.from({ length: m }, (_, i) => { const a = L[i], b = L[i + m]; const mk = x => x ? [x[0] === c.ng.mun ? `${x[0]} (adotado)` : x[0], String(x[1])] : ['', '']; return [...mk(a), ...mk(b)]; }) });
-  }
+  return B;
+}
+
+/* ================================================================
+   DPS — memória de cálculo da proteção contra surtos
+   ================================================================ */
+const VER_DPS = { ok: true, fail: false, warn: false };
+function construirMemorialDPS(proj, calc, opt = {}) {
+  const o = Object.assign({ assinatura: true }, opt), I = proj.info, P = proj.params, c = calc.dps || calcDPS(proj, calc), ps = calc.spda && calc.spda.projeto, B = [];
+  const Q = Object.values(c.quadros).filter(r => r.ativo), f1 = v => nfmt(v, 1), f2 = v => nfmt(v, 2);
+  B.push({ t: 'title', kicker: 'ABNT NBR 5410:2004 — 6.3.5 · ABNT NBR 5419-4:2026', text: 'Memória de cálculo — proteção contra surtos (DPS)', sub: 'Seleção, coordenação e instalação dos dispositivos de proteção contra surtos nos quadros de distribuição' });
+  B.push({ t: 'meta', rows: [['Obra', I.obra || '—'], ['Proprietário / cliente', I.cliente || '—'], ['Endereço', [I.endereco, I.cidade].filter(Boolean).join(' — ') || '—'],
+    ['Responsável técnico', [I.responsavel, I.registro].filter(Boolean).join(' — ') || '—'], ['ART / TRT / RRT', I.art || '—'], ['Data / revisão', `${dataCurta(I.data) || '—'} — ${I.revisao || 'R00'}`]] });
+  let n = 0; const sec = t => { n++; B.push({ t: 'h1', text: `${n}. ${t}` }); return n; };
+  sec('Objetivo');
+  B.push({ t: 'p', text: `Este documento apresenta a seleção dos dispositivos de proteção contra surtos (DPS) dos ${Q.length} quadro${Q.length === 1 ? '' : 's'} da obra acima identificada — classe, modos de proteção, tensão de operação contínua, correntes, nível de proteção, condutores de ligação, proteção de retaguarda e coordenação — segundo a ABNT NBR 5410:2004 (6.3.5) e a ABNT NBR 5419-4:2026.` });
+  sec('Normas e documentos de referência');
+  B.push({ t: 'list', items: ['ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão (6.3.5, Tabelas 31 e 49, Figura 13).', 'ABNT NBR 5419-4:2026 — Proteção contra descargas atmosféricas — Parte 4: Sistemas elétricos e eletrônicos internos na estrutura.',
+    'ABNT NBR IEC 61643-11 — Dispositivos de proteção contra surtos de baixa tensão — Requisitos e métodos de ensaio.', 'IEC 61643-12 — Seleção e princípios de aplicação de DPS; IEC 62305-4 — nível de proteção efetivo.', 'Catálogos e instruções dos fabricantes dos DPS (retaguarda, coordenação e instalação).'] });
+  sec('Dados da instalação e critérios');
+  B.push({ t: 'table', head: ['Parâmetro', 'Valor adotado'], widths: [42, 58], rows: [
+    ['Tensão nominal (U0 / U)', `${P.U0} / ${P.U} V`], ['Esquema de aterramento', P.aterramento], ['SPDA', ps ? `NP ${ps.base} — Iimp ≥ ${f2(ps.Iimp)} kA por modo no ponto de entrada (NBR 5419-4)` : 'não previsto'],
+    ['Exposição a surtos', EXPO_DPS[c.exp][1]], ['Equipamentos protegidos', `categoria ${CAT_UW_TXT[c.catEq]} — Uw = ${f1(uwTab31(P.U0, c.catEq))} kV`],
+    ['Suportabilidade a impulso (Tabela 31)', `${c.Uw[1]}: IV ${f1(c.Uw[2][0])} kV · III ${f1(c.Uw[2][1])} kV · II ${f1(c.Uw[2][2])} kV · I ${f1(c.Uw[2][3])} kV`]] });
+  B.push({ t: 'list', items: [
+    'Classe: I+II no ponto de entrada quando a estrutura tem SPDA ou exposição alta; II nos quadros de distribuição; III junto a equipamentos sensíveis quando o nível de proteção efetivo excede a suportabilidade deles.',
+    'Tensão de operação contínua (Tabela 49): Uc ≥ 1,1 × U0 nos modos das fases e Uc ≥ U0 no modo neutro–PE; no esquema TT a montante do DR, ligação n+1 (Figura 13).',
+    'Nível de proteção: Up ≤ suportabilidade da categoria II (Tabela 31); nível efetivo Up/f = Up + ΔU, com ΔU ≈ 1 kV por metro de condutor de ligação para DPS classe I e desprezível para classe II (IEC 62305-4).',
+    `Correntes: In ≥ 5 kA por modo (8/20 µs); Iimp ≥ 12,5 kA por modo (10/350 µs) ou o valor do nível do SPDA. Imáx pela exposição segundo as faixas usuais dos fabricantes: baixa ${EXPO_DPS.baixa[0]} kA, média ${EXPO_DPS.media[0]} kA, alta ${EXPO_DPS.alta[0]} kA.`,
+    'Condutores de ligação: comprimento total até 0,5 m (condutor vivo → DPS → barramento PE) e seção mínima de 4 mm² Cu, ou 16 mm² Cu para DPS classe I / estrutura com SPDA.',
+    'Proteção de retaguarda e corrente de curto-circuito suportável conforme o fabricante; coordenação entre estágios por produtos declarados coordenados ou por distância e indutância dos condutores.'] });
+  const sQ = sec('Seleção por quadro');
+  Q.forEach((r, i) => {
+    B.push({ t: 'h2', text: `${sQ}.${i + 1} Quadro ${r.q}${r.desc ? ' — ' + r.desc : ''}` });
+    B.push({ t: 'kv4', rows: [['Posição', r.origem ? 'Ponto de entrada (origem)' : 'Quadro de distribuição', 'Classe', r.classe], ['Ligação', r.ligTxt, 'Uc', `${r.Uc} V (N–PE ${r.UcN} V)`],
+      ['Correntes', r.classe === 'I+II' ? `Iimp ${f2(r.Iimp)} kA (10/350 µs) por modo${r.lig === 'npe' ? `; N–PE ${f1(r.IimpNPE)} kA` : ''}; In ${nfmt(r.In, 0)} kA` : `In ${nfmt(r.In, 0)} kA; Imáx ${r.Imax} kA (8/20 µs)`, 'Nível de proteção', `Up ≤ ${f2(r.Up)} kV; Up/f = ${f2(r.Upf)} kV`],
+      ['Condutores de ligação', `${f2(r.L)} m · ${fS(r.S)} mm² Cu`, 'Retaguarda', r.back ? `até ${r.back} A (fabricante)` : 'conforme o fabricante']] });
+    r.verifs.forEach(([st, t]) => B.push(st === 'info' ? { t: 'note', text: t } : { t: 'ver', ok: VER_DPS[st], text: t }));
+  });
+  sec('Classe III e coordenação');
+  B.push({ t: 'p', text: c.classe3 ? `Previstos ${c.classe3.n} DPS classe III (Uc ${c.classe3.Uc} V) junto aos equipamentos sensíveis, coordenados com os DPS do quadro que os alimenta.` : 'Não foram indicados pontos com equipamentos sensíveis que exijam DPS classe III; avaliar junto a equipamentos eletrônicos distantes do quadro.' });
+  B.push({ t: 'p', text: 'Os DPS em cascata (entrada → quadros → equipamentos) devem ser do mesmo fabricante ou declarados coordenados por ele; na falta dessa declaração, o comprimento dos condutores entre os estágios deve atender à instrução do fabricante.' });
+  sec('Instalação');
+  B.push({ t: 'list', items: ['Instalar os DPS junto ao barramento de proteção do quadro, com condutores curtos, retilíneos e sem laços; preferir a ligação em V (entrada e saída nos mesmos bornes) quando o comprimento passar de 0,5 m.',
+    'Proteger cada conjunto de DPS pela retaguarda indicada pelo fabricante, com indicação de fim de vida visível e contato de sinalização quando disponível.', 'Interligar o barramento PE dos quadros ao BEP; com SPDA, ligar o DPS de entrada ao BEP pelo caminho mais curto.',
+    'Inspecionar os DPS periodicamente e após descargas atmosféricas na região, substituindo os módulos sinalizados.'] });
+  sec('Conclusão');
+  const fal = Q.filter(r => r.status === 'fail');
+  B.push({ t: 'p', text: fal.length ? `Os DPS dos quadros ${fal.map(r => r.q).join(', ')} não atendem a todas as verificações; ajuste a especificação conforme indicado.` : `Os DPS especificados para os ${Q.length} quadros atendem às verificações de tensão, corrente, nível de proteção e instalação da ABNT NBR 5410 e da ABNT NBR 5419-4.` });
+  if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
   return B;
 }
 
@@ -5085,7 +5234,9 @@ function construirMemorialDescritivo(proj, calc, ids, opt = {}) {
     B.push({ t: 'p', text: `A análise de risco pela ABNT NBR 5419-2:2026 resultou em R1 = ${nfmt(cs.risco.R1 * 1e5, 2)} × 10⁻⁵ com as medidas adotadas (tolerável 1 × 10⁻⁵)${cs.npMin === 'nenhum' ? ', sem exigência de SPDA' : cs.npMin ? `, com exigência mínima de SPDA NP ${cs.npMin}` : ''}${refA('spda')}. ${ps ? `Adotado SPDA ${NP_TXT[cs.npAdot]}${cs.opcional ? ' por opção do projeto' : ''}: captação ${ps.mastros ? `por ${ps.mx * ps.my} captor(es) Franklin` : `em malha de até ${ps.malha} × ${ps.malha} m`}, ${ps.nDesc} descidas${ps.nAneis ? `, ${ps.nAneis} anel(éis) intermediário(s)` : ''} e anel de aterramento de ${nfmt(ps.Lanel, 0)} m (arranjo B), interligado ao BEP e ao aterramento da instalação elétrica.` : 'Não é instalado SPDA.'}` });
   }
   sub('Proteção contra surtos');
-  B.push({ t: 'p', text: `Previstos dispositivos de proteção contra surtos (DPS) na origem da instalação e nos quadros de distribuição, ligados entre cada condutor vivo e o barramento de proteção, com condutores de ligação curtos e retilíneos (6.3.5)${inf.AQ === 'AQ1' ? '' : ', em razão da classificação ' + inf.AQ + ' quanto a descargas atmosféricas'}${ps ? `. No quadro de entrada, os DPS são de classe I+II, com corrente de impulso Iimp ≥ ${nfmt(ps.Iimp, 1)} kA (10/350 µs) por modo de proteção, compatíveis com o nível de proteção do SPDA (NBR 5419-4)` : ''}.` });
+  const qdps = calc.dps ? Object.values(calc.dps.quadros).filter(r => r.ativo) : [];
+  B.push({ t: 'p', text: `Previstos dispositivos de proteção contra surtos (DPS) na origem da instalação e nos quadros de distribuição, ligados entre os condutores vivos e o barramento de proteção, com condutores de ligação curtos e retilíneos (6.3.5)${inf.AQ === 'AQ1' ? '' : ', em razão da classificação ' + inf.AQ + ' quanto a descargas atmosféricas'}${ps ? `; no quadro de entrada, DPS classe I+II compatíveis com o nível de proteção do SPDA (NBR 5419-4)` : ''}${refA('dps')}.` });
+  if (qdps.length) B.push({ t: 'list', items: qdps.map(r => `${r.q}: ${r.spec}; condutores de ligação de ${fS(r.S)} mm² Cu com até ${nfmt(r.L, 2)} m.`) });
 
   const sM = sec('Especificação dos materiais e normas de fabricação');
   B.push({ t: 'p', text: `Os materiais devem ser novos, de primeira qualidade, com certificação de conformidade do Inmetro quando compulsória, e atender às normas de fabricação indicadas. ${cm.lista.length ? `Os quantitativos constam da lista de materiais${refA('materiais')}.` : ''}` });
@@ -5152,6 +5303,9 @@ const MEMORIAS = [
   { id: 'diagramas', nome: 'Diagramas unifilares e multifilares', norma: 'ABNT NBR 5410:2004 · IEC 60617', arq: 'diagramas-quadros', titulo: 'Diagramas dos quadros de distribuição', rodape: 'Diagramas unifilares e multifilares conforme ABNT NBR 5410:2004',
     tem: (p, k) => Object.values(k.quadros).some(q => q.cs.length), resumo: (p, k) => { const n = Object.values(k.quadros).filter(q => q.cs.length).length; return `${n} quadro(s) · unifilar e multifilar`; }, falha: () => false,
     build: (p, k, o) => construirDiagramas(p, k, o) },
+  { id: 'dps', nome: 'Proteção contra surtos (DPS)', norma: 'ABNT NBR 5410:2004 · NBR 5419-4:2026', arq: 'memoria-dps', titulo: 'Memória de cálculo — DPS', rodape: 'Proteção contra surtos conforme ABNT NBR 5410:2004 e ABNT NBR 5419-4:2026',
+    tem: (p, k) => !!(k.dps && Object.values(k.dps.quadros).some(r => r.ativo)), resumo: (p, k) => Object.values(k.dps.quadros).filter(r => r.ativo).map(r => `${r.q}: classe ${r.classe}`).join(' · '),
+    falha: (p, k) => !!(k.dps && k.dps.status === 'fail'), build: (p, k, o) => construirMemorialDPS(p, k, o) },
   { id: 'lumi', nome: 'Cálculo luminotécnico', norma: p => [(p.lumi || []).length ? 'ABNT NBR ISO/CIE 8995-1:2013' : '', (p.lumiExt || []).length ? 'NBR 5101 / EN 12464-2' : ''].filter(Boolean).join(' · ') || 'ABNT NBR ISO/CIE 8995-1:2013', arq: 'relatorio-luminotecnico', titulo: 'Relatório luminotécnico',
     rodape: p => `Relatório luminotécnico conforme ${[(p.lumi || []).length ? 'ABNT NBR ISO/CIE 8995-1:2013' : '', (p.lumiExt || []).length ? 'NBR 5101 e EN 12464-2' : ''].filter(Boolean).join(', ') || 'ABNT NBR ISO/CIE 8995-1:2013'}`,
     tem: p => (p.lumi || []).length + (p.lumiExt || []).length > 0,
@@ -5251,6 +5405,7 @@ const DOC_CSS = `
 .doc .d-kv{width:100%;border-collapse:collapse;font-size:9pt;margin:4px 0 6px}
 .doc .d-kv th{width:14%;font-weight:600;color:var(--doc-muted);text-align:left;padding:2px 8px 2px 0;vertical-align:top;white-space:nowrap}
 .doc .d-kv td{padding:2px 14px 2px 0;vertical-align:top;width:36%}
+@media (max-width:600px){.doc .d-kv th{white-space:normal}.doc .d-kv td{padding-right:8px;overflow-wrap:anywhere}}
 .doc ul{margin:0 0 10px;padding-left:20px}.doc li{margin:2px 0}
 .doc .d-ver{margin:2px 0 4px;font-weight:500}
 .doc .d-ver.ok{color:var(--doc-ok)}.doc .d-ver.fail{color:var(--doc-fail)}
@@ -6399,7 +6554,7 @@ function renderSPDA() {
     ${fTxt('sp', 'nome', 'Estrutura', S.nome, { cls: 'w2' })}${fNum('sp', 'L', 'Comprimento L', S.L, { u: 'm' })}${fNum('sp', 'W', 'Largura W', S.W, { u: 'm' })}${fNum('sp', 'H', 'Altura H', S.H, { u: 'm' })}
     ${fSel('sp', 'cd', 'Localização relativa (CD)', S.cd, opSPDA(CD_LOC), { cls: 'w2' })}
     ${fSel('sp', 'ngMun', `Município — Anexo F (${NG_ANEXO_F[S.ngUF] ? NG_ANEXO_F[S.ngUF].nome : 'UF'})`, S.ngMun, [['', 'Outro município — informar NG'], ...Object.entries((NG_ANEXO_F[S.ngUF] || { mun: {} }).mun).map(([k, v]) => [k, `${k} — NG ${v}`])], { cls: 'w2', struct: true })}
-    ${S.ngMun && NG_ANEXO_F[S.ngUF] && NG_ANEXO_F[S.ngUF].mun[S.ngMun] ? fInfo('Densidade de descargas NG', `${NG_ANEXO_F[S.ngUF].mun[S.ngMun]} /km²/ano`) + fChk('sp', 'ngTabela', 'Reproduzir a tabela do Anexo F do estado no memorial', S.ngTabela, { cls: 'w2' })
+    ${S.ngMun && NG_ANEXO_F[S.ngUF] && NG_ANEXO_F[S.ngUF].mun[S.ngMun] ? fInfo('Densidade de descargas NG', `${NG_ANEXO_F[S.ngUF].mun[S.ngMun]} /km²/ano`)
       : fNum('sp', 'Ng', 'Densidade de descargas NG', S.Ng, { u: '/km²/ano', ph: 'Anexo F' }) + fTxt('sp', 'ngFonte', 'Fonte do NG', S.ngFonte, { cls: 'w2', ph: 'ex.: Anexo F — município de …' })}
   </div></fieldset>
   <fieldset data-scope="spda"><legend>Ocupação e perdas (vida humana e patrimônio)</legend><div class="grade">
@@ -6466,6 +6621,59 @@ function renderSPDARes() {
 }
 
 /* ================================================================
+   INTERFACE — seção Proteção contra surtos (DPS)
+   ================================================================ */
+function normalizarDPS(d) {
+  const out = { ...dpsPadrao(), ...(d || {}) };
+  if (!EXPO_DPS[out.exposicao]) out.exposicao = 'media';
+  if (CAT_UW[out.catEq] == null) out.catEq = 'II';
+  return out;
+}
+const ICONE_VER = { ok: 'ok', fail: 'fail', warn: 'warn', info: 'info' };
+function dpsResHTML(r) {
+  if (!r.ativo) return '<p class="mini" style="padding:10px 14px;margin:0">Quadro sem DPS (desmarcado).</p>';
+  return `<div class="spec" style="padding:10px 14px"><div class="linha"><span><small>Especificação</small><b>${esc(r.spec)}</b></span></div></div>
+    <ul class="verif">${r.verifs.map(([st, t]) => `<li class="${ICONE_VER[st]}"><span>${esc(t)}</span></li>`).join('')}</ul>
+    <div class="tw" style="margin:0 14px 12px"><table class="tbl"><thead><tr><th>Material</th><th class="r">Qtd.</th></tr></thead><tbody>${r.materiais.map(([d, q, u]) => `<tr><td class="wrap">${esc(d)}</td><td class="r">${q} ${u}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function renderDPS() {
+  const D = PROJ.dps, c = CALC.dps, P = PROJ.params, ps = CALC.spda && CALC.spda.projeto;
+  const Q = Object.values(CALC.quadros).filter(q => q.cs.length);
+  $('#tab-dps').innerHTML = `
+  <div class="mem-bar"><div><h2 class="tit">Proteção contra surtos (DPS)</h2><p class="sub" style="margin:0">Seleção dos DPS de cada quadro pela ABNT NBR 5410 (6.3.5, Tabelas 31 e 49) e pela ABNT NBR 5419-4:2026, com as faixas usuais de catálogos de fabricantes para a corrente máxima. ${ps ? `Com o SPDA NP ${ps.base}, o quadro de entrada recebe DPS classe I+II com Iimp ≥ ${nfmt(ps.Iimp, 2)} kA por modo.` : ''}</p></div>
+  <div class="mem-bt"><span class="mini" style="align-self:center">Memória do DPS:</span><button class="btn pri" type="button" data-exp="pdf" data-doc="dps">PDF</button><button class="btn" type="button" data-exp="docx" data-doc="dps">Word</button><button class="btn" type="button" data-exp="html" data-doc="dps">HTML</button></div></div>
+  <fieldset data-scope="dpsg"><legend>Critérios gerais</legend><div class="grade">
+    ${fSel('dg', 'exposicao', 'Exposição a surtos (Imáx dos DPS classe II)', D.exposicao, Object.entries(EXPO_DPS).map(([k, v]) => [k, `${v[1].split(' — ')[0]} — Imáx ${v[0]} kA`]), { cls: 'w2', struct: true, dica: EXPO_DPS[D.exposicao][1].split(' — ')[1] })}
+    ${fSel('dg', 'catEq', 'Equipamentos protegidos (categoria de suportabilidade)', D.catEq, Object.entries(CAT_UW_TXT).map(([k, v]) => [k, `${v} — Uw ${nfmt(uwTab31(P.U0, k), 1)} kV`]), { cls: 'w2' })}
+    ${fNum('dg', 'nSens', 'Pontos com equipamentos sensíveis (DPS classe III)', D.nSens, { dica: 'junto aos equipamentos distantes do quadro' })}
+    ${fInfo('Esquema / tensão', `${esc(P.aterramento)} · ${P.U0}/${P.U} V`)}
+  </div></fieldset>
+  <div id="dps-resumo"></div>
+  ${Q.map(q => { const Qd = PROJ.quadros[q.q] || {}, r = c.quadros[q.q], pre = 'dq-' + safeId(q.q), cl1 = r.ativo && r.classe === 'I+II';
+    return `<article class="quadro"><div class="quadro-cab"><div><h3>${esc(q.q)}</h3><span class="mini">${q.alim ? `alimentado por ${esc(q.alim.num)}` : 'ponto de entrada'}${Qd.desc ? ' · ' + esc(Qd.desc) : ''}</span></div>
+      <div class="grade g3" data-scope="dpsq" data-q="${esc(q.q)}" style="flex:1 1 560px">
+        ${fChk(pre, 'dps', 'DPS neste quadro', Qd.dps !== false, { struct: true })}
+        ${fSel(pre, 'dpsClasse', 'Classe', Qd.dpsClasse || 'auto', [['auto', `Automática (${r.classeAuto || '—'})`], ['I+II', 'I+II — ponto de entrada'], ['II', 'II — quadro de distribuição']], { struct: true })}
+        ${fSel(pre, 'dpsLig', 'Ligação', Qd.dpsLig || 'auto', Object.entries(LIG_DPS), { cls: 'w2' })}
+        ${fNum(pre, 'dpsUp', 'Up do produto', Qd.dpsUp, { u: 'kV', ph: r.ativo ? r.Up : '' })}
+        ${cl1 ? fNum(pre, 'dpsIimp', 'Iimp do produto por modo', Qd.dpsIimp, { u: 'kA', ph: r.IimpMin }) : ''}
+        ${fNum(pre, 'dpsL', 'Condutores de ligação (total)', Qd.dpsL, { u: 'm', ph: 0.5 })}${fNum(pre, 'dpsS', 'Seção dos condutores de ligação', Qd.dpsS, { u: 'mm²', ph: r.ativo ? r.Smin : '' })}
+        ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr do DPS (fabricante)', Qd.dpsIsccr, { u: 'kA', ph: 'catálogo' })}
+      </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}`;
+  renderDPSResumo();
+}
+function renderDPSResumo() {
+  const box = $('#dps-resumo'); if (!box) return; const c = CALC.dps, L = Object.values(c.quadros).filter(r => r.ativo);
+  box.innerHTML = `<div class="res" style="margin-bottom:14px"><div class="res-cab"><h3>Resumo</h3><span class="pill ${c.status}">${statusTxt(c.status)}</span></div>
+    <div class="metr num">${L.map(r => `<div><small>${esc(r.q)}</small><span${r.status === 'fail' ? ' class="bad"' : ''}>${r.classe} · ${r.classe === 'I+II' ? `${nfmt(r.Iimp, 1)} kA` : `${r.Imax} kA`}</span><small style="text-transform:none;letter-spacing:0">${r.lig === 'npe' ? `${r.nF}+1` : `${r.nF + 1}+0`} · Up ${nfmt(r.Up, 1)} kV</small></div>`).join('')}${c.classe3 ? `<div><small>Classe III</small><span>${c.classe3.n} ponto(s)</span></div>` : ''}</div>
+    ${c.avisos.length ? `<ul class="msgs">${c.avisos.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+}
+function atualizarDPSParcial() {
+  renderDPSResumo();
+  Object.values(CALC.dps.quadros).forEach(r => { const el = $('#dq-' + safeId(r.q) + '-res'); if (el) el.innerHTML = dpsResHTML(r); });
+}
+
+/* ================================================================
    INTERFACE — barra de menus suspensos: itens numerados, submenus (▸),
    atalhos de teclado alinhados à direita e separadores
    ================================================================ */
@@ -6473,7 +6681,7 @@ function renderSPDARes() {
 const REF_TABS = [['33', 'Tab. 33', 'Tabela 33 — tipos de linhas elétricas'], ['35', 'Tab. 35', 'Tabela 35 — temperaturas dos condutores'], ['36', 'Tab. 36', 'Tabela 36 — capacidade de condução, PVC (A1 a D)'], ['37', 'Tab. 37', 'Tabela 37 — capacidade de condução, EPR/XLPE (A1 a D)'],
   ['38', 'Tab. 38', 'Tabela 38 — capacidade de condução, PVC (E, F e G)'], ['39', 'Tab. 39', 'Tabela 39 — capacidade de condução, EPR/XLPE (E, F e G)'], ['40', 'Tab. 40/41', 'Tabelas 40 e 41 — temperatura e resistividade do solo'], ['42', 'Tab. 42/43', 'Tabelas 42 e 43 — agrupamento de circuitos'],
   ['44', 'Tab. 44/45', 'Tabelas 44 e 45 — cabos enterrados'], ['46', 'Tab. 46/47/48/58', 'Tabelas 46, 47, 48 e 58 — seções mínimas'], ['k', 'Fator k', 'Fator k — curto-circuito e condutor de proteção'], ['r20', 'Resistências', 'Resistência dos condutores (NBR NM 280)'], ['cat', 'Diâmetros', 'Diâmetros de cabos e eletrodutos'],
-  ['spda', 'SPDA (NBR 5419)', 'SPDA — NBR 5419:2026 (níveis, ângulos e materiais)'], ['8995', 'NBR ISO/CIE 8995-1', 'NBR ISO/CIE 8995-1 — iluminação de interiores'], ['ext', 'Exteriores (NBR 5101 / EN 12464-2)', 'Exteriores — NBR 5101, EN 12464-2 e EN 12193'], ['lum', 'Lâmpadas e luminárias', 'Lâmpadas e luminárias'], ['ndu', 'Energisa NDU 001', 'Energisa NDU 001 — demanda e categorias']];
+  ['dps', 'DPS', 'DPS — NBR 5410, NBR 5419-4 e fabricantes'], ['spda', 'SPDA (NBR 5419)', 'SPDA — NBR 5419:2026 (níveis, ângulos e materiais)'], ['8995', 'NBR ISO/CIE 8995-1', 'NBR ISO/CIE 8995-1 — iluminação de interiores'], ['ext', 'Exteriores (NBR 5101 / EN 12464-2)', 'Exteriores — NBR 5101, EN 12464-2 e EN 12193'], ['lum', 'Lâmpadas e luminárias', 'Lâmpadas e luminárias'], ['ndu', 'Energisa NDU 001', 'Energisa NDU 001 — demanda e categorias']];
 const ATALHOS = { F2: ['projeto'], F4: ['circuitos'], F8: ['quadros'], F9: ['memoria', 'mem:descritivo'] };
 let MENU_ABERTO = null;
 function menuDef() {
@@ -6485,11 +6693,12 @@ function menuDef() {
       { r: 'Abrir projeto…', act: 'abrir', k: 'Ctrl+O' },
       { r: 'Salvar projeto', act: 'salvar', k: 'Ctrl+S' }, '-',
       { r: 'Carregar o projeto de exemplo', act: 'exemplo', conf: 'Confirmar: substituir pelo exemplo?' }] },
-    { id: 'inst', rot: 'Instalações', tabs: ['circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa'], itens: [
+    { id: 'inst', rot: 'Instalações', tabs: ['circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'dps', 'energisa'], itens: [
       { r: 'Circuitos — condutores e proteção', go: 'circuitos', k: 'F4' },
       { r: 'Eletrodutos', go: 'eletrodutos' },
       { r: 'Eletrocalhas, perfilados e leitos', go: 'eletrocalhas' },
-      { r: 'Quadros de carga', go: 'quadros', k: 'F8' }, '-',
+      { r: 'Quadros de carga', go: 'quadros', k: 'F8' },
+      { r: 'Proteção contra surtos (DPS)', go: 'dps' }, '-',
       { r: 'Demanda Energisa — padrão de entrada', go: 'energisa' }] },
     { id: 'sist', rot: 'Sistemas', tabs: ['lumi', 'clima', 'aterr', 'spda'], itens: [
       { r: 'Luminotécnica', sub: [{ r: 'Interiores — NBR ISO/CIE 8995-1', act: 'lumi:int', go: 'lumi', chk: LMODO === 'int' }, { r: 'Exteriores — projetores e postes', act: 'lumi:ext', go: 'lumi', chk: LMODO === 'ext' }] },
@@ -6594,7 +6803,7 @@ function cliqueMenu(el) {
 function renderTrilha() {
   const box = $('#trilha'); if (!box || !PROJ) return;
   const M = menuDef(), m = M.find(x => x.tabs.includes(TAB)) || M[0];
-  const ROT = { projeto: 'Dados do projeto', circuitos: 'Circuitos', eletrodutos: 'Eletrodutos', eletrocalhas: 'Eletrocalhas', quadros: 'Quadros de carga', energisa: 'Demanda Energisa', lumi: 'Luminotécnica', clima: 'Climatização', aterr: 'Aterramento', spda: 'SPDA — NBR 5419:2026', materiais: 'Cadastro e lista de materiais', tabelas: 'Tabelas' };
+  const ROT = { projeto: 'Dados do projeto', circuitos: 'Circuitos', eletrodutos: 'Eletrodutos', eletrocalhas: 'Eletrocalhas', quadros: 'Quadros de carga', energisa: 'Demanda Energisa', lumi: 'Luminotécnica', clima: 'Climatização', aterr: 'Aterramento', spda: 'SPDA — NBR 5419:2026', dps: 'Proteção contra surtos (DPS)', materiais: 'Cadastro e lista de materiais', tabelas: 'Tabelas' };
   let p = [m.rot, ROT[TAB]];
   if (TAB === 'lumi') p.push(LMODO === 'ext' ? 'Exteriores' : 'Interiores');
   else if (TAB === 'aterr') p.push(PROJ.aterr.modo === 'completo' ? 'Completo' : 'Simplificado');
@@ -6648,7 +6857,7 @@ document.addEventListener('keydown', ev => {
    INTERFACE
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'dps', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
 const QDIAG = {};
 let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, DESC_ABERTO = false, MEMSEL = 'descritivo', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
 const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
@@ -6713,6 +6922,7 @@ function normalizarProjeto(p) {
   out.clima = normalizarClima(p.clima);
   out.aterr = normalizarAterr(p.aterr);
   out.spda = normalizarSPDA(p.spda);
+  out.dps = normalizarDPS(p.dps);
   out.materiais = normalizarMateriais(p.materiais);
   out.descritivo = normalizarDescritivo(p.descritivo, out.params.edificacao);
   out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
@@ -6734,7 +6944,7 @@ function carregar() {
 }
 
 /* ---------- ciclo de atualização ---------- */
-function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.spda) PROJ.spda = spdaPadrao(); CALC.spda = calcSPDA(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
+function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.spda) PROJ.spda = spdaPadrao(); CALC.spda = calcSPDA(PROJ, CALC); if (!PROJ.dps) PROJ.dps = dpsPadrao(); CALC.dps = calcDPS(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
 function circSel() { return PROJ.circuitos.find(c => c.id === SEL) || null; }
 function ambSel() { return (PROJ.lumi || []).find(a => a.id === LSEL) || null; }
 function mudou(struct) { recalc(); salvarLocal(); renderCabecalho(); if (struct) renderAba(); else renderParcial(); }
@@ -6775,6 +6985,8 @@ function onCampo(ev, isChange) {
   else if (sc === 'descinf') { const D = PROJ.descritivo, inf = box.dataset.inf; if (k === 'cod') D.influencias[inf] = v; else { D.medidas = D.medidas || {}; if (v) D.medidas[inf] = v; else delete D.medidas[inf]; } }
   else if (sc === 'desclocal') { const l = PROJ.descritivo.locais[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
+  else if (sc === 'dpsg') { PROJ.dps[k] = v; }
+  else if (sc === 'dpsq') { const q = PROJ.quadros[box.dataset.q] = PROJ.quadros[box.dataset.q] || {}; q[k] = v; }
   else if (sc === 'spda') { PROJ.spda[k] = v; struct = efeitosSPDA(k) || struct; }
   else if (sc === 'spdalin') { const l = PROJ.spda.linhas[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'aarr') { const a = arrSel(); if (!a) return; a[k] = v; struct = efeitosArranjo(a, k) || struct; }
@@ -6885,7 +7097,7 @@ function irPara(tab) {
   ABAS.forEach(a => { $('#tab-' + a).hidden = a !== TAB; });
   renderCabecalho(); renderAba();
 }
-function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, spda: renderSPDA, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
+function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, spda: renderSPDA, dps: renderDPS, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
 function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
@@ -6895,6 +7107,7 @@ function renderParcial() {
   else if (TAB === 'clima') atualizarClimaParcial();
   else if (TAB === 'aterr') atualizarAterrParcial();
   else if (TAB === 'spda') renderSPDARes();
+  else if (TAB === 'dps') atualizarDPSParcial();
   else if (TAB === 'materiais') renderMatResumo();
   else if (TAB === 'memoria') { clearTimeout(renderParcial._t); renderParcial._t = setTimeout(() => { const f = $('#folha'); if (f && TAB === 'memoria') f.innerHTML = renderHTMLDoc(docAtual(MEMSEL).blocos); }, 400); }
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
@@ -7520,6 +7733,12 @@ function renderTabelas() {
       + h3t('Tabela 14 — solda a transformador, raios X e galvanização') + tabelaHTML(['Equipamento', 'Fatores'], [['Solda a arco e galvanização', '1º maior 100 % · 2º maior 70 % · 3º maior 40 % · demais 30 %'], ['Solda a resistência', 'maior 100 % · demais 60 %'], ['Raios X', 'maior 100 % · demais 70 %']], false)
       + h3t('Tabela 16 — categorias de atendimento, 220/127 V') + cat(CAT_T16) + h3t('Tabela 21 — categorias de atendimento, 254/127 V (rede monofásica)') + cat(CAT_T21);
     nota = `Energisa ${NDU001_VER}. D (kVA) = (d1 + … + d7) / 0,92. Tipos M e B enquadrados pela carga instalada (kW); tipo T pela demanda (kVA). Valores "a (b)": cabo embutido (subterrâneo). Disjuntor dimensionado para o limite superior da faixa. A Tabela 16 vale para EAC, EMR, EMS, EMT, ERO, ESE e ESS. As tabelas da NDU 003 (agrupamentos e edifícios) são informadas na aba Demanda Energisa.`;
+  } else if (REFTAB === 'dps') {
+    corpo = h3t('Suportabilidade a impulso exigível — Tabela 31 da NBR 5410 (kV)', 0) + tabelaHTML(['Tensão nominal', 'IV — origem', 'III — distribuição', 'II — utilização', 'I — especialmente protegidos'], UW_TAB31.map(([, s, v]) => [s, ...v.map(x => nfmt(x, 1))]))
+      + h3t('Tensão de operação contínua mínima Uc — Tabela 49') + tabelaHTML(['Modo de proteção', 'TN-S / TN-C-S', 'TT'], [['Fase–neutro', '1,1 × U0', '1,1 × U0'], ['Fase–PE', '1,1 × U0', '1,1 × U0 (a jusante do DR)'], ['Neutro–PE', 'U0', 'U0 (centelhador, ligação n+1 a montante do DR)']], false)
+      + h3t('Correntes de descarga') + tabelaHTML(['Parâmetro', 'Critério'], [['In (8/20 µs) — classe II', '≥ 5 kA por modo (NBR 5410)'], ['Iimp (10/350 µs) — classe I', '≥ 12,5 kA por modo; com SPDA: NP I 25 kA · NP II 18,75 kA · NP III e IV 12,5 kA (3F+N)'], ['Iimp N–PE na ligação n+1', 'soma dos modos: NP I 100 kA · NP II 75 kA · NP III e IV 50 kA'], ...Object.values(EXPO_DPS).map(([v, t]) => [`Imáx classe II — ${t.split(' — ')[0].toLowerCase()}`, `${v} kA · ${t.split(' — ')[1]}`])], false)
+      + h3t('Instalação') + tabelaHTML(['Item', 'Critério'], [['Condutores de ligação', 'comprimento total ≤ 0,5 m; ligação em V quando maior'], ['Seção mínima', '4 mm² Cu; 16 mm² Cu para DPS classe I ou estrutura com SPDA'], ['Nível efetivo', 'Up/f = Up + ΔU; ΔU ≈ 1 kV/m na classe I (IEC 62305-4)'], ['Retaguarda', 'fusível ou disjuntor máximo indicado pelo fabricante'], ['Coordenação', 'DPS declarados coordenados pelo fabricante ou distância entre estágios conforme o catálogo']], false);
+    nota = 'NBR 5410:2004 (vigente; revisão em andamento) e NBR 5419-4:2026. As faixas de Imáx por exposição e os valores de Iimp por polo seguem catálogos de fabricantes do mercado (ex.: DEHN, Clamper, Schneider, Finder, MarGirius). Confirme os valores da Tabela 31, da Tabela 49 e dos itens 6.3.5.2 no seu exemplar da norma, e os dados de Up, retaguarda e Isccr na ficha técnica do produto escolhido.';
   } else if (REFTAB === 'spda') {
     const nps = ['I', 'II', 'III', 'IV'], hs = [2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
     corpo = tabelaHTML(['Nível de proteção', 'Esfera rolante (m)', 'Malha (m)', 'Descidas e anéis (m)', 'ki', 'Corrente de pico (kA)', 'PB', 'PEB / PSPD'], nps.map(k => { const P = NP_SPDA[k]; return [`NP ${k}`, String(P.r), `${P.malha} × ${P.malha}`, String(P.desc), fp(P.ki), String(P.Ip), fp(P.PB), fp(PSPD_NIV[k])]; }))

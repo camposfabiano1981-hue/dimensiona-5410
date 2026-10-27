@@ -196,12 +196,5 @@ function construirMemorialSPDA(proj, calc, opt = {}) {
   B.push({ t: 'p', text: `${r.okR1 && r.okR3 ? 'Com as medidas adotadas, o risco de perda de vida humana atende ao valor tolerável da ABNT NBR 5419-2:2026' : 'As medidas adotadas não atendem ao risco tolerável; revise o nível de proteção e as medidas complementares'}${r.okF ? '' : ', e a frequência de danos aos sistemas internos exige medidas de proteção contra surtos (MPS)'}. ${p ? `O SPDA nível ${p.base} tem ${p.nDesc} descidas, ${p.mastros ? `${p.mx * p.my} captor(es) Franklin` : 'captação em malha'} e anel de aterramento de ${f0(p.Lanel)} m.` : ''}` });
   if (sp.obs) B.push({ t: 'note', text: sp.obs });
   if (o.assinatura) B.push({ t: 'sign', place: [I.cidade, dataExtenso(I.data)].filter(Boolean).join(', '), name: I.responsavel || 'Responsável técnico', reg: [I.registro, I.art ? 'ART ' + I.art : ''].filter(Boolean).join(' — ') });
-  if (c.ng.tabela && sp.ngTabela) {
-    const T = NG_ANEXO_F[c.ng.uf], L = Object.entries(T.mun), m = Math.ceil(L.length / 2);
-    B.push({ t: 'h1', text: `Anexo — Densidade de descargas atmosféricas NG em ${T.nome}` });
-    B.push({ t: 'p', text: `Valores de NG (descargas atmosféricas por km² por ano) dos ${L.length} municípios de ${T.nome}, conforme a tabela municipal do Anexo F da ABNT NBR 5419-2:2026. Valor adotado neste memorial: ${c.ng.mun}, NG = ${c.ng.valor}.` });
-    B.push({ t: 'table', small: true, head: ['Município', 'NG', 'Município', 'NG'], widths: [38, 12, 38, 12], align: 'lrlr',
-      rows: Array.from({ length: m }, (_, i) => { const a = L[i], b = L[i + m]; const mk = x => x ? [x[0] === c.ng.mun ? `${x[0]} (adotado)` : x[0], String(x[1])] : ['', '']; return [...mk(a), ...mk(b)]; }) });
-  }
   return B;
 }

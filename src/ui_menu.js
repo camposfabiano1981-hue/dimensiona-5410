@@ -6,7 +6,7 @@
 const REF_TABS = [['33', 'Tab. 33', 'Tabela 33 — tipos de linhas elétricas'], ['35', 'Tab. 35', 'Tabela 35 — temperaturas dos condutores'], ['36', 'Tab. 36', 'Tabela 36 — capacidade de condução, PVC (A1 a D)'], ['37', 'Tab. 37', 'Tabela 37 — capacidade de condução, EPR/XLPE (A1 a D)'],
   ['38', 'Tab. 38', 'Tabela 38 — capacidade de condução, PVC (E, F e G)'], ['39', 'Tab. 39', 'Tabela 39 — capacidade de condução, EPR/XLPE (E, F e G)'], ['40', 'Tab. 40/41', 'Tabelas 40 e 41 — temperatura e resistividade do solo'], ['42', 'Tab. 42/43', 'Tabelas 42 e 43 — agrupamento de circuitos'],
   ['44', 'Tab. 44/45', 'Tabelas 44 e 45 — cabos enterrados'], ['46', 'Tab. 46/47/48/58', 'Tabelas 46, 47, 48 e 58 — seções mínimas'], ['k', 'Fator k', 'Fator k — curto-circuito e condutor de proteção'], ['r20', 'Resistências', 'Resistência dos condutores (NBR NM 280)'], ['cat', 'Diâmetros', 'Diâmetros de cabos e eletrodutos'],
-  ['spda', 'SPDA (NBR 5419)', 'SPDA — NBR 5419:2026 (níveis, ângulos e materiais)'], ['8995', 'NBR ISO/CIE 8995-1', 'NBR ISO/CIE 8995-1 — iluminação de interiores'], ['ext', 'Exteriores (NBR 5101 / EN 12464-2)', 'Exteriores — NBR 5101, EN 12464-2 e EN 12193'], ['lum', 'Lâmpadas e luminárias', 'Lâmpadas e luminárias'], ['ndu', 'Energisa NDU 001', 'Energisa NDU 001 — demanda e categorias']];
+  ['dps', 'DPS', 'DPS — NBR 5410, NBR 5419-4 e fabricantes'], ['spda', 'SPDA (NBR 5419)', 'SPDA — NBR 5419:2026 (níveis, ângulos e materiais)'], ['8995', 'NBR ISO/CIE 8995-1', 'NBR ISO/CIE 8995-1 — iluminação de interiores'], ['ext', 'Exteriores (NBR 5101 / EN 12464-2)', 'Exteriores — NBR 5101, EN 12464-2 e EN 12193'], ['lum', 'Lâmpadas e luminárias', 'Lâmpadas e luminárias'], ['ndu', 'Energisa NDU 001', 'Energisa NDU 001 — demanda e categorias']];
 const ATALHOS = { F2: ['projeto'], F4: ['circuitos'], F8: ['quadros'], F9: ['memoria', 'mem:descritivo'] };
 let MENU_ABERTO = null;
 function menuDef() {
@@ -18,11 +18,12 @@ function menuDef() {
       { r: 'Abrir projeto…', act: 'abrir', k: 'Ctrl+O' },
       { r: 'Salvar projeto', act: 'salvar', k: 'Ctrl+S' }, '-',
       { r: 'Carregar o projeto de exemplo', act: 'exemplo', conf: 'Confirmar: substituir pelo exemplo?' }] },
-    { id: 'inst', rot: 'Instalações', tabs: ['circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa'], itens: [
+    { id: 'inst', rot: 'Instalações', tabs: ['circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'dps', 'energisa'], itens: [
       { r: 'Circuitos — condutores e proteção', go: 'circuitos', k: 'F4' },
       { r: 'Eletrodutos', go: 'eletrodutos' },
       { r: 'Eletrocalhas, perfilados e leitos', go: 'eletrocalhas' },
-      { r: 'Quadros de carga', go: 'quadros', k: 'F8' }, '-',
+      { r: 'Quadros de carga', go: 'quadros', k: 'F8' },
+      { r: 'Proteção contra surtos (DPS)', go: 'dps' }, '-',
       { r: 'Demanda Energisa — padrão de entrada', go: 'energisa' }] },
     { id: 'sist', rot: 'Sistemas', tabs: ['lumi', 'clima', 'aterr', 'spda'], itens: [
       { r: 'Luminotécnica', sub: [{ r: 'Interiores — NBR ISO/CIE 8995-1', act: 'lumi:int', go: 'lumi', chk: LMODO === 'int' }, { r: 'Exteriores — projetores e postes', act: 'lumi:ext', go: 'lumi', chk: LMODO === 'ext' }] },
@@ -127,7 +128,7 @@ function cliqueMenu(el) {
 function renderTrilha() {
   const box = $('#trilha'); if (!box || !PROJ) return;
   const M = menuDef(), m = M.find(x => x.tabs.includes(TAB)) || M[0];
-  const ROT = { projeto: 'Dados do projeto', circuitos: 'Circuitos', eletrodutos: 'Eletrodutos', eletrocalhas: 'Eletrocalhas', quadros: 'Quadros de carga', energisa: 'Demanda Energisa', lumi: 'Luminotécnica', clima: 'Climatização', aterr: 'Aterramento', spda: 'SPDA — NBR 5419:2026', materiais: 'Cadastro e lista de materiais', tabelas: 'Tabelas' };
+  const ROT = { projeto: 'Dados do projeto', circuitos: 'Circuitos', eletrodutos: 'Eletrodutos', eletrocalhas: 'Eletrocalhas', quadros: 'Quadros de carga', energisa: 'Demanda Energisa', lumi: 'Luminotécnica', clima: 'Climatização', aterr: 'Aterramento', spda: 'SPDA — NBR 5419:2026', dps: 'Proteção contra surtos (DPS)', materiais: 'Cadastro e lista de materiais', tabelas: 'Tabelas' };
   let p = [m.rot, ROT[TAB]];
   if (TAB === 'lumi') p.push(LMODO === 'ext' ? 'Exteriores' : 'Interiores');
   else if (TAB === 'aterr') p.push(PROJ.aterr.modo === 'completo' ? 'Completo' : 'Simplificado');

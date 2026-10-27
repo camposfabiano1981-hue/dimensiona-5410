@@ -17,10 +17,10 @@ const LOCAL = LIBS && {
   'docx@8.5.0': 'docx-8.5.0/package/build/index.umd.js',
   'exceljs@4.4.0': 'exceljs/package/dist/exceljs.min.js'
 };
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'dps', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
 // memorial descritivo com anexos e relatório consolidado (PDF, Word e HTML), memórias separadas e lista de materiais (PDF e Word),
 // quadro de cargas (Excel, aba Memória) e lista de materiais (Excel, aba Materiais)
-const SEPARADAS = ['circuitos', 'eletrodutos', 'calhas', 'quadros', 'diagramas', 'lumi', 'energisa', 'clima', 'aterr', 'spda', 'materiais'];
+const SEPARADAS = ['circuitos', 'eletrodutos', 'calhas', 'quadros', 'diagramas', 'dps', 'lumi', 'energisa', 'clima', 'aterr', 'spda', 'materiais'];
 const DOCS = [['memoria', 'descritivo', ['pdf', 'docx', 'html']], ...SEPARADAS.map(d => ['memoria', d, ['pdf', 'docx']]), ['memoria', 'consolidado', ['pdf', 'docx', 'html']], ['memoria', null, ['xlsx']], ['materiais', null, ['xlsxmat']]];
 
 (async () => {

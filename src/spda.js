@@ -155,7 +155,7 @@ function linhaSPDA(tipo = 'energia') {
   return { id: uid(), nome: tipo === 'energia' ? 'Linha de energia' : 'Linha de telecomunicações', tipo, ativa: true, inst: tipo === 'energia' ? 'aerea' : 'aerea', LL: 1000, ce: 'urbano', ct: 'bt', blind: tipo === 'energia' ? 'neutro' : 'aereaSem', rs: 'ate20', uw: 2.5 };
 }
 function spdaPadrao() {
-  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', ngUF: 'MS', ngMun: '', ngTabela: true, Ng: null, ngFonte: '',
+  return { ativo: false, nome: 'Edificação', L: 20, W: 12, H: 7, cd: 'menores', ngUF: 'MS', ngMun: '', Ng: null, ngFonte: '',
     ocup: 'residencial', piso: 'concreto', rp: 'nenhuma', rf: 'normal', hz: 'nenhum', nzNt: 100, tz: 8760, vida: 'nao', patrimonio: false, czCt: 100, critico: false,
     linhas: [linhaSPDA('energia'), linhaSPDA('telecom')],
     np: 'auto', dps: 'auto', pta: 'nenhuma', ptu: 'nenhuma', ks3: 'semCuidado', wm: null,
