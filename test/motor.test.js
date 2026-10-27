@@ -12,7 +12,7 @@ vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, construirMemorialDPS };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, construirMemorialDPS };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -126,35 +126,50 @@ test('DPS — seleção por quadro (NBR 5410 6.3.5, NBR 5419-4:2026 e faixas de 
   const qm = K.dps.quadros.QM, qd = K.dps.quadros['QD-1'];
   // entrada com SPDA NP III: classe I+II, 4+0 no TN-S, Iimp 12,5 kA por modo, condutores de 16 mm²
   assert.equal(qm.classe, 'I+II'); assert.equal(qm.lig, 'pe'); assert.equal(qm.nPolos, 4);
-  perto(qm.Iimp, 12.5, 1e-9, 'Iimp'); assert.equal(qm.Smin, 16); perto(qm.Upf, qm.Up + qm.L, 1e-9, 'Up/f = Up + 1 kV/m × L');
+  perto(qm.Iimp, 12.5, 1e-9, 'Iimp'); assert.equal(qm.SminNBR, 16); perto(qm.Upf, qm.Up + qm.L, 1e-9, 'Up/f = Up + 1 kV/m × L');
   assert.notEqual(qm.status, 'fail', qm.verifs.filter(v => v[0] === 'fail').map(v => v[1]).join(' | '));
-  // quadro de distribuição: classe II, Imáx pela exposição média, 4 mm²
-  assert.equal(qd.classe, 'II'); assert.equal(qd.Imax, 40); assert.ok(qd.In >= 5); assert.equal(qd.Smin, 4); assert.ok(qd.Up <= 1.5);
+  // quadro de distribuição: classe II, In pelo nível de exposição F, 4 mm² da NBR 5410
+  assert.equal(qd.classe, 'II'); assert.equal(qd.In, 20); assert.equal(qd.Imax, 40); assert.equal(qd.SminNBR, 4); assert.ok(qd.Up <= 1.5);
   assert.notEqual(qd.status, 'fail', qd.verifs.filter(v => v[0] === 'fail').map(v => v[1]).join(' | '));
   // esquema TT: ligação n+1 e centelhador N–PE com a soma das correntes
   const P2 = JSON.parse(JSON.stringify(P)); P2.params.aterramento = 'TT';
   const K2 = A.calcularProjeto(P2); K2.aterr = A.calcAterramento(P2, K2); K2.spda = A.calcSPDA(P2, K2); const d2 = A.calcDPS(P2, K2);
   assert.equal(d2.quadros.QM.lig, 'npe'); perto(d2.quadros.QM.IimpNPE, 50, 1e-9, 'Iimp N–PE');
+  // TN-C-S: neutro aterrado no BEP do quadro de entrada — DPS só nas fases (Figura 13, esquema 1)
+  P2.params.aterramento = 'TN-C-S'; const d3 = A.calcDPS(P2, K2);
+  assert.ok(d3.quadros.QM.semNPE && d3.quadros.QM.nPolos === 3, 'TN-C-S sem módulo N–PE na entrada'); assert.equal(d3.quadros['QD-1'].nPolos, 4);
   const B = A.construirMemorialDPS(P, K);
   assert.ok(B.filter(b => b.t === 'ver').length >= 10, 'verificações no memorial');
+  assert.ok(!JSON.stringify(B).includes('TOV') && !JSON.stringify(K.dps).includes('UT'), 'sem TOV no motor e na memória');
 });
 
-test('DPS — TOV, distância de proteção, tecnologia e coordenação', () => {
+test('DPS — métodos de fabricantes (catálogo Siemens 5SD7) e verificações complementares', () => {
   const qd = K.dps.quadros['QD-1'], qm = K.dps.quadros.QM;
+  // nível de exposição F = Td × (1,6 + 2 × LBT + δ) = 80 × (1,6 + 0,4 + 0,5) = 200 → In 20 kA; obrigatório (AQ3, SPDA)
+  perto(K.dps.F, 200, 1e-9, 'F'); assert.equal(K.dps.InExp, 20); assert.equal(K.dps.necess.obrig, true);
+  const inF = (Td, LBT, delta) => { const Px = JSON.parse(JSON.stringify(P)); Px.dps = { ...Px.dps, Td, LBT, delta }; return A.calcDPS(Px, { ...K, spda: null }); };
+  const x1 = inF(10, 0.2, 0.5); perto(x1.F, 25, 1e-9, 'F = 10 × 2,5'); assert.equal(x1.InExp, 5); assert.equal(x1.necess.obrig, false);
+  assert.equal(inF(30, 0.1, 0).InExp, 10); assert.equal(inF(30, 2, 1).F, 30 * (1.6 + 1 + 1));
+  // seção pela proteção a montante: QD-1 em T com F1 = 63 A → 10 mm²; entrada classe I+II → 16 mm²
+  assert.deepEqual([qd.Imont, qd.lq.fase, qd.lq.pe, qd.S], [63, 10, 10, 10]); assert.equal(qm.S, 16);
   // lpo = (Uw − Up/f) / 25 V/m = (1,5 − 1,2) kV / 25 V/m = 12 m; circuitos terminais acima disso, com 10 m ou mais
-  perto(qd.lpo, 12, 1e-9, 'lpo'); assert.ok(qd.foraLpo.includes('13') && !qd.foraLpo.includes('9'), 'circuitos além de lpo');
+  perto(qd.dProt, 12, 1e-9, 'lpo'); assert.ok(qd.foraDist.includes('13') && !qd.foraDist.includes('9'), 'circuitos além de lpo');
   assert.equal(qd.verifs.find(v => v[1].startsWith('Distância de proteção'))[0], 'ok', 'classe III prevista cobre os circuitos longos');
   assert.ok(qd.verifs.some(v => v[0] === 'ok' && v[1].includes('(≥ 10 m)')), 'coordenação por 12 m de cabo');
-  perto(qd.UTmin, 1.45 * 127, 1e-9, 'UT mínimo');
   const P3 = JSON.parse(JSON.stringify(P));
-  P3.dps.nSens = 0; P3.quadros.QM = { ...(P3.quadros.QM || {}), dpsTec: 'centelhador', dpsL: 1, dpsUT: 150 };
-  P3.quadros['QD-1'] = { ...P3.quadros['QD-1'], dpsUT: 440, dpsCoord: true };
+  P3.dps.nSens = 0; P3.dps.critDist = 'fab'; P3.quadros.QM = { ...(P3.quadros.QM || {}), dpsTec: 'centelhador', dpsL: 1, dpsUc: 275 };
+  P3.quadros['QD-1'] = { ...P3.quadros['QD-1'], dpsCoord: true, dpsIn: 10, dpsV: true, dpsS: 6 };
   const K3 = A.calcularProjeto(P3); K3.aterr = A.calcAterramento(P3, K3); K3.spda = A.calcSPDA(P3, K3); const d3 = A.calcDPS(P3, K3);
   const m3 = d3.quadros.QM, q3 = d3.quadros['QD-1'];
-  perto(m3.Upf, Math.max(m3.Up, 1), 1e-9, 'centelhador: Up/f = máx(Up; ΔU)'); assert.equal(m3.status, 'fail', 'UT de 150 V abaixo de 1,45 × U0');
-  assert.ok(q3.verifs.some(v => v[0] === 'ok' && v[1].startsWith('Sobretensão temporária')), 'UT de 440 V atende');
-  assert.equal(q3.verifs.find(v => v[1].startsWith('Distância de proteção'))[0], 'warn', 'sem classe III, circuitos longos ficam em alerta');
+  perto(m3.Upf, Math.max(m3.Up, 1), 1e-9, 'centelhador: Up/f = máx(Up; ΔU)'); assert.equal(m3.Uc, 275, 'Uc do produto');
+  assert.equal(q3.status, 'fail', 'In do produto de 10 kA abaixo dos 20 kA exigidos');
+  // distância de 30 m do fabricante: só o circuito 13 (35 m) fica de fora; sem classe III, alerta
+  assert.deepEqual(q3.foraDist, ['13']); assert.equal(q3.verifs.find(v => v[1].startsWith('Distância de proteção'))[0], 'warn');
+  // ligação em V de classe II com F1 = 63 A → 10 mm² do fabricante: 6 mm² gera alerta
+  assert.ok(q3.verifs.some(v => v[0] === 'warn' && v[1].includes('em série (em V)') && v[1].includes('adotados 6 mm²')), 'seção abaixo da do fabricante');
   assert.ok(q3.verifs.some(v => v[1].includes('declarados coordenados')), 'coordenação declarada pelo fabricante');
+  // proteção a montante acima da tabela em V e F2 do fabricante para F1 > 125 A (classe II em T)
+  assert.ok(A.lqDPS(false, true, 80).fora); assert.equal(A.lqDPS(false, false, 160).F2, 125); assert.equal(A.lqDPS(true, false, 200).fase, 35);
   P3.quadros.QM = { ...P3.quadros.QM, dpsTec: 'varistor', dpsV: true }; const d4 = A.calcDPS(P3, K3);
   perto(d4.quadros.QM.Upf, d4.quadros.QM.Up, 1e-9, 'ligação em V: ΔU desprezível');
 });

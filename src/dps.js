@@ -1,8 +1,9 @@
 /* ================================================================
    DPS — PROTEÇÃO CONTRA SURTOS
-   ABNT NBR 5410:2004 (6.3.5, Tabelas 31 e 49), ABNT NBR 5419-4:2026,
-   ABNT NBR IEC 61643-11 / IEC 61643-12, IEC 62305-4 e critérios usuais
-   de catálogos de fabricantes (Imáx por exposição, Iimp por nível de proteção)
+   ABNT NBR 5410:2004 (6.3.5, Tabelas 31 e 49, Figura 13), ABNT NBR 5419-4:2026,
+   ABNT NBR IEC 61643-11 / IEC 61643-12, IEC 62305-4 e métodos de catálogos de
+   fabricantes: Siemens 5SD7 (nível de exposição F, seção dos condutores pela
+   proteção a montante, distância de proteção de 30 m) e faixas usuais de Imáx
    ================================================================ */
 const UC_DPS = [175, 275, 320, 385, 440, 460, 600];
 const ucDPS = U0 => UC_DPS.find(v => v >= 1.1 * U0 - 1e-9) || Math.ceil(1.1 * U0);
@@ -19,33 +20,71 @@ const EXPO_DPS = {
 };
 const LIG_DPS = { auto: 'Pelo esquema de aterramento', pe: 'Fases e neutro ao PE (n+0)', npe: 'Fases ao neutro e centelhador N–PE (n+1)' };
 const TEC_DPS = { varistor: 'Varistor (limitador de tensão)', centelhador: 'Centelhador (comutador de tensão)' };
-/* parâmetros complementares: k da distância de proteção por oscilação (IEC 62305-4, Anexo D),
-   distância informativa de coordenação entre estágios (IEC 61643-12) e sobretensões temporárias (IEC 61643-11) */
-const K_OSC = 25, D_COORD = 10, UT_FATOR = 1.45, UT_NPE_TT = 1200;
-function dpsPadrao() { return { exposicao: 'media', catEq: 'II', nSens: 0 }; }
+/* método do nível de exposição F (catálogo Siemens 5SD7): F = Td × (1,6 + 2 × LBT + δ), LBT em km limitado a 0,5;
+   Tabela 1 — δ pela situação da linha aérea e da edificação; Tabela 2 — In do DPS classe II pelo valor de F */
+const METODO_DPS = { F: 'Nível de exposição F (catálogo Siemens)', faixa: 'Faixas de exposição baixa, média e alta (catálogos)' };
+const DELTA_DPS = [[0, 'Completamente envolvida por estruturas'], [0.5, 'Algumas estruturas próximas ou situação desconhecida'], [0.75, 'Terreno plano ou descampado'], [1, 'Sobre morro, junto a água superficial ou área montanhosa']];
+const IN_F = [[40, 5], [80, 10], [Infinity, 20]];
+const inPorF = F => IN_F.find(x => F <= x[0])[1];
+/* seção dos condutores de ligação pela proteção a montante F1 (catálogo Siemens 5SD7):
+   [F1 até (A), Lq2 — lado da fase (mm²), Lq3 — lado do PE (mm²), fusível F2 no ramal do DPS (A gL/gG)];
+   ligação em série (em V) ou em paralelo (em T), DPS classe I / I+II ou classe II */
+const LQ_DPS = {
+  'I|V': [[63, 10, 16], [80, 16, 16], [100, 25, 16], [125, 35, 16]],
+  'I|T': [[25, 6, 16], [80, 10, 16], [125, 16, 16], [160, 25, 25], [250, 35, 35, 160], [315, 50, 50, 160], [Infinity, 50, 50, 160]],
+  'II|V': [[40, 6, 6], [63, 10, 10]],
+  'II|T': [[50, 6, 6], [80, 10, 10], [125, 16, 16], [Infinity, 16, 16, 125]]
+};
+function lqDPS(cl1, emV, F1) {
+  const t = LQ_DPS[(cl1 ? 'I' : 'II') + '|' + (emV ? 'V' : 'T')], x = t.find(r => F1 <= r[0] + 1e-9);
+  return x ? { fase: x[1], pe: x[2], F2: x[3] || null } : { fora: true, max: t[t.length - 1][0] };
+}
+const DIST_DPS = { norma: 'Distância por oscilação lpo (IEC 62305-4, Anexo D)', fab: 'Prática de fabricante — 30 m (catálogo Siemens)' };
+const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3;
+function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma' }; }
 
 function calcDPS(proj, calc) {
   const P = proj.params, D = { ...dpsPadrao(), ...(proj.dps || {}) }, ps = calc.spda && calc.spda.projeto, out = { quadros: {}, falhas: [], avisos: [] };
   const exp = EXPO_DPS[D.exposicao] ? D.exposicao : 'media', catEq = CAT_UW[D.catEq] != null ? D.catEq : 'II';
-  Object.assign(out, { exp, catEq, nSens: Math.max(0, Math.round(+D.nSens || 0)), Uw: UW_TAB31.find(x => P.U0 <= x[0]) });
+  const metodo = METODO_DPS[D.metodo] ? D.metodo : 'F', critDist = DIST_DPS[D.critDist] ? D.critDist : 'norma';
+  const Td = +D.Td > 0 ? +D.Td : null, sub = D.alim === 'subterranea', delta = DELTA_DPS.some(x => x[0] === +D.delta) ? +D.delta : 0.5;
+  const LBT = sub ? 0 : Math.min(Math.max(+D.LBT || 0, 0), 0.5);
+  Object.assign(out, { exp, catEq, metodo, critDist, Td, sub, delta, LBT, nSens: Math.max(0, Math.round(+D.nSens || 0)), Uw: UW_TAB31.find(x => P.U0 <= x[0]) });
+  // obrigatoriedade (NBR 5410, influências externas AQ): estrutura com SPDA (AQ3) ou linha aérea com Td > 25 (AQ2)
+  out.necess = ps ? { obrig: true, txt: 'obrigatório — edificação com SPDA (AQ3)' }
+    : sub ? { obrig: false, txt: 'não obrigatório — alimentação em baixa tensão totalmente subterrânea; recomendado para proteger os equipamentos' }
+    : Td == null ? { obrig: null, txt: 'informe o nível ceráunico Td: com alimentação aérea, o DPS é obrigatório acima de 25 dias de trovoada por ano (AQ2)' }
+    : Td > 25 ? { obrig: true, txt: `obrigatório — alimentação aérea e Td = ${nfmt(Td, 0)} > 25 dias de trovoada por ano (AQ2)` }
+    : { obrig: false, txt: `não obrigatório — Td = ${nfmt(Td, 0)} ≤ 25 dias de trovoada por ano (AQ1); recomendado para proteger os equipamentos` };
+  // corrente nominal dos DPS classe II: nível de exposição F (Siemens) ou faixas de exposição (Imáx de catálogo)
+  if (metodo === 'F') {
+    out.F = Td != null ? Td * (1.6 + 2 * LBT + delta) : null; out.InExp = out.F != null ? inPorF(out.F) : 20; out.ImaxExp = 2 * out.InExp;
+    out.InTxt = out.F != null ? `nível de exposição F = ${nfmt(Td, 0)} × (1,6 + 2 × ${nfmt(LBT, 2)} + ${nfmt(delta, 2)}) = ${nfmt(out.F, 0)} → In ${out.InExp} kA` : 'Td não informado: adotado In 20 kA (F > 80, situação da maior parte do país)';
+  } else {
+    out.ImaxExp = EXPO_DPS[exp][0]; out.InExp = Math.max(5, out.ImaxExp / 2);
+    out.InTxt = `exposição ${EXPO_DPS[exp][1].split(' — ')[0].toLowerCase()} — Imáx ${out.ImaxExp} kA`;
+  }
+  const pd = calc.energisa && Object.values(calc.energisa.ucs || {})[0];
   Object.values(calc.quadros).forEach(q => {
     if (!q.cs.length) return;
     const Qd = proj.quadros[q.q] || {}, r = out.quadros[q.q] = { q: q.q, desc: Qd.desc || '', ativo: Qd.dps !== false, verifs: [], materiais: [] };
     if (!r.ativo) { r.status = 'off'; return; }
     const nF = q.usadas.length, origem = !q.alim, v = (st, t) => r.verifs.push([st, t]);
     r.origem = origem; r.nF = nF;
-    // classe: I+II na entrada quando há SPDA ou exposição alta; II nos demais quadros
-    r.classeAuto = origem && (ps || exp === 'alta') ? 'I+II' : 'II';
+    // classe: I+II na entrada quando há SPDA (descargas diretas); II nos demais quadros
+    r.classeAuto = origem && (ps || (metodo === 'faixa' && exp === 'alta')) ? 'I+II' : 'II';
     r.classe = ['I+II', 'II'].includes(Qd.dpsClasse) ? Qd.dpsClasse : r.classeAuto;
     const cl1 = r.classe === 'I+II';
-    // modos de proteção pela ligação
+    // modos de proteção (Figura 13): no TN-C-S o neutro é aterrado no BEP do quadro de entrada e dispensa o módulo N–PE
     r.lig = Qd.dpsLig === 'pe' || Qd.dpsLig === 'npe' ? Qd.dpsLig : (P.aterramento === 'TT' ? 'npe' : 'pe');
-    r.ligTxt = r.lig === 'pe' ? `${nF + 1}+0 — fases e neutro ao PE` : `${nF}+1 — fases ao neutro e centelhador N–PE`;
-    r.nPolos = nF + 1;
-    // tensão de operação contínua (Tabela 49)
-    r.UcMinF = 1.1 * P.U0; r.UcMinN = P.U0; r.Uc = ucDPS(P.U0); r.UcN = r.lig === 'npe' ? Math.max(255, ucDPS(P.U0 / 1.1)) : r.Uc;
-    // correntes: In ≥ 5 kA (NBR 5410); Imáx pela exposição (fabricantes); Iimp ≥ 12,5 kA ou o do nível do SPDA
-    r.Imax = EXPO_DPS[exp][0]; r.In = Math.max(5, r.Imax / 2, cl1 ? 20 : 0);
+    r.semNPE = r.lig === 'pe' && origem && P.aterramento === 'TN-C-S';
+    r.nPolos = r.semNPE ? nF : nF + 1;
+    r.ligTxt = r.lig === 'npe' ? `${nF}+1 — fases ao neutro e centelhador N–PE` : r.semNPE ? `${nF}+0 — fases ao PEN / BEP (neutro aterrado no BEP)` : `${nF + 1}+0 — fases e neutro ao PE`;
+    // tensão de operação contínua (Tabela 49): valor do produto ou menor valor comercial
+    r.UcMinF = 1.1 * P.U0; r.UcMinN = P.U0; r.UcProd = +Qd.dpsUc > 0; r.Uc = r.UcProd ? +Qd.dpsUc : ucDPS(P.U0);
+    r.UcN = r.lig === 'npe' ? Math.max(255, ucDPS(P.U0 / 1.1)) : r.Uc;
+    // correntes: In pelo método escolhido (mínimo de 5 kA da NBR 5410); Iimp ≥ 12,5 kA ou o do nível do SPDA
+    r.Imax = out.ImaxExp; r.InReq = Math.max(5, out.InExp, cl1 ? 20 : 0); r.InProd = +Qd.dpsIn > 0; r.In = r.InProd ? +Qd.dpsIn : r.InReq;
     if (cl1) { r.IimpMin = Math.max(12.5, ps ? ps.Iimp : 0); r.Iimp = Math.max(12.5, +Qd.dpsIimp || 0, r.IimpMin); r.IimpNPE = r.lig === 'npe' ? r.Iimp * (nF + 1) : r.Iimp; }
     // nível de proteção (Tabela 31) e nível efetivo com os condutores de ligação
     r.Uw2 = uwTab31(P.U0, 'II'); r.Uw3 = uwTab31(P.U0, 'III'); r.UwEq = uwTab31(P.U0, catEq);
@@ -54,63 +93,77 @@ function calcDPS(proj, calc) {
     // ΔU ≈ 1 kV por metro de condutor de ligação para correntes de descarga direta (classe I); desprezível na classe II e na ligação em V
     r.L = +Qd.dpsL > 0 ? +Qd.dpsL : 0.5; r.dU = cl1 && !r.emV ? r.L * 1 : 0;
     r.Upf = r.tec === 'centelhador' ? Math.max(r.Up, r.dU) : r.Up + r.dU;
+    r.UpPE = r.lig === 'npe' && +Qd.dpsUpPE > 0 ? +Qd.dpsUpPE : null; r.UpfPE = r.UpPE != null ? r.UpPE + r.dU : null;
     r.soDist = q.cs.every(c => c.tipo === 'dist'); r.UwRef = r.soDist ? r.Uw3 : r.UwEq; r.catRef = r.soDist ? 'III' : catEq;
-    // condutores de ligação, retaguarda e curto-circuito
-    r.Smin = cl1 || (ps && origem) ? 16 : 4; r.S = +Qd.dpsS > 0 ? +Qd.dpsS : r.Smin;
+    // proteção a montante (F1), retaguarda do fabricante e curto-circuito
     r.back = +Qd.dpsBack > 0 ? +Qd.dpsBack : null; r.isccr = +Qd.dpsIsccr > 0 ? +Qd.dpsIsccr : null; r.icc = +Qd.icc || +P.icc || null;
-    r.Imont = q.alim ? calc.res[q.alim.id].In : (+Qd.dgIn > 0 ? +Qd.dgIn : null);
-    // sobretensões temporárias (TOV) e corrente subsequente dos centelhadores
-    r.UTmin = UT_FATOR * P.U0; r.UT = +Qd.dpsUT > 0 ? +Qd.dpsUT : null; r.UTnpe = P.aterramento === 'TT' && r.lig === 'npe' ? UT_NPE_TT : null;
     r.ifi = +Qd.dpsIfi > 0 ? +Qd.dpsIfi : null;
-    // distância de proteção por oscilação: lpo = (Uw − Up/f) / k; desconsiderada se o circuito tem menos de 10 m ou Up/f < Uw/2
-    r.lpo = Math.max(0, (r.UwEq - r.Upf) * 1000 / K_OSC); r.lpoDispensa = r.Upf < r.UwEq / 2;
-    r.foraLpo = r.soDist || r.lpoDispensa ? [] : q.cs.filter(c => c.tipo !== 'dist' && (+c.L || 0) >= 10 && (+c.L || 0) > r.lpo).map(c => c.num);
+    r.Imont = q.alim ? calc.res[q.alim.id].In : (+Qd.dgIn > 0 ? +Qd.dgIn : (pd && pd.padrao && pd.padrao.disj) || null);
+    // condutores de ligação: mínimo da NBR 5410 e seção do fabricante pela proteção a montante
+    r.SminNBR = cl1 || (ps && origem) ? 16 : 4;
+    r.lq = r.Imont ? lqDPS(cl1, r.emV, r.Imont) : null;
+    r.Srec = Math.max(r.SminNBR, r.lq && !r.lq.fora ? Math.max(r.lq.fase, r.lq.pe) : 0);
+    r.S = +Qd.dpsS > 0 ? +Qd.dpsS : r.Srec;
+    r.F2 = r.back && r.Imont && r.Imont > r.back ? r.back : (!r.back && r.lq && r.lq.F2 ? r.lq.F2 : null);
+    // distância de proteção: oscilação (lpo = (Uw − Up/f) / k, dispensada se Up/f < Uw/2 ou circuito < 10 m) ou 30 m do fabricante
+    if (critDist === 'fab') { r.dProt = D_PROT_FAB; r.distDispensa = false; }
+    else { r.dProt = Math.max(0, (r.UwEq - r.Upf) * 1000 / K_OSC); r.distDispensa = r.Upf < r.UwEq / 2; }
+    r.foraDist = r.soDist || r.distDispensa ? [] : q.cs.filter(c => c.tipo !== 'dist' && (critDist === 'fab' || (+c.L || 0) >= 10) && (+c.L || 0) > r.dProt + 1e-9).map(c => c.num);
     // verificações
-    v(r.Uc >= r.UcMinF - 1e-9 ? 'ok' : 'fail', `Uc = ${r.Uc} V ≥ 1,1 × U0 = ${nfmt(r.UcMinF, 0)} V nos modos das fases (Tabela 49)`);
-    v(r.UcN >= r.UcMinN - 1e-9 ? 'ok' : 'fail', `Uc N–PE = ${r.UcN} V ≥ U0 = ${P.U0} V${r.lig === 'npe' ? ' (centelhador)' : ''}`);
+    const cmp = (a, b) => a >= b - 1e-9 ? '≥' : '<';
+    v(r.Uc >= r.UcMinF - 1e-9 ? 'ok' : 'fail', `Uc = ${r.Uc} V ${cmp(r.Uc, r.UcMinF)} 1,1 × U0 = ${nfmt(r.UcMinF, 0)} V nos modos das fases (Tabela 49)${r.UcProd ? ' — valor do produto' : ' — menor valor comercial'}`);
+    v(r.UcN >= r.UcMinN - 1e-9 ? 'ok' : 'fail', `Uc N–PE = ${r.UcN} V ${cmp(r.UcN, r.UcMinN)} U0 = ${P.U0} V${r.lig === 'npe' ? ' (centelhador)' : ''}`);
+    if (r.semNPE) v('ok', 'Neutro aterrado no BEP deste quadro (TN-C-S): DPS só nas fases, ligados ao PEN / BEP (NBR 5410, Figura 13, esquema de conexão 1)');
     v(r.Up <= r.Uw2 + 1e-9 ? 'ok' : 'fail', `Up = ${nfmt(r.Up, 2)} kV ≤ ${nfmt(r.Uw2, 1)} kV (categoria II da Tabela 31)${r.UpPadrao ? ' — valor típico; confirme no catálogo' : ''}`);
-    v(r.UT ? (r.UT >= r.UTmin - 1e-9 ? 'ok' : 'fail') : 'info', r.UT ? `Sobretensão temporária suportável UT = ${nfmt(r.UT, 0)} V ${r.UT >= r.UTmin - 1e-9 ? '≥' : '<'} 1,45 × U0 = ${nfmt(r.UTmin, 0)} V por 5 s (falhas na baixa tensão)` : `Sobretensão temporária: o DPS deve suportar UT ≥ 1,45 × U0 = ${nfmt(r.UTmin, 0)} V por 5 s (ensaio TOV do fabricante, IEC 61643-11)`);
-    if (r.UTnpe) v('info', `Centelhador N–PE no esquema TT: suportar ${UT_NPE_TT} V por 200 ms (falhas na alta tensão)`);
     if (cl1) {
-      if (r.tec === 'centelhador') v(r.ifi && r.icc ? (r.ifi >= r.icc - 1e-9 ? 'ok' : 'fail') : 'info', r.ifi && r.icc ? `Corrente subsequente interrompida Ifi = ${nfmt(r.ifi, 1)} kA ${r.ifi >= r.icc - 1e-9 ? '≥' : '<'} curto-circuito presumido de ${nfmt(r.icc || 0, 1)} kA` : `Centelhador: a corrente subsequente interrompida Ifi deve ser ≥ ${r.icc ? nfmt(r.icc, 1) + ' kA (curto-circuito presumido)' : 'a corrente de curto-circuito presumida no quadro'}; informe o valor do catálogo`);
+      if (r.tec === 'centelhador') v(r.ifi && r.icc ? (r.ifi >= r.icc - 1e-9 ? 'ok' : 'fail') : 'info', r.ifi && r.icc ? `Corrente subsequente interrompida Ifi = ${nfmt(r.ifi, 1)} kA ${cmp(r.ifi, r.icc)} curto-circuito presumido de ${nfmt(r.icc, 1)} kA` : `Centelhador: a corrente subsequente interrompida Ifi deve ser ≥ ${r.icc ? nfmt(r.icc, 1) + ' kA (curto-circuito presumido)' : 'a corrente de curto-circuito presumida no quadro'}; informe o valor do catálogo`);
       v(r.Iimp >= r.IimpMin - 1e-9 ? 'ok' : 'fail', `Iimp = ${nfmt(r.Iimp, 2)} kA (10/350 µs) por modo ≥ ${nfmt(r.IimpMin, 2)} kA${ps && origem ? ` (NP ${ps.base} do SPDA)` : ' (mínimo de 12,5 kA)'}`);
       if (r.lig === 'npe') v('info', `Centelhador N–PE: Iimp ≥ ${nfmt(r.IimpNPE, 1)} kA (soma das correntes dos ${nF + 1} condutores)`);
     }
-    v(r.In >= 5 ? 'ok' : 'fail', `In = ${nfmt(r.In, 0)} kA (8/20 µs) ≥ 5 kA por modo; Imáx = ${r.Imax} kA para exposição ${EXPO_DPS[exp][1].split(' — ')[0].toLowerCase()}`);
+    if (r.lig === 'npe') v('info', 'Centelhador N–PE: corrente subsequente interrompida Ifi ≥ 100 A (NBR 5410).');
+    v(r.In >= r.InReq - 1e-9 ? 'ok' : 'fail', `${r.InProd ? `In do produto = ${nfmt(r.In, 0)} kA ${cmp(r.In, r.InReq)} ${nfmt(r.InReq, 0)} kA exigidos` : `In = ${nfmt(r.In, 0)} kA`} (8/20 µs) por modo — ${out.InTxt}${cl1 ? '; DPS classe I+II: In ≥ 20 kA (faixa de catálogo)' : ''}; mínimo de 5 kA da NBR 5410`);
     v(r.L <= 0.5 + 1e-9 ? 'ok' : 'fail', `Condutores de ligação: ${nfmt(r.L, 2)} m ≤ 0,5 m (comprimento total, condutor vivo → DPS → barramento PE)`);
-    v(r.S >= r.Smin - 1e-9 ? 'ok' : 'fail', `Seção dos condutores de ligação ${fS(r.S)} mm² ≥ ${r.Smin} mm² Cu${r.Smin === 16 ? ' (DPS classe I / estrutura com SPDA)' : ''}`);
+    v(r.S >= r.SminNBR - 1e-9 ? 'ok' : 'fail', `Seção dos condutores de ligação ${fS(r.S)} mm² ${cmp(r.S, r.SminNBR)} ${r.SminNBR} mm² Cu (NBR 5410${r.SminNBR === 16 ? ', DPS classe I / estrutura com SPDA' : ''})`);
+    const lig = r.emV ? 'ligação em série (em V)' : 'ligação em paralelo (em T)';
+    if (r.lq && !r.lq.fora) { const sl = Math.max(r.lq.fase, r.lq.pe); v(r.S >= sl - 1e-9 ? 'ok' : 'warn', `Seção pela proteção a montante de ${r.Imont} A — ${lig}, catálogo Siemens: lado da fase ${r.lq.fase} mm², lado do PE ${r.lq.pe} mm²${r.lq.F2 ? `, com fusível F2 de ${r.lq.F2} A gL/gG no ramal do DPS` : ''}${r.S < sl - 1e-9 ? ` — adotados ${fS(r.S)} mm²` : ''}`); }
+    else if (r.lq) v('warn', `Ligação em série (em V) com proteção a montante de ${r.Imont} A: o fabricante prevê até ${r.lq.max} A — use a ligação em paralelo (em T) com retaguarda própria.`);
+    else v('info', 'Informe o disjuntor geral do quadro para obter a seção dos condutores de ligação pela proteção a montante (catálogo Siemens).');
     v(r.Upf <= r.UwRef + 1e-9 ? 'ok' : 'warn', `Nível efetivo Up/f = ${r.tec === 'centelhador' ? 'máx(Up; ΔU)' : 'Up + ΔU'} = ${r.tec === 'centelhador' ? `máx(${nfmt(r.Up, 2)}; ${nfmt(r.dU, 2)})` : `${nfmt(r.Up, 2)} + ${nfmt(r.dU, 2)}`} = ${nfmt(r.Upf, 2)} kV ${r.Upf <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV (categoria ${r.catRef}${r.soDist ? ', quadro só de distribuição' : ''})${r.Upf > r.UwRef + 1e-9 ? ': prever DPS classe III junto aos equipamentos ou ligação em V' : ''}`);
-    if (!r.soDist) v(r.foraLpo.length && !out.nSens ? 'warn' : 'ok', r.lpoDispensa ? `Distância de proteção: Up/f = ${nfmt(r.Upf, 2)} kV < Uw/2 = ${nfmt(r.UwEq / 2, 2)} kV — distância por oscilação dispensada` : `Distância de proteção por oscilação lpo = (Uw − Up/f) / ${K_OSC} V/m = ${nfmt(r.lpo, 1)} m${!r.foraLpo.length ? ' — todos os circuitos atendem' : `; circuitos ${r.foraLpo.join(', ')} mais longos: ${out.nSens ? `equipamentos sensíveis protegidos pelos ${out.nSens} DPS classe III previstos` : `DPS classe III junto aos equipamentos sensíveis ou DPS com Up/f ≤ ${nfmt(r.UwEq / 2, 2)} kV`}`}`);
-    if (r.back == null) v('info', 'Proteção de retaguarda: informe a corrente máxima do fusível ou disjuntor indicada pelo fabricante do DPS.');
-    else if (r.Imont && r.Imont > r.back) v('warn', `A proteção a montante (${r.Imont} A) excede a retaguarda máxima do DPS (${r.back} A): instalar dispositivo de retaguarda dedicado de até ${r.back} A.`);
+    if (r.lig === 'npe') v(r.UpfPE == null ? 'info' : r.UpfPE <= r.UwRef + 1e-9 ? 'ok' : 'warn', r.UpfPE == null ? 'Ligação n+1: confirme no catálogo o Up entre fase e PE (módulo da fase em série com o centelhador N–PE; na linha Siemens 5SD7, de 1,7 a 2,5 kV).' : `Nível de proteção fase–PE da ligação n+1: ${nfmt(r.UpPE, 2)} + ${nfmt(r.dU, 2)} = ${nfmt(r.UpfPE, 2)} kV ${r.UpfPE <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV${r.UpfPE > r.UwRef + 1e-9 ? ': proteger os equipamentos com DPS classe II ou III a jusante' : ''}`);
+    if (!r.soDist) {
+      const base = critDist === 'fab' ? `Distância de proteção de ${D_PROT_FAB} m (prática de fabricante, catálogo Siemens)` : `Distância de proteção por oscilação lpo = (Uw − Up/f) / ${K_OSC} V/m = ${nfmt(r.dProt, 1)} m`;
+      v(r.foraDist.length && !out.nSens ? 'warn' : 'ok', r.distDispensa ? `Distância de proteção: Up/f = ${nfmt(r.Upf, 2)} kV < Uw/2 = ${nfmt(r.UwEq / 2, 2)} kV — distância por oscilação dispensada` : `${base}${!r.foraDist.length ? ' — todos os circuitos atendem' : `; circuitos ${r.foraDist.join(', ')} mais longos: ${out.nSens ? `equipamentos sensíveis protegidos pelos ${out.nSens} DPS classe III previstos` : 'DPS classe III junto aos equipamentos sensíveis'}`}`);
+    }
+    if (r.back == null && r.F2) v('info', `Proteção a montante de ${r.Imont} A: prever fusível F2 de ${r.F2} A gL/gG no ramal do DPS (catálogo Siemens) ou a retaguarda indicada pelo fabricante do produto.`);
+    else if (r.back == null) v('info', 'Proteção de retaguarda: informe a corrente máxima do fusível ou disjuntor indicada pelo fabricante do DPS.');
+    else if (r.Imont && r.Imont > r.back) v('warn', `A proteção a montante (${r.Imont} A) excede a retaguarda máxima do DPS (${r.back} A): instalar dispositivo de retaguarda dedicado de ${r.back} A — valor menor pode romper com surtos abaixo dos nominais do DPS.`);
     else v('ok', `Proteção a montante${r.Imont ? ` de ${r.Imont} A` : ''} dentro da retaguarda máxima do fabricante (${r.back} A)`);
     if (r.isccr && r.icc) v(r.icc <= r.isccr + 1e-9 ? 'ok' : 'fail', `Corrente de curto-circuito presumida ${nfmt(r.icc, 1)} kA ≤ ${nfmt(r.isccr, 1)} kA suportável pelo DPS com a retaguarda (Isccr)`);
     else v('info', 'Informe a corrente de curto-circuito suportável do DPS (Isccr) para comparar com a do quadro.');
-    if (P.aterramento === 'TT') v(r.lig === 'npe' ? 'ok' : 'warn', r.lig === 'npe' ? 'Esquema TT: DPS a montante do DR com ligação n+1 (NBR 5410, Figura 13)' : 'Esquema TT com DPS ao PE: só a jusante do DR; a montante do DR use a ligação n+1 (NBR 5410, Figura 13)');
+    if (P.aterramento === 'TT') v(r.lig === 'npe' ? 'ok' : 'warn', r.lig === 'npe' ? 'Esquema TT: DPS a montante do DR com ligação n+1 (NBR 5410, Figura 13, esquema de conexão 3)' : 'Esquema TT com DPS ao PE: só a jusante do DR; a montante do DR use a ligação n+1 (NBR 5410, Figura 13)');
     if (!origem) {
       const up = out.quadros[q.alim.quadro], Lc = +q.alim.L || 0;
       if (up && up.ativo && Qd.dpsCoord) v('ok', `Coordenação com o DPS do ${q.alim.quadro}: produtos declarados coordenados pelo fabricante`);
       else if (up && up.ativo && Lc < D_COORD) v('warn', `Coordenação: ${nfmt(Lc, 1)} m de cabo entre os DPS do ${q.alim.quadro} e deste quadro (< ${D_COORD} m) — use DPS declarados coordenados pelo fabricante ou indutor de desacoplamento.`);
       else if (up && up.ativo) v('ok', `Coordenação com o DPS do ${q.alim.quadro}: ${nfmt(Lc, 1)} m de cabo entre os estágios (≥ ${D_COORD} m)`);
     }
-    if (Qd.dpsJusDR) v('info', 'DPS a jusante de DR geral: o DR deve ser seletivo (tipo S) e imune a surtos, para não atuar a cada descarga.');
-    if (r.lig === 'npe') v('info', 'Centelhador N–PE: corrente subsequente interrompida Ifi ≥ 100 A (IEC 60364-5-534).');
+    if (Qd.dpsJusDR) v('info', `DPS a jusante de DR: o DR, instantâneo ou temporizado, deve ter imunidade a correntes de surto de no mínimo ${IMUN_DR} kA (8/20 µs) — DR tipo S recomendado.`);
     r.status = r.verifs.some(x => x[0] === 'fail') ? 'fail' : r.verifs.some(x => x[0] === 'warn') ? 'warn' : 'ok';
     // especificação e materiais
     const corr = cl1 ? `Iimp ${nfmt(r.Iimp, 1)} kA (10/350 µs), In ${nfmt(r.In, 0)} kA` : `In ${nfmt(r.In, 0)} kA, Imáx ${r.Imax} kA (8/20 µs)`;
-    r.spec = `DPS classe ${r.classe}${cl1 ? ` (${r.tec})` : ''}, ligação ${r.ligTxt}: Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV, UT ≥ ${nfmt(r.UTmin, 0)} V/5 s`;
+    r.spec = `DPS classe ${r.classe}${cl1 ? ` (${r.tec})` : ''}, ligação ${r.ligTxt}: Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`;
     const nb = 'ABNT NBR IEC 61643-11';
-    if (r.lig === 'pe') r.materiais.push([`DPS classe ${r.classe} unipolar${cl1 ? ` (${r.tec})` : ''} — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF + 1, 'un', nb]);
+    if (r.lig === 'pe') r.materiais.push([`DPS classe ${r.classe} unipolar${cl1 ? ` (${r.tec})` : ''} — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, r.nPolos, 'un', nb]);
     else {
       r.materiais.push([`DPS classe ${r.classe} unipolar (fase–neutro) — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF, 'un', nb]);
       r.materiais.push([`Centelhador N–PE classe ${r.classe} — Uc ${r.UcN} V, ${cl1 ? `Iimp ${nfmt(r.IimpNPE, 0)} kA (10/350 µs)` : `In ${nfmt(r.In * (nF + 1) / 2, 0)} kA (8/20 µs)`}`, 1, 'un', nb]);
     }
-    r.materiais.push([`Condutor de cobre verde-amarelo ${fS(r.S)} mm² para ligação dos DPS`, Math.max(1, Math.ceil((nF + 2) * r.L)), 'm', 'ABNT NBR NM 247-3']);
-    if (r.back && r.Imont && r.Imont > r.back) r.materiais.push([`Disjuntor de retaguarda dos DPS ${nF + (r.lig === 'pe' ? 1 : 0)}P até ${r.back} A (conforme o fabricante)`, 1, 'un', 'ABNT NBR NM 60898']);
+    r.materiais.push([`Condutor de cobre ${fS(r.S)} mm² para ligação dos DPS (fases e PE)`, Math.max(1, Math.ceil((r.nPolos + 1) * r.L)), 'm', 'ABNT NBR NM 247-3']);
+    if (r.F2) r.materiais.push([`Fusível gL/gG ou disjuntor de retaguarda dos DPS — ${r.F2} A (conforme o fabricante)`, nF, 'un', 'ABNT NBR IEC 60269 / NBR NM 60898']);
   });
   const lista = Object.values(out.quadros).filter(r => r.ativo);
   if (out.nSens) out.classe3 = { n: out.nSens, Uc: ucDPS(P.U0) };
-  if (lista.some(r => r.foraLpo && r.foraLpo.length) && !out.nSens) out.avisos.push('Há circuitos além da distância de proteção do DPS do quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III junto a eles.');
+  if (lista.some(r => r.foraDist && r.foraDist.length) && !out.nSens) out.avisos.push('Há circuitos além da distância de proteção do DPS do quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III junto a eles.');
   else if (lista.some(r => r.status === 'warn' && r.Upf > r.UwRef) && !out.nSens) out.avisos.push('O nível de proteção efetivo excede a suportabilidade dos equipamentos em algum quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III.');
   out.status = lista.some(r => r.status === 'fail') ? 'fail' : (lista.some(r => r.status === 'warn') || out.avisos.length ? 'warn' : 'ok');
   return out;

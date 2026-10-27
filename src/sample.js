@@ -7,7 +7,7 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), spda: spdaPadrao(), dps: { ...dpsPadrao(), nSens: 2 }, materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), spda: spdaPadrao(), dps: { ...dpsPadrao(), Td: 80, LBT: 0.2, delta: 0.5, nSens: 2 }, materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
     memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }

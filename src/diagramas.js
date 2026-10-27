@@ -30,7 +30,7 @@ function dadosQuadro(proj, calc, nome) {
   const sist = { monofasico: 'monofásico', bifasico: 'bifásico', trifasico: 'trifásico' }[P.fornecimento] || '';
   return { nome, desc: Qd.desc || '', usadas: q.usadas, cs, ent, q,
     dg: { In: +Qd.dgIn > 0 ? +Qd.dgIn : ent.In, polos: q.usadas.length },
-    dps: (() => { const x = calc.dps && calc.dps.quadros[nome]; if (x) return x.ativo ? { classe: x.classe, Uc: x.Uc, UcN: x.UcN, In: x.In, Iimp: x.classe === 'I+II' ? x.Iimp : null, Up: x.Up, lig: x.lig, ligTxt: x.ligTxt } : null;
+    dps: (() => { const x = calc.dps && calc.dps.quadros[nome]; if (x) return x.ativo ? { classe: x.classe, Uc: x.Uc, UcN: x.UcN, In: x.In, Iimp: x.classe === 'I+II' ? x.Iimp : null, Up: x.Up, lig: x.lig, ligTxt: x.ligTxt, semNPE: !!x.semNPE } : null;
       return Qd.dps !== false ? { classe: 'II', Uc: ucDPS(P.U0), In: 20, Up: P.U0 <= 150 ? 1.2 : 1.5, lig: 'pe' } : null; })(),
     reserva: reservaTab59(cs.length), sistemaTxt: `${P.U0}/${P.U} V · ${sist} · esquema ${P.aterramento} · ${cs.length} circuito${cs.length === 1 ? '' : 's'}` };
 }
@@ -76,7 +76,7 @@ function unifilarSVG(d, ini = 0, fim = d.cs.length) {
     if (d.dps) {
       g += `<circle cx="${xb}" cy="166" r="2.8" fill="${DG_COR.ink}"/>` + lD(xb, 166, xb - 52, 166) + lD(xb - 52, 166, xb - 52, 178) + dpsD(xb - 52, 178) + lD(xb - 52, 200, xb - 52, 210) + terraD(xb - 52, 210);
       g += tD(xb - 12, 236, `DPS classe ${d.dps.classe}`, { fs: 9.5, anc: 'end' }) + tD(xb - 12, 248, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, anc: 'end', cor: DG_COR.mut })
-        + tD(xb - 12, 260, `${d.dps.lig === 'npe' ? `${d.usadas.length}+1 (N–PE centelhador)` : `${d.usadas.length + 1}+0 → PE`}${d.dps.Up ? ` · Up ${nfmt(d.dps.Up, 1)} kV` : ''}`, { fs: 9, anc: 'end', cor: DG_COR.mut });
+        + tD(xb - 12, 260, `${d.dps.lig === 'npe' ? `${d.usadas.length}+1 (N–PE centelhador)` : d.dps.semNPE ? `${d.usadas.length}+0 → PEN/BEP` : `${d.usadas.length + 1}+0 → PE`}${d.dps.Up ? ` · Up ${nfmt(d.dps.Up, 1)} kV` : ''}`, { fs: 9, anc: 'end', cor: DG_COR.mut });
     }
   }
   g += lD(xb, ini ? 56 : 156, xb, yEnd, { w: 5 }) + (ini ? lD(xb, 50, xb, 60, { w: 5, dash: '3 3' }) : '');
@@ -134,7 +134,7 @@ function multifilarSVG(d, ini = 0, fim = Math.min(d.cs.length, DIAG_MULTI)) {
   });
   g += lD(63, yb[fases[0]] - 5, 63, yb[fases[fases.length - 1]] - 4, { w: 1, dash: '2 2' }) + tD(64, yb[fases[0]] - 13, d.dg.In ? `DG ${d.dg.polos}P ${d.dg.In} A` : 'DG', { fs: 9.5, anc: 'middle' });
   if (d.dps) {
-    const vivos = [...fases, 'N'], yD = yBot + 26, xs = vivos.map((k, i) => 124 + i * 14);
+    const vivos = d.dps.semNPE ? [...fases] : [...fases, 'N'], yD = yBot + 26, xs = vivos.map((k, i) => 124 + i * 14);
     let yC = yD + 34;
     if (d.dps.lig === 'npe') {
       // n+1: fases ao neutro por varistores; neutro ao PE por centelhador
@@ -147,7 +147,7 @@ function multifilarSVG(d, ini = 0, fim = Math.min(d.cs.length, DIAG_MULTI)) {
       vivos.forEach((k, i) => { g += fioD(xs[i], yb[k], xs[i], yD, k) + noD(xs[i], yb[k], k) + dpsD(xs[i], yD, 20) + lD(xs[i], yD + 20, xs[i], yC); });
       g += fioD(114, yC, xs[xs.length - 1], yC, 'PE') + fioD(114, yb.PE, 114, yC, 'PE') + noD(114, yb.PE, 'PE');
     }
-    g += tD(110, yC + 18, `DPS classe ${d.dps.classe} · ${d.dps.lig === 'npe' ? `${fases.length}+1` : `${fases.length + 1}+0`}`, { fs: 9.5 }) + tD(110, yC + 30, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, cor: DG_COR.mut });
+    g += tD(110, yC + 18, `DPS classe ${d.dps.classe} · ${d.dps.lig === 'npe' ? `${fases.length}+1` : `${vivos.length}+0`}`, { fs: 9.5 }) + tD(110, yC + 30, d.dps.Iimp ? `Iimp ${nfmt(d.dps.Iimp, 1)} kA · Uc ${d.dps.Uc} V` : `Uc ${d.dps.Uc} V · In ${nfmt(d.dps.In, 0)} kA`, { fs: 9, cor: DG_COR.mut });
   }
   // legenda das cores
   [['A', 'fase A — preto'], ['B', 'fase B — vermelho'], ['C', 'fase C — branco'], ['N', 'neutro — azul-claro'], ['PE', 'proteção — verde-amarelo']].filter(([k]) => cond.includes(k)).forEach(([k, l], i) => {

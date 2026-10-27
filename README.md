@@ -44,16 +44,23 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
   - colunas de ligação, FCA, FCT e fator de potência;
   - exportação para Excel com fórmulas.
 
-**Proteção contra surtos — DPS (NBR 5410 6.3.5 e NBR 5419-4:2026)**
-- **Por quadro:** classe (I+II na entrada com SPDA ou exposição alta; II nos quadros), ligação pelo esquema de aterramento (n+0 ao PE ou n+1 com centelhador N–PE; TT a montante do DR em n+1), Uc pela Tabela 49 e valor comercial (175 V em 127/220 V; 275 V em 220/380 V).
-- **Correntes:** In ≥ 5 kA; Imáx pela exposição segundo as faixas usuais de fabricantes (20, 40 ou 65 kA); Iimp ≥ 12,5 kA ou o do nível do SPDA (25 / 18,75 / 12,5 kA por polo; N–PE com a soma).
-- **Verificações:** Up ≤ categoria II da Tabela 31, nível efetivo Up/f contra a suportabilidade dos equipamentos (varistor: Up + ΔU; centelhador: máx(Up; ΔU); ΔU de 1 kV/m na classe I e desprezível na ligação em V), condutores de ligação (≤ 0,5 m; 4 ou 16 mm²), retaguarda e Isccr do fabricante e indicação de DPS classe III.
-- **Parâmetros complementares de seleção:**
-  - sobretensão temporária (TOV): UT ≥ 1,45 × U0 por 5 s; no TT, centelhador N–PE para 1 200 V por 200 ms (IEC 61643-11);
-  - centelhadores: corrente subsequente interrompida Ifi ≥ curto-circuito presumido; N–PE com Ifi ≥ 100 A (IEC 60364-5-534);
-  - distância de proteção por oscilação lpo = (Uw − Up/f) / 25 V/m, com a lista dos circuitos terminais mais longos (IEC 62305-4, Anexo D);
-  - coordenação entre estágios: DPS declarados coordenados pelo fabricante ou pelo menos 10 m de cabo (IEC 61643-12, informativo);
-  - DPS a jusante de DR geral: DR seletivo (tipo S).
+**Proteção contra surtos — DPS (NBR 5410 6.3.5, NBR 5419-4:2026 e métodos de fabricantes)**
+- **Obrigatoriedade (NBR 5410, influências AQ):** obrigatório com SPDA (AQ3) ou com alimentação aérea e Td > 25 dias de trovoada por ano (AQ2).
+- **Por quadro:**
+  - classe I+II na entrada com SPDA e II nos quadros;
+  - ligação pela Figura 13: só fases com o neutro aterrado no BEP (TN-C-S na entrada), n+0 ao PE, ou n+1 com centelhador N–PE no TT a montante do DR;
+  - Uc pela Tabela 49 (valor comercial ou do produto).
+- **Corrente nominal da classe II — dois métodos:**
+  - nível de exposição F = Td × (1,6 + 2 × LBT + δ) → In 5, 10 ou 20 kA (catálogo Siemens 5SD7);
+  - faixas de exposição com Imáx de 20, 40 ou 65 kA (catálogos).
+- **Correntes da classe I:** Iimp ≥ 12,5 kA ou o do nível do SPDA (25 / 18,75 / 12,5 kA por polo; N–PE com a soma); Ifi dos centelhadores ≥ curto-circuito presumido e N–PE ≥ 100 A.
+- **Nível de proteção:**
+  - Up ≤ categoria II da Tabela 31;
+  - nível efetivo: varistor Up + ΔU, centelhador máx(Up; ΔU); ΔU de 1 kV/m na classe I e desprezível na ligação em V;
+  - Up fase–PE na ligação n+1.
+- **Condutores de ligação:** ≤ 0,5 m; seção mínima de 4 ou 16 mm² (NBR 5410) e seção do fabricante pela proteção a montante, em série (V) ou paralelo (T), com o fusível F2 quando exigido (catálogo Siemens).
+- **Distância de proteção:** lpo = (Uw − Up/f) / 25 V/m (IEC 62305-4, Anexo D) ou 30 m (prática de fabricante), com a lista dos circuitos que pedem DPS classe III.
+- **Demais verificações:** retaguarda e Isccr do fabricante, coordenação entre estágios (declaração do fabricante ou 10 m de cabo) e DR a montante com imunidade ≥ 3 kA (8/20 µs).
 - **Saídas:** memória própria (PDF, Word e HTML) anexável ao memorial descritivo; especificação nos diagramas unifilar e multifilar (com o desenho da ligação n+1) e na lista de materiais.
 
 **SPDA — proteção contra descargas atmosféricas (ABNT NBR 5419:2026)**
@@ -187,7 +194,7 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 | Demanda | Energisa NDU 001 v7.0 e NDU 003 v8.1 (Tabelas 03 e 04 da NDU 003 a preencher pelo projetista) |
 | Carga térmica | ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008; NBR 15220-2; ISO 7730; ASHRAE Handbook — Fundamentals |
 | SPDA | ABNT NBR 5419-1 a 5419-4:2026 (substituiu a edição 2015); IEC 62305 |
-| DPS | ABNT NBR 5410:2004 (6.3.5, Tabelas 31 e 49); ABNT NBR 5419-4:2026; ABNT NBR IEC 61643-11; IEC 61643-12; IEC 60364-5-534; IEC 62305-4 (Anexo D); Energisa ETU-124.2; catálogos de fabricantes |
+| DPS | ABNT NBR 5410:2004 (6.3.5, Tabelas 31 e 49, Figura 13); ABNT NBR 5419-4:2026; ABNT NBR IEC 61643-11; IEC 61643-12; IEC 62305-4 (Anexo D); Siemens, catálogo DPS 5SD7 (2021); Energisa ETU-124.2; fichas Clamper e demais fabricantes |
 | Aterramento | ABNT NBR 5410:2004 (6.4); NBR 7117-1:2020; NBR 15749:2009; NBR 15751:2013; IEEE Std 80-2013; Energisa NDU 001 v7.0 (8.10); Kindermann & Campagnolo, *Aterramento Elétrico* |
 
 **Dados que o projetista precisa confirmar:**
@@ -197,7 +204,7 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 - **Iluminação externa:**
   - os níveis da NBR 5101 são os da edição 2018 (a edição 2024 usa as classes M, C e P, com requisitos de luminância) e os da EN 12464-2 são de referência; confirme na edição vigente e nas exigências da prefeitura ou da distribuidora;
   - os projetores do catálogo são genéricos e o modelo de intensidade é simétrico em torno do eixo de mira; para luminárias viárias assimétricas e projetos executivos, confirme com a fotometria do fabricante (IES/LDT) em software de cálculo.
-- **DPS:** confira na sua NBR 5410 os valores das Tabelas 31 e 49 e dos itens 6.3.5.2 usados no motor, e informe Up, Iimp, UT, Ifi, retaguarda e Isccr do produto escolhido (os valores-padrão são típicos de catálogo). Os critérios de TOV, Ifi e coordenação por 10 m vêm das normas IEC e de catálogos; a regra dos 10 m é informativa e cede à declaração do fabricante.
+- **DPS:** confira na sua NBR 5410 os valores das Tabelas 31 e 49 e dos itens 6.3.5.2 usados no motor, e informe Uc, Up, In, Iimp, Ifi, retaguarda e Isccr do produto escolhido (os valores-padrão são típicos de catálogo). O nível de exposição F, as seções pela proteção a montante e a distância de 30 m são do catálogo Siemens 5SD7 (2021); a coordenação por 10 m de cabo é informativa e cede à declaração do fabricante. O Td (dias de trovoada por ano) vem do mapa isoceráunico da região.
 - **SPDA:**
   - a densidade NG vem da tabela municipal do Anexo F da NBR 5419-2:2026: os 79 municípios de Mato Grosso do Sul estão no motor de cálculo (o memorial cita só o município escolhido; o exemplo usa Campo Grande, NG = 30); para outros estados, informe o valor;
   - as probabilidades e perdas seguem as tabelas da Parte 2 e ficam listadas no memorial; os limites da frequência de danos (1 e 0,1 por ano) e as seções de materiais da revisão foram obtidos de resumos técnicos — confira-os no texto oficial da ABNT.
