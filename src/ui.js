@@ -2,7 +2,7 @@
    INTERFACE
    ================================================================ */
 const LS_KEY = 'dimensiona5410.projeto.v1', LS_TAB = 'dimensiona5410.aba';
-const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'materiais', 'memoria', 'tabelas'];
+const ABAS = ['projeto', 'circuitos', 'eletrodutos', 'eletrocalhas', 'quadros', 'energisa', 'lumi', 'clima', 'aterr', 'spda', 'materiais', 'memoria', 'tabelas'];
 const QDIAG = {};
 let PROJ, CALC, SEL = null, LSEL = null, USEL = null, CSEL = null, ASEL = null, CCONS_ABERTO = false, DESC_ABERTO = false, MEMSEL = 'descritivo', LPLANTA = 'mapa', TAB = 'circuitos', REFTAB = '33', REFMAT = 'Cu';
 const MEMOPT = { metodologia: true, detalhe: true, anexo33: true, assinatura: true };
@@ -66,6 +66,7 @@ function normalizarProjeto(p) {
   out.energisa = normalizarEnergisa(p.energisa);
   out.clima = normalizarClima(p.clima);
   out.aterr = normalizarAterr(p.aterr);
+  out.spda = normalizarSPDA(p.spda);
   out.materiais = normalizarMateriais(p.materiais);
   out.descritivo = normalizarDescritivo(p.descritivo, out.params.edificacao);
   out.memorias = { grupo: MEMORIAS.map(m => m.id), ...(p.memorias || {}) };
@@ -87,7 +88,7 @@ function carregar() {
 }
 
 /* ---------- ciclo de atualização ---------- */
-function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
+function recalc() { garantirQuadros(PROJ); if (!PROJ.energisa) PROJ.energisa = energisaPadrao(); if (!PROJ.clima) PROJ.clima = climaPadrao(); CALC = calcularProjeto(PROJ); CALC.energisa = calcEnergisa(PROJ); CALC.clima = calcClima(PROJ, CALC); if (!PROJ.aterr) PROJ.aterr = aterrPadrao(); CALC.aterr = calcAterramento(PROJ, CALC); if (!PROJ.spda) PROJ.spda = spdaPadrao(); CALC.spda = calcSPDA(PROJ, CALC); if (!PROJ.materiais) PROJ.materiais = materiaisPadrao(); if (!PROJ.descritivo) PROJ.descritivo = descritivoPadrao(PROJ.params.edificacao); CALC.materiais = calcMateriais(PROJ, CALC); }
 function circSel() { return PROJ.circuitos.find(c => c.id === SEL) || null; }
 function ambSel() { return (PROJ.lumi || []).find(a => a.id === LSEL) || null; }
 function mudou(struct) { recalc(); salvarLocal(); renderCabecalho(); if (struct) renderAba(); else renderParcial(); }
@@ -128,6 +129,8 @@ function onCampo(ev, isChange) {
   else if (sc === 'descinf') { const D = PROJ.descritivo, inf = box.dataset.inf; if (k === 'cod') D.influencias[inf] = v; else { D.medidas = D.medidas || {}; if (v) D.medidas[inf] = v; else delete D.medidas[inf]; } }
   else if (sc === 'desclocal') { const l = PROJ.descritivo.locais[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
+  else if (sc === 'spda') { PROJ.spda[k] = v; struct = efeitosSPDA(k) || struct; }
+  else if (sc === 'spdalin') { const l = PROJ.spda.linhas[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'aarr') { const a = arrSel(); if (!a) return; a[k] = v; struct = efeitosArranjo(a, k) || struct; }
   else if (sc === 'cat') { if (v == null || !(v > 0)) delete PROJ.catalogo[k]; else PROJ.catalogo[k] = v; }
   mudou(struct);
@@ -236,7 +239,7 @@ function irPara(tab) {
   ABAS.forEach(a => { $('#tab-' + a).hidden = a !== TAB; });
   renderCabecalho(); renderAba();
 }
-function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
+function renderAba() { ({ projeto: renderProjeto, circuitos: renderCircuitos, eletrodutos: renderEletrodutos, eletrocalhas: renderEletrocalhas, quadros: renderQuadros, energisa: renderEnergisa, lumi: renderLumi, clima: renderClima, aterr: renderAterr, spda: renderSPDA, materiais: renderMateriais, memoria: renderMemoria, tabelas: renderTabelas })[TAB](); }
 function renderParcial() {
   if (TAB === 'circuitos') { renderLista(); renderResultado(); const c = circSel(), d = $('#c-dem-val'); if (c && d) d.innerHTML = demCircTxt(c); }
   else if (TAB === 'projeto') Object.values(CALC.quadros).forEach(q => { const el = $('#pd-' + safeId(q.q)); if (el) el.innerHTML = demQuadroTxt(q.dem); });
@@ -245,6 +248,7 @@ function renderParcial() {
   else if (TAB === 'energisa') atualizarEnergisaParcial();
   else if (TAB === 'clima') atualizarClimaParcial();
   else if (TAB === 'aterr') atualizarAterrParcial();
+  else if (TAB === 'spda') renderSPDARes();
   else if (TAB === 'materiais') renderMatResumo();
   else if (TAB === 'memoria') { clearTimeout(renderParcial._t); renderParcial._t = setTimeout(() => { const f = $('#folha'); if (f && TAB === 'memoria') f.innerHTML = renderHTMLDoc(docAtual(MEMSEL).blocos); }, 400); }
   else if (TAB === 'eletrodutos') Object.values(CALC.trechos).forEach(t => { const pre = 't-' + safeId(t.key); const r = $('#' + pre + '-res'); if (r) r.innerHTML = trechoRes(t); const p = $('#' + pre + '-pill'); if (p) p.outerHTML = pillTrecho(t, pre); });
@@ -870,6 +874,14 @@ function renderTabelas() {
       + h3t('Tabela 14 — solda a transformador, raios X e galvanização') + tabelaHTML(['Equipamento', 'Fatores'], [['Solda a arco e galvanização', '1º maior 100 % · 2º maior 70 % · 3º maior 40 % · demais 30 %'], ['Solda a resistência', 'maior 100 % · demais 60 %'], ['Raios X', 'maior 100 % · demais 70 %']], false)
       + h3t('Tabela 16 — categorias de atendimento, 220/127 V') + cat(CAT_T16) + h3t('Tabela 21 — categorias de atendimento, 254/127 V (rede monofásica)') + cat(CAT_T21);
     nota = `Energisa ${NDU001_VER}. D (kVA) = (d1 + … + d7) / 0,92. Tipos M e B enquadrados pela carga instalada (kW); tipo T pela demanda (kVA). Valores "a (b)": cabo embutido (subterrâneo). Disjuntor dimensionado para o limite superior da faixa. A Tabela 16 vale para EAC, EMR, EMS, EMT, ERO, ESE e ESS. As tabelas da NDU 003 (agrupamentos e edifícios) são informadas na aba Demanda Energisa.`;
+  } else if (REFTAB === 'spda') {
+    const nps = ['I', 'II', 'III', 'IV'], hs = [2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+    corpo = tabelaHTML(['Nível de proteção', 'Esfera rolante (m)', 'Malha (m)', 'Descidas e anéis (m)', 'ki', 'Corrente de pico (kA)', 'PB', 'PEB / PSPD'], nps.map(k => { const P = NP_SPDA[k]; return [`NP ${k}`, String(P.r), `${P.malha} × ${P.malha}`, String(P.desc), fp(P.ki), String(P.Ip), fp(P.PB), fp(PSPD_NIV[k])]; }))
+      + h3t('Ângulo de proteção α (graus) pela altura do captor acima do plano de referência') + tabelaHTML(['Altura h (m)', ...nps.map(k => `NP ${k}`)], hs.map(h => [String(h), ...nps.map(k => { const a = anguloProtecao(h, NP_SPDA[k].r); return a == null ? '—' : nfmt(a, 1); })]))
+      + h3t('Seções mínimas dos materiais (NBR 5419-3:2026)') + tabelaHTML(['Material', 'Captação e descidas', 'Aterramento'], [['Cobre', '35 mm²', '50 mm² (cabo de 7 ou 19 fios)'], ['Aço cobreado', '35 mm²', '50 mm²'], ['Alumínio', '70 mm²', 'não utilizar'], ['Alumínio cobreado', '70 mm²', '—'], ['Aço zincado a quente', '50 mm²', 'conforme a norma — não usar na transição concreto–solo'], ['Captor vertical maciço', '200 mm² (Ø 16 mm)', '—'], ['Captor vertical tubular', '100 mm², parede de 1,2 mm', '—']], false)
+      + h3t('Comprimento mínimo do eletrodo l1 (arranjo B)') + tabelaHTML(['ρ (Ω·m)', 'NP I', 'NP II', 'NP III e IV'], [100, 500, 800, 1000, 1500, 2000, 3000].map(r => [String(r), nfmt(l1Aterr('I', r), 1), nfmt(l1Aterr('II', r), 1), nfmt(l1Aterr('III', r), 1)]))
+      + h3t('Distância de segurança s = ki × (kc / km) × l') + tabelaHTML(['Coeficiente', 'Valores'], [['ki', 'NP I: 0,08 · NP II: 0,06 · NP III e IV: 0,04'], ['kc', '1 descida: 1 · 2 descidas: 0,66 · 3 ou mais: 0,44'], ['km', 'ar: 1 · concreto ou alvenaria: 0,5']], false);
+    nota = 'ABNT NBR 5419:2026. O ângulo de proteção é calculado pela equivalência de área com a esfera rolante, que reproduz as curvas da Parte 3; acima do raio da esfera só se aplicam a esfera rolante e as malhas. Distância entre descidas: valor típico, admitidos 20 % a mais. A edição de 2026 trocou "classe do SPDA" por "nível de proteção (NP)", manteve apenas o arranjo B (anel) no aterramento, equiparou o aço cobreado ao cobre e passou a verificar a eficácia do aterramento pela continuidade elétrica. As seções da tabela vêm de resumos técnicos da revisão; confira-as no texto oficial da ABNT. Inspeção: visual anual; completa a cada 3 anos (1 ano para explosivos, corrosão severa ou serviços essenciais).';
   } else if (REFTAB === 'ext') {
     const linhas = []; let g = null;
     REQ_EXT.forEach(a => { if (a.g !== g) { g = a.g; linhas.push([`<b>${esc(g)}</b>`, '', '', '']); } linhas.push([esc(a.n), nfmt(a.Em, 0), nfmt(a.U0, 2), esc(a.ref)]); });
@@ -964,6 +976,9 @@ document.addEventListener('click', ev => {
     case 'bt-dup-ext': { const a = areaXSel(); if (!a) return; const n = JSON.parse(JSON.stringify(a)); n.id = uid(); n.nome = (a.nome || '') + ' (cópia)'; PROJ.lumiExt.splice(PROJ.lumiExt.indexOf(a) + 1, 0, n); XSEL = n.id; mudou(true); return; }
     case 'bt-exc-ext': return confirmar2(el, 'Confirmar exclusão', () => { const X = PROJ.lumiExt, i = X.findIndex(a => a.id === XSEL); if (i < 0) return; const [rm] = X.splice(i, 1); XSEL = (X[i] || X[i - 1] || {}).id || null; mudou(true); toast(`${rm.nome} excluída.`); });
     case 'bt-sug-ext': return aplicarSugestaoExt();
+    case 'bt-spda-ativar': PROJ.spda.ativo = true; mudou(true); return;
+    case 'bt-spda-retirar': return confirmar2(el, 'Confirmar: retirar?', () => { PROJ.spda.ativo = false; mudou(true); toast('SPDA retirado do projeto (os dados ficam guardados).'); });
+    case 'bt-spda-sug': { const s = CALC.spda.projeto && CALC.spda.projeto.sugestao; if (!s) return; Object.assign(PROJ.spda, { mx: s.mx, my: s.my }); mudou(true); return; }
     case 'bt-add-q': { const inp = $('#novo-quadro'); const n = (inp.value || '').trim(); if (!n) { toast('Informe o nome do quadro.'); inp.focus(); return; } if (PROJ.quadros[n]) { toast(`Já existe o quadro ${n}.`); return; } PROJ.quadros[n] = { desc: '', fd: null, icc: PROJ.params.icc, dvMont: 0 }; mudou(true); toast(`Quadro ${n} criado. Atribua circuitos a ele no campo "Quadro de origem".`); return; }
     case 'bt-cat-reset': PROJ.catalogo = {}; mudou(true); toast('Valores típicos restaurados.'); return;
     case 'bt-salvar': return oferecerArquivo(`${slug()}.dimensiona5410.json`, JSON.stringify(PROJ, null, 2), 'application/json');

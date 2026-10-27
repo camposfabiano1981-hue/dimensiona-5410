@@ -7,7 +7,7 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), spda: spdaPadrao(), materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
     memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }
@@ -74,6 +74,8 @@ function projetoExemplo() {
   const qtd = (ini, q) => { const x = proj.materiais.itens.find(m => m.desc.startsWith(ini)); if (x) x.qtd = q; };
   [['DPS classe II', 4], ['Barramento de neutro', 1], ['Barramento de proteção', 1], ['Caixa de embutir 4×2', 30], ['Caixa octogonal', 14], ['Tomada 2P+T 10 A', 18], ['Tomada 2P+T 20 A', 4],
     ['Interruptor simples 10 A', 8], ['Interruptor paralelo', 2], ['Saída de fio', 3], ['Barramento de equipotencialização', 1], ['Conector de emenda', 40], ['Fita isolante', 5], ['Anilhas', 1]].forEach(([i, q]) => qtd(i, q));
+  Object.assign(proj.spda, { ativo: true, nome: 'Residência unifamiliar térrea', L: 15, W: 8, H: 5.5, cd: 'menores', Ng: 10, ngFonte: 'valor ilustrativo — substitua pelo NG do Anexo F da NBR 5419-2:2026 para o município',
+    ocup: 'residencial', piso: 'ceramica', rp: 'manual', rf: 'normal', np: 'III', dps: 'auto', metodo: 'malha', matCapt: 'aluminio70', matAterr: 'cobre50', dParede: 1, prof: 0.5 });
   return proj;
 }
 if (typeof module !== 'undefined') module.exports = { projetoExemplo, projetoVazio };

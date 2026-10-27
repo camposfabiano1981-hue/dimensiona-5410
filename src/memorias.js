@@ -35,6 +35,9 @@ const MEMORIAS = [
     rodape: p => p.aterr.modo === 'completo' ? 'Aterramento conforme ABNT NBR 5410:2004, NBR 7117-1:2020 e NBR 15751:2013' : 'Aterramento conforme ABNT NBR 5410:2004 — método simplificado de hastes',
     tem: p => (p.aterr.arr || []).length > 0, resumo: (p, k) => { const nf = p.aterr.arr.filter(a => k.aterr.arr[a.id].status === 'fail').length; return `${p.aterr.arr.length} sistema(s)${nf ? ` · ${nf} com pendência` : ''}`; },
     falha: (p, k) => k.aterr.status === 'fail', build: (p, k) => construirMemorialAterramento(p, k, k.aterr) },
+  { id: 'spda', nome: 'SPDA — análise de risco e projeto', norma: 'ABNT NBR 5419:2026', arq: 'memorial-spda', titulo: 'Memorial do SPDA', rodape: 'Análise de risco e projeto do SPDA conforme ABNT NBR 5419:2026',
+    tem: p => !!(p.spda && p.spda.ativo), resumo: (p, k) => { const c = k.spda; return c && c.ativo ? `${NP_TXT[c.npAdot]} · R1 ${nfmt(c.risco.R1 * 1e5, 2)} × 10⁻⁵${c.projeto ? ` · ${c.projeto.nDesc} descidas` : ''}` : '—'; },
+    falha: (p, k) => !!(k.spda && k.spda.status === 'fail'), build: (p, k, o) => construirMemorialSPDA(p, k, o) },
   { id: 'materiais', nome: 'Lista de materiais', norma: 'Cadastro de materiais e normas de fabricação', arq: 'lista-de-materiais', titulo: 'Lista de materiais', rodape: 'Lista de materiais',
     tem: (p, k) => (k.materiais || calcMateriais(p, k)).lista.length > 0, resumo: (p, k) => `${(k.materiais || calcMateriais(p, k)).lista.length} itens`, falha: () => false,
     build: (p, k, o) => construirListaMateriais(p, k, o) }

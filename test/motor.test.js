@@ -6,13 +6,13 @@ const assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const SRC = path.join(__dirname, '..', 'src');
-const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'materiais', 'pictos', 'sample', 'memorial', 'diagramas', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'descritivo', 'memorias', 'export'];
+const MODULOS = ['tables', 'engine', 'calhas', 'lumi', 'lumiext', 'energisa', 'clima', 'aterr', 'spda', 'materiais', 'pictos', 'sample', 'memorial', 'diagramas', 'lumidoc', 'energisadoc', 'climadoc', 'aterrdoc', 'spdadoc', 'descritivo', 'memorias', 'export'];
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -21,6 +21,7 @@ const E = A.calcEnergisa(P);
 const C = A.calcClima(P, K);
 K.energisa = E; K.clima = C;
 const T = A.calcAterramento(P, K); K.aterr = T;
+K.spda = A.calcSPDA(P, K);
 const MT = A.calcMateriais(P, K); K.materiais = MT;
 const perto = (v, ref, tol, msg) => assert.ok(Math.abs(v - ref) <= tol, `${msg}: ${v} ≠ ${ref} ± ${tol}`);
 
@@ -80,11 +81,36 @@ test('Diagramas — unifilar e multifilar refletem os circuitos de cada quadro',
   assert.equal(c1.fs.length + (c1.N ? 1 : 0) + (c1.PE ? 1 : 0), r1.nVias, 'condutores do circuito 1');
   assert.equal(d.cs.filter(c => c.dr).length, q.cs.filter(c => K.res[c.id].drUsado).length, 'DR nos diagramas');
   // DPS no quadro e na lista de materiais (fases + neutro)
-  const dps = MT.auto.find(i => i.key.startsWith('dps|'));
-  assert.ok(d.dps && dps && dps.q === Object.values(K.quadros).filter(x => x.cs.length).reduce((s, x) => s + x.usadas.length + 1, 0), 'DPS no quantitativo');
+  const dps = MT.auto.filter(i => i.key.startsWith('dps|')).reduce((s, i) => s + i.q, 0);
+  assert.equal(dps, Object.values(K.quadros).filter(x => x.cs.length).reduce((s, x) => s + x.usadas.length + 1, 0), 'DPS no quantitativo');
+  assert.equal(A.dadosQuadro(P, K, 'QM').dps.classe, 'I+II', 'DPS classe I+II no quadro de entrada quando há SPDA');
   const B = A.construirDiagramas(P, K);
   assert.ok(B.filter(b => b.t === 'fig' && b.full).length >= 4, 'figuras dos diagramas');
   for (const b of B.filter(b => b.t === 'fig')) assert.ok(b.ar > 0.2 && b.ar <= 1.3, `proporção da figura ${b.ar}`);
+});
+
+test('SPDA — ângulo de proteção, análise de risco e projeto (NBR 5419:2026)', () => {
+  // ângulo equivalente à esfera rolante reproduz as curvas da norma: ~71° a 2 m e ~23° no limite de altura
+  perto(A.anguloProtecao(2, 20), 70.6, 0.5, 'NP I a 2 m'); perto(A.anguloProtecao(10, 20), 45, 0.6, 'NP I a 10 m');
+  perto(A.anguloProtecao(20, 20), 23.2, 0.3, 'NP I a 20 m'); perto(A.anguloProtecao(2, 60), 79, 0.5, 'NP IV a 2 m');
+  assert.equal(A.anguloProtecao(25, 20), null, 'acima do raio da esfera o ângulo não se aplica');
+  assert.equal(A.l1Aterr('I', 3000), 80); assert.equal(A.l1Aterr('II', 800), 5); assert.equal(A.l1Aterr('III', 3000), 5);
+  // risco do exemplo: componentes conferidos com as expressões da Parte 2
+  const S = P.spda, c = K.spda, r = c.semProt, H = +S.H;
+  perto(r.AD, S.L * S.W + 6 * H * (S.L + S.W) + Math.PI * 9 * H * H, 1e-6, 'área de exposição AD');
+  perto(r.ND, S.Ng * r.AD * 0.5 * 1e-6, 1e-12, 'ND');
+  perto(r.R1, r.RA + r.RB + r.RU + r.RV, 1e-15, 'R1 = RA + RB + RU + RV');
+  perto(r.RA, r.ND * 1 * 1e-3 * 1e-2, 1e-15, 'RA = ND × PA × LA (cerâmica, sem medidas)');
+  assert.ok(c.risco.okR1, 'medidas adotadas atendem ao risco tolerável');
+  assert.ok(c.npMin != null && c.matriz.length === 5, 'combinações de NP e DPS');
+  // projeto NP III: 4 descidas nos cantos, anel com re ≥ l1, distância de segurança
+  const p = c.projeto;
+  assert.equal(p.nDesc, 4); assert.ok(p.okAnel, 'anel atende a l1');
+  perto(p.s, 0.04 * 0.44 / 1 * H, 1e-9, 'distância de segurança');
+  perto(p.Iimp, 100 * 0.5 / 4, 1e-9, 'Iimp por modo do DPS classe I (NP III, 3F+N)');
+  assert.ok(MT.auto.some(i => i.cat === 'spda'), 'materiais do SPDA no quantitativo');
+  const B = A.construirMemorialSPDA(P, K);
+  assert.ok(B.filter(b => b.t === 'fig').length >= 3 && B.some(b => b.t === 'ver'), 'memorial com figuras e verificações');
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

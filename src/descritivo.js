@@ -130,7 +130,7 @@ function construirMemorialDescritivo(proj, calc, ids, opt = {}) {
     ...(temK ? ['ABNT NBR 16401-1:2024 e NBR 16401-2:2024 — Instalações de ar-condicionado.'] : []),
     ...(temT ? ['ABNT NBR 15749:2009 — Medição de resistência de aterramento; ABNT NBR 7117-1:2020 — Resistividade do solo.'] : []),
     ...(P.edificacao === 'publica' ? ['ABNT NBR 13570 — Instalações elétricas em locais de afluência de público.'] : []),
-    'ABNT NBR 5419 (partes 1 a 4) — Proteção contra descargas atmosféricas (quando aplicável).',
+    proj.spda && proj.spda.ativo ? 'ABNT NBR 5419-1 a 5419-4:2026 — Proteção contra descargas atmosféricas.' : 'ABNT NBR 5419 (partes 1 a 4) — Proteção contra descargas atmosféricas (quando aplicável).',
     'NR-10 — Segurança em instalações e serviços em eletricidade (Ministério do Trabalho e Emprego).',
     'Normas de fabricação dos materiais, relacionadas na seção de especificação dos materiais.'
   ] });
@@ -219,8 +219,13 @@ function construirMemorialDescritivo(proj, calc, ids, opt = {}) {
   sub('Aterramento e equipotencialização');
   const sis = temT ? proj.aterr.arr.filter(a => !calc.aterr.arr[a.id].excluido) : [];
   B.push({ t: 'p', text: `Esquema de aterramento ${P.aterramento}. Todas as massas e os pontos de utilização são ligados ao condutor de proteção, que acompanha todos os circuitos. O barramento de equipotencialização principal (BEP), junto ao quadro geral, interliga o condutor de aterramento, os condutores de proteção, as tubulações metálicas e os demais elementos condutivos da edificação (6.4.2).${sis.length ? ' Eletrodos de aterramento: ' + sis.map(a => `${a.nome} — ${geomArranjoTxt(a, calc.aterr.arr[a.id])}, R = ${f2(calc.aterr.arr[a.id].R)} Ω`).join('; ') + refA('aterr') + '.' : ''}` });
+  const cs = calc.spda && calc.spda.ativo ? calc.spda : null, ps = cs && cs.projeto;
+  if (cs) {
+    sub('Proteção contra descargas atmosféricas (SPDA)');
+    B.push({ t: 'p', text: `A análise de risco pela ABNT NBR 5419-2:2026 resultou em R1 = ${nfmt(cs.risco.R1 * 1e5, 2)} × 10⁻⁵ com as medidas adotadas (tolerável 1 × 10⁻⁵)${cs.npMin === 'nenhum' ? ', sem exigência de SPDA' : cs.npMin ? `, com exigência mínima de SPDA NP ${cs.npMin}` : ''}${refA('spda')}. ${ps ? `Adotado SPDA ${NP_TXT[cs.npAdot]}${cs.opcional ? ' por opção do projeto' : ''}: captação ${ps.mastros ? `por ${ps.mx * ps.my} captor(es) Franklin` : `em malha de até ${ps.malha} × ${ps.malha} m`}, ${ps.nDesc} descidas${ps.nAneis ? `, ${ps.nAneis} anel(éis) intermediário(s)` : ''} e anel de aterramento de ${nfmt(ps.Lanel, 0)} m (arranjo B), interligado ao BEP e ao aterramento da instalação elétrica.` : 'Não é instalado SPDA.'}` });
+  }
   sub('Proteção contra surtos');
-  B.push({ t: 'p', text: `Previstos dispositivos de proteção contra surtos (DPS) na origem da instalação e nos quadros de distribuição, ligados entre cada condutor vivo e o barramento de proteção, com condutores de ligação curtos e retilíneos (6.3.5)${inf.AQ === 'AQ1' ? '' : ', em razão da classificação ' + inf.AQ + ' quanto a descargas atmosféricas'}.` });
+  B.push({ t: 'p', text: `Previstos dispositivos de proteção contra surtos (DPS) na origem da instalação e nos quadros de distribuição, ligados entre cada condutor vivo e o barramento de proteção, com condutores de ligação curtos e retilíneos (6.3.5)${inf.AQ === 'AQ1' ? '' : ', em razão da classificação ' + inf.AQ + ' quanto a descargas atmosféricas'}${ps ? `. No quadro de entrada, os DPS são de classe I+II, com corrente de impulso Iimp ≥ ${nfmt(ps.Iimp, 1)} kA (10/350 µs) por modo de proteção, compatíveis com o nível de proteção do SPDA (NBR 5419-4)` : ''}.` });
 
   const sM = sec('Especificação dos materiais e normas de fabricação');
   B.push({ t: 'p', text: `Os materiais devem ser novos, de primeira qualidade, com certificação de conformidade do Inmetro quando compulsória, e atender às normas de fabricação indicadas. ${cm.lista.length ? `Os quantitativos constam da lista de materiais${refA('materiais')}.` : ''}` });

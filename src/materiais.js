@@ -11,6 +11,7 @@ const CAT_MAT = {
   caixas: { nome: 'Caixas', espec: 'Caixas de embutir e de derivação em material isolante não propagante de chama, com orelhas metálicas, compatíveis com os dispositivos e com o número de condutores.', normas: 'ABNT NBR IEC 60670-1' },
   disp: { nome: 'Tomadas, interruptores e dispositivos de comando', espec: 'Tomadas 2P+T no padrão brasileiro (10 A e 20 A, 250 V), interruptores de 10 A e placas em material termoplástico, com certificação compulsória do Inmetro.', normas: 'ABNT NBR 14136; NBR NM 60884-1; NBR NM 60669-1' },
   ilum: { nome: 'Iluminação', espec: 'Luminárias e lâmpadas LED com os dados fotométricos considerados no cálculo luminotécnico (fluxo, potência, temperatura de cor e IRC), com certificação do Inmetro.', normas: 'ABNT NBR IEC 60598-1; NBR IEC 62560; NBR ISO/CIE 8995-1' },
+  spda: { nome: 'SPDA — proteção contra descargas atmosféricas', espec: 'Captação, descidas e anéis em cobre nu, alumínio ou aço cobreado com as seções mínimas da NBR 5419-3:2026; aterramento em anel (arranjo B) com cabo de cobre nu ou aço cobreado de 50 mm²; conectores de medição, fixadores, proteção mecânica das descidas e caixas de inspeção.', normas: 'ABNT NBR 5419-3:2026; NBR 13571; NBR 16254' },
   aterr: { nome: 'Aterramento e equipotencialização', espec: 'Hastes de aço-cobreado, cabo de cobre nu, conectores apropriados (cunha, compressão ou solda exotérmica), caixas de inspeção e barramento de equipotencialização principal (BEP).', normas: 'ABNT NBR 13571; NBR 16254; NBR 5410 (6.4)' },
   clima: { nome: 'Equipamentos de climatização', espec: 'Condicionadores de ar com selo de eficiência do Programa Brasileiro de Etiquetagem, instalados conforme o fabricante e a ABNT NBR 16655, com circuito exclusivo.', normas: 'ABNT NBR 16401-1; NBR 16655; Inmetro (PBE)' },
   div: { nome: 'Materiais diversos', espec: 'Conectores de emenda e derivação, terminais de compressão, fitas isolantes e de autofusão, abraçadeiras e demais materiais de fixação e acabamento, de primeira qualidade.', normas: 'Conforme o fabricante; certificação Inmetro quando compulsória' }
@@ -101,12 +102,16 @@ function materiaisAuto(proj, calc) {
     const std = MODULOS_STD.find(x => x >= n) || n;
     add(`quad|${q.q}`, 'quad', `Quadro de distribuição ${q.q}${(proj.quadros[q.q] || {}).desc ? ' (' + proj.quadros[q.q].desc + ')' : ''} — ${std} módulos DIN, com barramentos de fase, neutro e proteção; ${q.cs.length} circuitos + reserva para ${res} circuitos (Tabela 59)`, 'un', 'ABNT NBR IEC 61439-3', 1, q.q);
   });
-  // DPS classe II em cada quadro (fases e neutro ao PE)
+  // DPS em cada quadro (fases e neutro ao PE): classe I+II no quadro de entrada quando há SPDA (NBR 5419-4)
+  const ps = calc.spda && calc.spda.projeto;
   Object.values(calc.quadros).forEach(q => {
     if (!q.cs.length || (proj.quadros[q.q] || {}).dps === false) return;
     const uc = ucDPS(proj.params.U0);
-    add(`dps|II|${uc}`, 'prot', `DPS classe II — Uc ${uc} V, In 20 kA, Imáx 40 kA`, 'un', 'ABNT NBR IEC 61643-11', q.usadas.length + 1, q.q);
+    if (ps && !q.alim) add(`dps|I|${uc}|${ps.Iimp}`, 'prot', `DPS classe I+II — Uc ${uc} V, Iimp ${nfmt(ps.Iimp, 1)} kA (10/350 µs), In 20 kA`, 'un', 'ABNT NBR IEC 61643-11; NBR 5419-4', q.usadas.length + 1, q.q);
+    else add(`dps|II|${uc}`, 'prot', `DPS classe II — Uc ${uc} V, In 20 kA, Imáx 40 kA`, 'un', 'ABNT NBR IEC 61643-11', q.usadas.length + 1, q.q);
   });
+  // SPDA (NBR 5419-3)
+  if (ps) ps.materiais.forEach(([d, q, u, n]) => add(`spda|${d}`, 'spda', d, u, n, q, 'SPDA'));
   // eletrodutos
   Object.values(calc.trechos).forEach(t => {
     if (!t.aplica || !t.esc || (calc.calhas || {})[t.key]) return;

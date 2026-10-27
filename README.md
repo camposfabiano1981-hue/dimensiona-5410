@@ -6,7 +6,8 @@ Plataforma web para **projetos elétricos de baixa tensão**:
 - cálculo luminotécnico de interiores pela **NBR ISO/CIE 8995-1** e de exteriores (projetores em postes) pela **NBR 5101 / EN 12464-2**;
 - demanda para a concessionária pelas normas **Energisa NDU 001 / NDU 003**;
 - carga térmica de climatização pela **ABNT NBR 16401**;
-- aterramento, da haste única à malha, pelas **NBR 5410, NBR 7117-1 e NBR 15751 / IEEE Std 80**.
+- aterramento, da haste única à malha, pelas **NBR 5410, NBR 7117-1 e NBR 15751 / IEEE Std 80**;
+- **SPDA** — análise de risco e projeto pela **ABNT NBR 5419:2026** (partes 1 a 4).
 
 O documento principal é o **memorial descritivo** da instalação (NBR 5410), com influências externas, especificação dos materiais e normas de fabricação, tendo como **anexos** as memórias de cálculo escolhidas pelo profissional e a **lista de materiais**. Cada memória também sai separadamente ou num **relatório consolidado**, em **PDF**, **Word (.docx)** e **HTML**. O quadro de cargas e a lista de materiais saem em **Excel (.xlsx)**.
 
@@ -42,6 +43,13 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
   - balanceamento de fases e demanda do alimentador;
   - colunas de ligação, FCA, FCT e fator de potência;
   - exportação para Excel com fórmulas.
+
+**SPDA — proteção contra descargas atmosféricas (ABNT NBR 5419:2026)**
+- **Análise de risco (Parte 2):** áreas de exposição AD e AM, eventos perigosos ND, NM, NL e NI, componentes RA, RB, RC, RM, RU, RV, RW e RZ, risco R1 (vida humana), R3 (patrimônio cultural) e frequência de danos F aos sistemas internos, novidade da edição 2026 (tolerável 1 por ano, ou 0,1 para sistemas críticos).
+- **Escolha das medidas:** tabela de combinações nível de proteção × DPS, com o nível mínimo exigido; com SPDA, os DPS da entrada ficam compatíveis com o mesmo nível.
+- **Projeto (Parte 3):** níveis de proteção NP I a IV (esfera rolante, malha, descidas e anéis), captação pelo método das malhas ou por captores Franklin (ângulo de proteção equivalente à esfera rolante, com sugestão do número de mastros), descidas nos cantos e intermediárias, anéis a cada 10 a 20 m de altura, aterramento em anel (arranjo B, o único na edição 2026) com verificação de l1 e eletrodos adicionais, distância de segurança s = ki · kc/km · l.
+- **DPS (Parte 4):** corrente de impulso por modo do DPS classe I na entrada; o quadro de entrada passa a mostrar DPS classe I+II nos diagramas e na lista de materiais.
+- **Saídas:** planta da cobertura, elevação com a zona protegida, gráfico de risco, materiais com normas, inspeção (visual anual e completa a cada 1 ou 3 anos) e memorial em PDF, Word e HTML, anexável ao memorial descritivo.
 
 **Diagramas unifilar e multifilar dos quadros**
 - **Gerados automaticamente** a partir dos circuitos: alimentação, disjuntor geral, DPS, disjuntores, DR (IDR ou DDR), condutores com as seções e distribuição entre as fases.
@@ -131,7 +139,7 @@ Dois modos, escolhidos no topo da seção ou em Sistemas › Aterramento:
 - **Anexos:** as memórias de cálculo e a lista de materiais marcadas pelo profissional entram como Anexo A, B, C…, com uma única assinatura.
 
 **Memórias de cálculo**
-- **Memórias separadas:** condutores e proteção, eletrodutos, eletrocalhas, quadros de carga, diagramas dos quadros, luminotécnica, demanda Energisa, carga térmica e aterramento, cada uma em PDF, Word e HTML.
+- **Memórias separadas:** condutores e proteção, eletrodutos, eletrocalhas, quadros de carga, diagramas dos quadros, luminotécnica, demanda Energisa, carga térmica, aterramento e SPDA, cada uma em PDF, Word e HTML.
 - **Relatório consolidado:** reúne as memórias marcadas, com sumário, partes A, B, C… (numeração prefixada pela letra da parte) e uma única assinatura do responsável técnico. A declaração de carga do titular, exigida pela Energisa, é mantida.
 - **Formatação comum:** todos os documentos têm cabeçalho, rodapé, paginação e bloco de assinatura.
 - **Tabelas da norma:** consulta às tabelas da NBR 5410, da NBR ISO/CIE 8995-1 e da NDU 001 dentro da plataforma.
@@ -166,6 +174,7 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 | Iluminação de exteriores | ABNT NBR 5101 (classes por iluminância da edição 2018); EN 12464-2 / CIE S 015; EN 12193; Mamede Filho, *Instalações Elétricas Industriais* (métodos dos lúmens e ponto a ponto) |
 | Demanda | Energisa NDU 001 v7.0 e NDU 003 v8.1 (Tabelas 03 e 04 da NDU 003 a preencher pelo projetista) |
 | Carga térmica | ABNT NBR 16401-1:2024, NBR 16401-2:2024 e NBR 16401-3:2008; NBR 15220-2; ISO 7730; ASHRAE Handbook — Fundamentals |
+| SPDA | ABNT NBR 5419-1 a 5419-4:2026 (substituiu a edição 2015); IEC 62305 |
 | Aterramento | ABNT NBR 5410:2004 (6.4); NBR 7117-1:2020; NBR 15749:2009; NBR 15751:2013; IEEE Std 80-2013; Energisa NDU 001 v7.0 (8.10); Kindermann & Campagnolo, *Aterramento Elétrico* |
 
 **Dados que o projetista precisa confirmar:**
@@ -175,6 +184,9 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 - **Iluminação externa:**
   - os níveis da NBR 5101 são os da edição 2018 (a edição 2024 usa as classes M, C e P, com requisitos de luminância) e os da EN 12464-2 são de referência; confirme na edição vigente e nas exigências da prefeitura ou da distribuidora;
   - os projetores do catálogo são genéricos e o modelo de intensidade é simétrico em torno do eixo de mira; para luminárias viárias assimétricas e projetos executivos, confirme com a fotometria do fabricante (IES/LDT) em software de cálculo.
+- **SPDA:**
+  - informe a densidade NG do Anexo F da NBR 5419-2:2026 para o município (a edição 2026 recalibrou os valores; o NG do exemplo é ilustrativo);
+  - as probabilidades e perdas seguem as tabelas da Parte 2 e ficam listadas no memorial; os limites da frequência de danos (1 e 0,1 por ano) e as seções de materiais da revisão foram obtidos de resumos técnicos — confira-os no texto oficial da ABNT.
 - **Aterramento:**
   - a resistividade deve vir de medição em campo, de preferência em época seca;
   - as equações simplificadas da IEEE 80 valem para malhas regulares em solo homogêneo; em solo fortemente estratificado ou geometria irregular, confirme com software de malha;
@@ -198,6 +210,8 @@ src/lumiext.js        Iluminação de exteriores: requisitos, projetores, lúmen
 src/energisa.js       Tabelas e cálculo de demanda das NDU 001 / NDU 003
 src/clima.js          Carga térmica: clima, sol, condução periódica, psicrometria, PMV/PPD
 src/aterr.js          Aterramento: solo (Wenner, duas camadas), hastes, cabo, malha, toque e passo
+src/spda.js           SPDA: análise de risco (NBR 5419-2) e projeto (NBR 5419-3 e 5419-4)
+src/spdadoc.js        SPDA: planta, elevação, gráfico de risco e memorial
 src/pictos.js         Desenhos da Tabela 33 e cortes de eletrodutos
 src/memorial.js       Memória de cálculo NBR 5410
 src/diagramas.js      Diagramas unifilar e multifilar dos quadros
