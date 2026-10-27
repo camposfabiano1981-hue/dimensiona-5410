@@ -82,7 +82,7 @@ test('Diagramas — unifilar e multifilar refletem os circuitos de cada quadro',
   assert.equal(c1.fs.length + (c1.N ? 1 : 0) + (c1.PE ? 1 : 0), r1.nVias, 'condutores do circuito 1');
   assert.equal(d.cs.filter(c => c.dr).length, q.cs.filter(c => K.res[c.id].drUsado).length, 'DR nos diagramas');
   // DPS no quadro e na lista de materiais (fases + neutro)
-  const dps = MT.auto.filter(i => i.key.startsWith('dps|')).reduce((s, i) => s + i.q, 0);
+  const dps = MT.auto.filter(i => i.key.startsWith('dps|') && !i.key.startsWith('dps|III')).reduce((s, i) => s + i.q, 0);
   assert.equal(dps, Object.values(K.quadros).filter(x => x.cs.length).reduce((s, x) => s + x.usadas.length + 1, 0), 'DPS no quantitativo');
   assert.equal(A.dadosQuadro(P, K, 'QM').dps.classe, 'I+II', 'DPS classe I+II no quadro de entrada quando há SPDA');
   const B = A.construirDiagramas(P, K);
@@ -137,6 +137,26 @@ test('DPS — seleção por quadro (NBR 5410 6.3.5, NBR 5419-4:2026 e faixas de 
   assert.equal(d2.quadros.QM.lig, 'npe'); perto(d2.quadros.QM.IimpNPE, 50, 1e-9, 'Iimp N–PE');
   const B = A.construirMemorialDPS(P, K);
   assert.ok(B.filter(b => b.t === 'ver').length >= 10, 'verificações no memorial');
+});
+
+test('DPS — TOV, distância de proteção, tecnologia e coordenação', () => {
+  const qd = K.dps.quadros['QD-1'], qm = K.dps.quadros.QM;
+  // lpo = (Uw − Up/f) / 25 V/m = (1,5 − 1,2) kV / 25 V/m = 12 m; circuitos terminais acima disso, com 10 m ou mais
+  perto(qd.lpo, 12, 1e-9, 'lpo'); assert.ok(qd.foraLpo.includes('13') && !qd.foraLpo.includes('9'), 'circuitos além de lpo');
+  assert.equal(qd.verifs.find(v => v[1].startsWith('Distância de proteção'))[0], 'ok', 'classe III prevista cobre os circuitos longos');
+  assert.ok(qd.verifs.some(v => v[0] === 'ok' && v[1].includes('(≥ 10 m)')), 'coordenação por 12 m de cabo');
+  perto(qd.UTmin, 1.45 * 127, 1e-9, 'UT mínimo');
+  const P3 = JSON.parse(JSON.stringify(P));
+  P3.dps.nSens = 0; P3.quadros.QM = { ...(P3.quadros.QM || {}), dpsTec: 'centelhador', dpsL: 1, dpsUT: 150 };
+  P3.quadros['QD-1'] = { ...P3.quadros['QD-1'], dpsUT: 440, dpsCoord: true };
+  const K3 = A.calcularProjeto(P3); K3.aterr = A.calcAterramento(P3, K3); K3.spda = A.calcSPDA(P3, K3); const d3 = A.calcDPS(P3, K3);
+  const m3 = d3.quadros.QM, q3 = d3.quadros['QD-1'];
+  perto(m3.Upf, Math.max(m3.Up, 1), 1e-9, 'centelhador: Up/f = máx(Up; ΔU)'); assert.equal(m3.status, 'fail', 'UT de 150 V abaixo de 1,45 × U0');
+  assert.ok(q3.verifs.some(v => v[0] === 'ok' && v[1].startsWith('Sobretensão temporária')), 'UT de 440 V atende');
+  assert.equal(q3.verifs.find(v => v[1].startsWith('Distância de proteção'))[0], 'warn', 'sem classe III, circuitos longos ficam em alerta');
+  assert.ok(q3.verifs.some(v => v[1].includes('declarados coordenados')), 'coordenação declarada pelo fabricante');
+  P3.quadros.QM = { ...P3.quadros.QM, dpsTec: 'varistor', dpsV: true }; const d4 = A.calcDPS(P3, K3);
+  perto(d4.quadros.QM.Upf, d4.quadros.QM.Up, 1e-9, 'ligação em V: ΔU desprezível');
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

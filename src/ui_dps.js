@@ -34,9 +34,13 @@ function renderDPS() {
         ${fSel(pre, 'dpsClasse', 'Classe', Qd.dpsClasse || 'auto', [['auto', `Automática (${r.classeAuto || '—'})`], ['I+II', 'I+II — ponto de entrada'], ['II', 'II — quadro de distribuição']], { struct: true })}
         ${fSel(pre, 'dpsLig', 'Ligação', Qd.dpsLig || 'auto', Object.entries(LIG_DPS), { cls: 'w2' })}
         ${fNum(pre, 'dpsUp', 'Up do produto', Qd.dpsUp, { u: 'kV', ph: r.ativo ? r.Up : '' })}
+        ${cl1 ? fSel(pre, 'dpsTec', 'Tecnologia (classe I)', Qd.dpsTec || 'varistor', [['varistor', 'Varistor'], ['centelhador', 'Centelhador']], { struct: true }) : ''}
         ${cl1 ? fNum(pre, 'dpsIimp', 'Iimp do produto por modo', Qd.dpsIimp, { u: 'kA', ph: r.IimpMin }) : ''}
+        ${cl1 && r.tec === 'centelhador' ? fNum(pre, 'dpsIfi', 'Ifi do centelhador', Qd.dpsIfi, { u: 'kA', ph: 'catálogo' }) : ''}
+        ${fNum(pre, 'dpsUT', 'UT (TOV) do produto', Qd.dpsUT, { u: 'V', ph: r.ativo ? `≥ ${nfmt(r.UTmin, 0)}` : '' })}
         ${fNum(pre, 'dpsL', 'Condutores de ligação (total)', Qd.dpsL, { u: 'm', ph: 0.5 })}${fNum(pre, 'dpsS', 'Seção dos condutores de ligação', Qd.dpsS, { u: 'mm²', ph: r.ativo ? r.Smin : '' })}
         ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr do DPS (fabricante)', Qd.dpsIsccr, { u: 'kA', ph: 'catálogo' })}
+        ${cl1 ? fChk(pre, 'dpsV', 'Ligação em V (ΔU desprezível)', !!Qd.dpsV) : ''}${q.alim ? fChk(pre, 'dpsCoord', 'Coordenado com o DPS a montante (fabricante)', !!Qd.dpsCoord) : ''}${fChk(pre, 'dpsJusDR', 'DPS a jusante de DR geral', !!Qd.dpsJusDR)}
       </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}`;
   renderDPSResumo();
 }

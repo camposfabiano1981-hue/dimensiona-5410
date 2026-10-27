@@ -2776,6 +2776,10 @@ const EXPO_DPS = {
   alta: [65, 'Alta — área rural, edificação isolada ou em elevação, linha aérea longa']
 };
 const LIG_DPS = { auto: 'Pelo esquema de aterramento', pe: 'Fases e neutro ao PE (n+0)', npe: 'Fases ao neutro e centelhador N–PE (n+1)' };
+const TEC_DPS = { varistor: 'Varistor (limitador de tensão)', centelhador: 'Centelhador (comutador de tensão)' };
+/* parâmetros complementares: k da distância de proteção por oscilação (IEC 62305-4, Anexo D),
+   distância informativa de coordenação entre estágios (IEC 61643-12) e sobretensões temporárias (IEC 61643-11) */
+const K_OSC = 25, D_COORD = 10, UT_FATOR = 1.45, UT_NPE_TT = 1200;
 function dpsPadrao() { return { exposicao: 'media', catEq: 'II', nSens: 0 }; }
 
 function calcDPS(proj, calc) {
@@ -2804,24 +2808,37 @@ function calcDPS(proj, calc) {
     // nível de proteção (Tabela 31) e nível efetivo com os condutores de ligação
     r.Uw2 = uwTab31(P.U0, 'II'); r.Uw3 = uwTab31(P.U0, 'III'); r.UwEq = uwTab31(P.U0, catEq);
     r.Up = +Qd.dpsUp > 0 ? +Qd.dpsUp : (cl1 ? 1.5 : (P.U0 <= 150 ? 1.2 : 1.5)); r.UpPadrao = !(+Qd.dpsUp > 0);
-    r.L = +Qd.dpsL > 0 ? +Qd.dpsL : 0.5; r.dU = cl1 ? r.L * 1 : 0; r.Upf = r.Up + r.dU;
+    r.tec = cl1 && Qd.dpsTec === 'centelhador' ? 'centelhador' : 'varistor'; r.emV = !!Qd.dpsV;
+    // ΔU ≈ 1 kV por metro de condutor de ligação para correntes de descarga direta (classe I); desprezível na classe II e na ligação em V
+    r.L = +Qd.dpsL > 0 ? +Qd.dpsL : 0.5; r.dU = cl1 && !r.emV ? r.L * 1 : 0;
+    r.Upf = r.tec === 'centelhador' ? Math.max(r.Up, r.dU) : r.Up + r.dU;
     r.soDist = q.cs.every(c => c.tipo === 'dist'); r.UwRef = r.soDist ? r.Uw3 : r.UwEq; r.catRef = r.soDist ? 'III' : catEq;
     // condutores de ligação, retaguarda e curto-circuito
     r.Smin = cl1 || (ps && origem) ? 16 : 4; r.S = +Qd.dpsS > 0 ? +Qd.dpsS : r.Smin;
     r.back = +Qd.dpsBack > 0 ? +Qd.dpsBack : null; r.isccr = +Qd.dpsIsccr > 0 ? +Qd.dpsIsccr : null; r.icc = +Qd.icc || +P.icc || null;
     r.Imont = q.alim ? calc.res[q.alim.id].In : (+Qd.dgIn > 0 ? +Qd.dgIn : null);
+    // sobretensões temporárias (TOV) e corrente subsequente dos centelhadores
+    r.UTmin = UT_FATOR * P.U0; r.UT = +Qd.dpsUT > 0 ? +Qd.dpsUT : null; r.UTnpe = P.aterramento === 'TT' && r.lig === 'npe' ? UT_NPE_TT : null;
+    r.ifi = +Qd.dpsIfi > 0 ? +Qd.dpsIfi : null;
+    // distância de proteção por oscilação: lpo = (Uw − Up/f) / k; desconsiderada se o circuito tem menos de 10 m ou Up/f < Uw/2
+    r.lpo = Math.max(0, (r.UwEq - r.Upf) * 1000 / K_OSC); r.lpoDispensa = r.Upf < r.UwEq / 2;
+    r.foraLpo = r.soDist || r.lpoDispensa ? [] : q.cs.filter(c => c.tipo !== 'dist' && (+c.L || 0) >= 10 && (+c.L || 0) > r.lpo).map(c => c.num);
     // verificações
     v(r.Uc >= r.UcMinF - 1e-9 ? 'ok' : 'fail', `Uc = ${r.Uc} V ≥ 1,1 × U0 = ${nfmt(r.UcMinF, 0)} V nos modos das fases (Tabela 49)`);
     v(r.UcN >= r.UcMinN - 1e-9 ? 'ok' : 'fail', `Uc N–PE = ${r.UcN} V ≥ U0 = ${P.U0} V${r.lig === 'npe' ? ' (centelhador)' : ''}`);
     v(r.Up <= r.Uw2 + 1e-9 ? 'ok' : 'fail', `Up = ${nfmt(r.Up, 2)} kV ≤ ${nfmt(r.Uw2, 1)} kV (categoria II da Tabela 31)${r.UpPadrao ? ' — valor típico; confirme no catálogo' : ''}`);
+    v(r.UT ? (r.UT >= r.UTmin - 1e-9 ? 'ok' : 'fail') : 'info', r.UT ? `Sobretensão temporária suportável UT = ${nfmt(r.UT, 0)} V ${r.UT >= r.UTmin - 1e-9 ? '≥' : '<'} 1,45 × U0 = ${nfmt(r.UTmin, 0)} V por 5 s (falhas na baixa tensão)` : `Sobretensão temporária: o DPS deve suportar UT ≥ 1,45 × U0 = ${nfmt(r.UTmin, 0)} V por 5 s (ensaio TOV do fabricante, IEC 61643-11)`);
+    if (r.UTnpe) v('info', `Centelhador N–PE no esquema TT: suportar ${UT_NPE_TT} V por 200 ms (falhas na alta tensão)`);
     if (cl1) {
+      if (r.tec === 'centelhador') v(r.ifi && r.icc ? (r.ifi >= r.icc - 1e-9 ? 'ok' : 'fail') : 'info', r.ifi && r.icc ? `Corrente subsequente interrompida Ifi = ${nfmt(r.ifi, 1)} kA ${r.ifi >= r.icc - 1e-9 ? '≥' : '<'} curto-circuito presumido de ${nfmt(r.icc || 0, 1)} kA` : `Centelhador: a corrente subsequente interrompida Ifi deve ser ≥ ${r.icc ? nfmt(r.icc, 1) + ' kA (curto-circuito presumido)' : 'a corrente de curto-circuito presumida no quadro'}; informe o valor do catálogo`);
       v(r.Iimp >= r.IimpMin - 1e-9 ? 'ok' : 'fail', `Iimp = ${nfmt(r.Iimp, 2)} kA (10/350 µs) por modo ≥ ${nfmt(r.IimpMin, 2)} kA${ps && origem ? ` (NP ${ps.base} do SPDA)` : ' (mínimo de 12,5 kA)'}`);
       if (r.lig === 'npe') v('info', `Centelhador N–PE: Iimp ≥ ${nfmt(r.IimpNPE, 1)} kA (soma das correntes dos ${nF + 1} condutores)`);
     }
     v(r.In >= 5 ? 'ok' : 'fail', `In = ${nfmt(r.In, 0)} kA (8/20 µs) ≥ 5 kA por modo; Imáx = ${r.Imax} kA para exposição ${EXPO_DPS[exp][1].split(' — ')[0].toLowerCase()}`);
     v(r.L <= 0.5 + 1e-9 ? 'ok' : 'fail', `Condutores de ligação: ${nfmt(r.L, 2)} m ≤ 0,5 m (comprimento total, condutor vivo → DPS → barramento PE)`);
     v(r.S >= r.Smin - 1e-9 ? 'ok' : 'fail', `Seção dos condutores de ligação ${fS(r.S)} mm² ≥ ${r.Smin} mm² Cu${r.Smin === 16 ? ' (DPS classe I / estrutura com SPDA)' : ''}`);
-    v(r.Upf <= r.UwRef + 1e-9 ? 'ok' : 'warn', `Nível efetivo Up/f = Up + ΔU = ${nfmt(r.Up, 2)} + ${nfmt(r.dU, 2)} = ${nfmt(r.Upf, 2)} kV ${r.Upf <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV (categoria ${r.catRef}${r.soDist ? ', quadro só de distribuição' : ''})${r.Upf > r.UwRef + 1e-9 ? ': prever DPS classe III junto aos equipamentos ou ligação em V' : ''}`);
+    v(r.Upf <= r.UwRef + 1e-9 ? 'ok' : 'warn', `Nível efetivo Up/f = ${r.tec === 'centelhador' ? 'máx(Up; ΔU)' : 'Up + ΔU'} = ${r.tec === 'centelhador' ? `máx(${nfmt(r.Up, 2)}; ${nfmt(r.dU, 2)})` : `${nfmt(r.Up, 2)} + ${nfmt(r.dU, 2)}`} = ${nfmt(r.Upf, 2)} kV ${r.Upf <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV (categoria ${r.catRef}${r.soDist ? ', quadro só de distribuição' : ''})${r.Upf > r.UwRef + 1e-9 ? ': prever DPS classe III junto aos equipamentos ou ligação em V' : ''}`);
+    if (!r.soDist) v(r.foraLpo.length && !out.nSens ? 'warn' : 'ok', r.lpoDispensa ? `Distância de proteção: Up/f = ${nfmt(r.Upf, 2)} kV < Uw/2 = ${nfmt(r.UwEq / 2, 2)} kV — distância por oscilação dispensada` : `Distância de proteção por oscilação lpo = (Uw − Up/f) / ${K_OSC} V/m = ${nfmt(r.lpo, 1)} m${!r.foraLpo.length ? ' — todos os circuitos atendem' : `; circuitos ${r.foraLpo.join(', ')} mais longos: ${out.nSens ? `equipamentos sensíveis protegidos pelos ${out.nSens} DPS classe III previstos` : `DPS classe III junto aos equipamentos sensíveis ou DPS com Up/f ≤ ${nfmt(r.UwEq / 2, 2)} kV`}`}`);
     if (r.back == null) v('info', 'Proteção de retaguarda: informe a corrente máxima do fusível ou disjuntor indicada pelo fabricante do DPS.');
     else if (r.Imont && r.Imont > r.back) v('warn', `A proteção a montante (${r.Imont} A) excede a retaguarda máxima do DPS (${r.back} A): instalar dispositivo de retaguarda dedicado de até ${r.back} A.`);
     else v('ok', `Proteção a montante${r.Imont ? ` de ${r.Imont} A` : ''} dentro da retaguarda máxima do fabricante (${r.back} A)`);
@@ -2830,15 +2847,18 @@ function calcDPS(proj, calc) {
     if (P.aterramento === 'TT') v(r.lig === 'npe' ? 'ok' : 'warn', r.lig === 'npe' ? 'Esquema TT: DPS a montante do DR com ligação n+1 (NBR 5410, Figura 13)' : 'Esquema TT com DPS ao PE: só a jusante do DR; a montante do DR use a ligação n+1 (NBR 5410, Figura 13)');
     if (!origem) {
       const up = out.quadros[q.alim.quadro], Lc = +q.alim.L || 0;
-      if (up && up.ativo && Lc < 5) v('warn', `Coordenação: ${nfmt(Lc, 1)} m de cabo entre os DPS do ${q.alim.quadro} e deste quadro (< 5 m) — use DPS declarados coordenados pelo fabricante ou indutor de desacoplamento.`);
-      else if (up && up.ativo) v('ok', `Coordenação com o DPS do ${q.alim.quadro}: ${nfmt(Lc, 1)} m de cabo entre os estágios`);
+      if (up && up.ativo && Qd.dpsCoord) v('ok', `Coordenação com o DPS do ${q.alim.quadro}: produtos declarados coordenados pelo fabricante`);
+      else if (up && up.ativo && Lc < D_COORD) v('warn', `Coordenação: ${nfmt(Lc, 1)} m de cabo entre os DPS do ${q.alim.quadro} e deste quadro (< ${D_COORD} m) — use DPS declarados coordenados pelo fabricante ou indutor de desacoplamento.`);
+      else if (up && up.ativo) v('ok', `Coordenação com o DPS do ${q.alim.quadro}: ${nfmt(Lc, 1)} m de cabo entre os estágios (≥ ${D_COORD} m)`);
     }
+    if (Qd.dpsJusDR) v('info', 'DPS a jusante de DR geral: o DR deve ser seletivo (tipo S) e imune a surtos, para não atuar a cada descarga.');
+    if (r.lig === 'npe') v('info', 'Centelhador N–PE: corrente subsequente interrompida Ifi ≥ 100 A (IEC 60364-5-534).');
     r.status = r.verifs.some(x => x[0] === 'fail') ? 'fail' : r.verifs.some(x => x[0] === 'warn') ? 'warn' : 'ok';
     // especificação e materiais
     const corr = cl1 ? `Iimp ${nfmt(r.Iimp, 1)} kA (10/350 µs), In ${nfmt(r.In, 0)} kA` : `In ${nfmt(r.In, 0)} kA, Imáx ${r.Imax} kA (8/20 µs)`;
-    r.spec = `DPS classe ${r.classe}, ligação ${r.ligTxt}: Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`;
+    r.spec = `DPS classe ${r.classe}${cl1 ? ` (${r.tec})` : ''}, ligação ${r.ligTxt}: Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV, UT ≥ ${nfmt(r.UTmin, 0)} V/5 s`;
     const nb = 'ABNT NBR IEC 61643-11';
-    if (r.lig === 'pe') r.materiais.push([`DPS classe ${r.classe} unipolar — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF + 1, 'un', nb]);
+    if (r.lig === 'pe') r.materiais.push([`DPS classe ${r.classe} unipolar${cl1 ? ` (${r.tec})` : ''} — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF + 1, 'un', nb]);
     else {
       r.materiais.push([`DPS classe ${r.classe} unipolar (fase–neutro) — Uc ${r.Uc} V, ${corr}, Up ≤ ${nfmt(r.Up, 1)} kV`, nF, 'un', nb]);
       r.materiais.push([`Centelhador N–PE classe ${r.classe} — Uc ${r.UcN} V, ${cl1 ? `Iimp ${nfmt(r.IimpNPE, 0)} kA (10/350 µs)` : `In ${nfmt(r.In * (nF + 1) / 2, 0)} kA (8/20 µs)`}`, 1, 'un', nb]);
@@ -2848,7 +2868,8 @@ function calcDPS(proj, calc) {
   });
   const lista = Object.values(out.quadros).filter(r => r.ativo);
   if (out.nSens) out.classe3 = { n: out.nSens, Uc: ucDPS(P.U0) };
-  if (lista.some(r => r.status === 'warn' && r.Upf > r.UwRef) && !out.nSens) out.avisos.push('O nível de proteção efetivo excede a suportabilidade dos equipamentos em algum quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III.');
+  if (lista.some(r => r.foraLpo && r.foraLpo.length) && !out.nSens) out.avisos.push('Há circuitos além da distância de proteção do DPS do quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III junto a eles.');
+  else if (lista.some(r => r.status === 'warn' && r.Upf > r.UwRef) && !out.nSens) out.avisos.push('O nível de proteção efetivo excede a suportabilidade dos equipamentos em algum quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III.');
   out.status = lista.some(r => r.status === 'fail') ? 'fail' : (lista.some(r => r.status === 'warn') || out.avisos.length ? 'warn' : 'ok');
   return out;
 }
@@ -3175,7 +3196,7 @@ function projetoVazio() {
     info: { obra: '', cliente: '', endereco: '', cidade: '', responsavel: '', registro: '', art: '', data: hojeISO(), revisao: 'R00', concessionaria: '', obs: '' },
     params: P,
     quadros: { 'QD-1': { desc: 'Quadro de distribuição', fd: null, icc: P.icc, dvMont: 0 } },
-    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), spda: spdaPadrao(), materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
+    trechos: {}, catalogo: {}, circuitos: [], lumi: [], lumiExt: [], energisa: energisaPadrao(), clima: climaPadrao(), aterr: aterrPadrao(), spda: spdaPadrao(), dps: { ...dpsPadrao(), nSens: 2 }, materiais: materiaisPadrao(), descritivo: descritivoPadrao(P.edificacao),
     memorias: { grupo: MEMORIAS.map(m => m.id) }
   };
 }
@@ -4972,7 +4993,7 @@ function construirMemorialDPS(proj, calc, opt = {}) {
   B.push({ t: 'p', text: `Este documento apresenta a seleção dos dispositivos de proteção contra surtos (DPS) dos ${Q.length} quadro${Q.length === 1 ? '' : 's'} da obra acima identificada — classe, modos de proteção, tensão de operação contínua, correntes, nível de proteção, condutores de ligação, proteção de retaguarda e coordenação — segundo a ABNT NBR 5410:2004 (6.3.5) e a ABNT NBR 5419-4:2026.` });
   sec('Normas e documentos de referência');
   B.push({ t: 'list', items: ['ABNT NBR 5410:2004 Versão Corrigida:2008 — Instalações elétricas de baixa tensão (6.3.5, Tabelas 31 e 49, Figura 13).', 'ABNT NBR 5419-4:2026 — Proteção contra descargas atmosféricas — Parte 4: Sistemas elétricos e eletrônicos internos na estrutura.',
-    'ABNT NBR IEC 61643-11 — Dispositivos de proteção contra surtos de baixa tensão — Requisitos e métodos de ensaio.', 'IEC 61643-12 — Seleção e princípios de aplicação de DPS; IEC 62305-4 — nível de proteção efetivo.', 'Catálogos e instruções dos fabricantes dos DPS (retaguarda, coordenação e instalação).'] });
+    'ABNT NBR IEC 61643-11 — Dispositivos de proteção contra surtos de baixa tensão — Requisitos e métodos de ensaio.', 'IEC 61643-12 — Seleção e princípios de aplicação de DPS (coordenação); IEC 62305-4 — nível de proteção efetivo e distância de proteção (Anexo D); IEC 60364-5-534 — seleção e instalação de DPS.', ...(calc.energisa && Object.keys(calc.energisa.ucs || {}).length ? ['Energisa ETU-124.2 — Especificação técnica de dispositivo de proteção contra surtos (DPS).'] : []), 'Catálogos e instruções dos fabricantes dos DPS (retaguarda, coordenação e instalação).'] });
   sec('Dados da instalação e critérios');
   B.push({ t: 'table', head: ['Parâmetro', 'Valor adotado'], widths: [42, 58], rows: [
     ['Tensão nominal (U0 / U)', `${P.U0} / ${P.U} V`], ['Esquema de aterramento', P.aterramento], ['SPDA', ps ? `NP ${ps.base} — Iimp ≥ ${f2(ps.Iimp)} kA por modo no ponto de entrada (NBR 5419-4)` : 'não previsto'],
@@ -4981,21 +5002,29 @@ function construirMemorialDPS(proj, calc, opt = {}) {
   B.push({ t: 'list', items: [
     'Classe: I+II no ponto de entrada quando a estrutura tem SPDA ou exposição alta; II nos quadros de distribuição; III junto a equipamentos sensíveis quando o nível de proteção efetivo excede a suportabilidade deles.',
     'Tensão de operação contínua (Tabela 49): Uc ≥ 1,1 × U0 nos modos das fases e Uc ≥ U0 no modo neutro–PE; no esquema TT a montante do DR, ligação n+1 (Figura 13).',
-    'Nível de proteção: Up ≤ suportabilidade da categoria II (Tabela 31); nível efetivo Up/f = Up + ΔU, com ΔU ≈ 1 kV por metro de condutor de ligação para DPS classe I e desprezível para classe II (IEC 62305-4).',
+    'Nível de proteção: Up ≤ suportabilidade da categoria II (Tabela 31); nível efetivo Up/f = Up + ΔU para varistores e Up/f = máx(Up; ΔU) para centelhadores, com ΔU ≈ 1 kV por metro de condutor de ligação para DPS classe I e desprezível para classe II ou ligação em V (IEC 62305-4).',
+    `Distância de proteção por oscilação: lpo = (Uw − Up/f) / ${K_OSC} V/m; circuitos terminais mais longos que lpo pedem DPS classe III junto aos equipamentos, salvo quando o circuito tem menos de 10 m ou Up/f < Uw/2 (IEC 62305-4, Anexo D).`,
+    `Sobretensões temporárias: o DPS deve suportar UT ≥ ${nfmt(UT_FATOR, 2)} × U0 = ${nfmt(UT_FATOR * P.U0, 0)} V por 5 s (falhas na baixa tensão)${P.aterramento === 'TT' ? ` e o centelhador N–PE, ${UT_NPE_TT} V por 200 ms (falhas na alta tensão)` : ''}, conforme o ensaio TOV da IEC 61643-11.`,
     `Correntes: In ≥ 5 kA por modo (8/20 µs); Iimp ≥ 12,5 kA por modo (10/350 µs) ou o valor do nível do SPDA. Imáx pela exposição segundo as faixas usuais dos fabricantes: baixa ${EXPO_DPS.baixa[0]} kA, média ${EXPO_DPS.media[0]} kA, alta ${EXPO_DPS.alta[0]} kA.`,
-    'Condutores de ligação: comprimento total até 0,5 m (condutor vivo → DPS → barramento PE) e seção mínima de 4 mm² Cu, ou 16 mm² Cu para DPS classe I / estrutura com SPDA.',
-    'Proteção de retaguarda e corrente de curto-circuito suportável conforme o fabricante; coordenação entre estágios por produtos declarados coordenados ou por distância e indutância dos condutores.'] });
+    'Condutores de ligação: comprimento total até 0,5 m (condutor vivo → DPS → barramento PE) e seção mínima de 4 mm² Cu, ou 16 mm² Cu para DPS classe I / estrutura com SPDA; os condutores devem suportar o curto-circuito até a atuação da retaguarda.',
+    'Centelhadores: corrente subsequente interrompida Ifi ≥ curto-circuito presumido no ponto de instalação; centelhador N–PE com Ifi ≥ 100 A (IEC 60364-5-534).',
+    `Proteção de retaguarda e corrente de curto-circuito suportável (Isccr) conforme o fabricante; coordenação entre estágios por produtos declarados coordenados pelo fabricante ou por pelo menos ${D_COORD} m de cabo entre eles (IEC 61643-12, informativo), ou indutor de desacoplamento.`,
+    'DPS instalado a jusante de DR geral: o DR deve ser seletivo (tipo S) e imune a surtos, para não desligar a instalação a cada descarga.'] });
   const sQ = sec('Seleção por quadro');
   Q.forEach((r, i) => {
     B.push({ t: 'h2', text: `${sQ}.${i + 1} Quadro ${r.q}${r.desc ? ' — ' + r.desc : ''}` });
     B.push({ t: 'kv4', rows: [['Posição', r.origem ? 'Ponto de entrada (origem)' : 'Quadro de distribuição', 'Classe', r.classe], ['Ligação', r.ligTxt, 'Uc', `${r.Uc} V (N–PE ${r.UcN} V)`],
+      ...(r.classe === 'I+II' ? [['Tecnologia', TEC_DPS[r.tec], 'Ligação dos condutores', r.emV ? 'em V (ΔU desprezível)' : 'derivação']] : []),
       ['Correntes', r.classe === 'I+II' ? `Iimp ${f2(r.Iimp)} kA (10/350 µs) por modo${r.lig === 'npe' ? `; N–PE ${f1(r.IimpNPE)} kA` : ''}; In ${nfmt(r.In, 0)} kA` : `In ${nfmt(r.In, 0)} kA; Imáx ${r.Imax} kA (8/20 µs)`, 'Nível de proteção', `Up ≤ ${f2(r.Up)} kV; Up/f = ${f2(r.Upf)} kV`],
-      ['Condutores de ligação', `${f2(r.L)} m · ${fS(r.S)} mm² Cu`, 'Retaguarda', r.back ? `até ${r.back} A (fabricante)` : 'conforme o fabricante']] });
+      ['Condutores de ligação', `${f2(r.L)} m · ${fS(r.S)} mm² Cu`, 'Retaguarda', r.back ? `até ${r.back} A (fabricante)` : 'conforme o fabricante'],
+      ['TOV suportável', r.UT ? `UT = ${nfmt(r.UT, 0)} V` : `UT ≥ ${nfmt(r.UTmin, 0)} V por 5 s`, 'Distância de proteção', r.soDist ? 'quadro só de distribuição' : r.lpoDispensa ? 'dispensada (Up/f < Uw/2)' : `lpo = ${f1(r.lpo)} m`]] });
     r.verifs.forEach(([st, t]) => B.push(st === 'info' ? { t: 'note', text: t } : { t: 'ver', ok: VER_DPS[st], text: t }));
   });
   sec('Classe III e coordenação');
-  B.push({ t: 'p', text: c.classe3 ? `Previstos ${c.classe3.n} DPS classe III (Uc ${c.classe3.Uc} V) junto aos equipamentos sensíveis, coordenados com os DPS do quadro que os alimenta.` : 'Não foram indicados pontos com equipamentos sensíveis que exijam DPS classe III; avaliar junto a equipamentos eletrônicos distantes do quadro.' });
-  B.push({ t: 'p', text: 'Os DPS em cascata (entrada → quadros → equipamentos) devem ser do mesmo fabricante ou declarados coordenados por ele; na falta dessa declaração, o comprimento dos condutores entre os estágios deve atender à instrução do fabricante.' });
+  const longe = Q.filter(r => r.foraLpo && r.foraLpo.length).map(r => `${r.q} (circuitos ${r.foraLpo.join(', ')}; lpo = ${f1(r.lpo)} m)`);
+  B.push({ t: 'p', text: (c.classe3 ? `Previstos ${c.classe3.n} DPS classe III (Uc ${c.classe3.Uc} V) junto aos equipamentos sensíveis, coordenados com os DPS do quadro que os alimenta.` : 'Não foram indicados pontos com equipamentos sensíveis que exijam DPS classe III; avaliar junto a equipamentos eletrônicos distantes do quadro.')
+    + (longe.length ? ` Circuitos além da distância de proteção do DPS do quadro: ${longe.join('; ')} — os equipamentos sensíveis alimentados por eles devem receber DPS classe III próprio.` : '') });
+  B.push({ t: 'p', text: `Os DPS em cascata (entrada → quadros → equipamentos) devem ser do mesmo fabricante ou declarados coordenados por ele; na falta dessa declaração, recomenda-se pelo menos ${D_COORD} m de cabo entre os estágios (IEC 61643-12, informativo) ou indutor de desacoplamento, observada a instrução do fabricante.` });
   sec('Instalação');
   B.push({ t: 'list', items: ['Instalar os DPS junto ao barramento de proteção do quadro, com condutores curtos, retilíneos e sem laços; preferir a ligação em V (entrada e saída nos mesmos bornes) quando o comprimento passar de 0,5 m.',
     'Proteger cada conjunto de DPS pela retaguarda indicada pelo fabricante, com indicação de fim de vida visível e contato de sinalização quando disponível.', 'Interligar o barramento PE dos quadros ao BEP; com SPDA, ligar o DPS de entrada ao BEP pelo caminho mais curto.',
@@ -6656,9 +6685,13 @@ function renderDPS() {
         ${fSel(pre, 'dpsClasse', 'Classe', Qd.dpsClasse || 'auto', [['auto', `Automática (${r.classeAuto || '—'})`], ['I+II', 'I+II — ponto de entrada'], ['II', 'II — quadro de distribuição']], { struct: true })}
         ${fSel(pre, 'dpsLig', 'Ligação', Qd.dpsLig || 'auto', Object.entries(LIG_DPS), { cls: 'w2' })}
         ${fNum(pre, 'dpsUp', 'Up do produto', Qd.dpsUp, { u: 'kV', ph: r.ativo ? r.Up : '' })}
+        ${cl1 ? fSel(pre, 'dpsTec', 'Tecnologia (classe I)', Qd.dpsTec || 'varistor', [['varistor', 'Varistor'], ['centelhador', 'Centelhador']], { struct: true }) : ''}
         ${cl1 ? fNum(pre, 'dpsIimp', 'Iimp do produto por modo', Qd.dpsIimp, { u: 'kA', ph: r.IimpMin }) : ''}
+        ${cl1 && r.tec === 'centelhador' ? fNum(pre, 'dpsIfi', 'Ifi do centelhador', Qd.dpsIfi, { u: 'kA', ph: 'catálogo' }) : ''}
+        ${fNum(pre, 'dpsUT', 'UT (TOV) do produto', Qd.dpsUT, { u: 'V', ph: r.ativo ? `≥ ${nfmt(r.UTmin, 0)}` : '' })}
         ${fNum(pre, 'dpsL', 'Condutores de ligação (total)', Qd.dpsL, { u: 'm', ph: 0.5 })}${fNum(pre, 'dpsS', 'Seção dos condutores de ligação', Qd.dpsS, { u: 'mm²', ph: r.ativo ? r.Smin : '' })}
         ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr do DPS (fabricante)', Qd.dpsIsccr, { u: 'kA', ph: 'catálogo' })}
+        ${cl1 ? fChk(pre, 'dpsV', 'Ligação em V (ΔU desprezível)', !!Qd.dpsV) : ''}${q.alim ? fChk(pre, 'dpsCoord', 'Coordenado com o DPS a montante (fabricante)', !!Qd.dpsCoord) : ''}${fChk(pre, 'dpsJusDR', 'DPS a jusante de DR geral', !!Qd.dpsJusDR)}
       </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}`;
   renderDPSResumo();
 }
@@ -7737,8 +7770,9 @@ function renderTabelas() {
     corpo = h3t('Suportabilidade a impulso exigível — Tabela 31 da NBR 5410 (kV)', 0) + tabelaHTML(['Tensão nominal', 'IV — origem', 'III — distribuição', 'II — utilização', 'I — especialmente protegidos'], UW_TAB31.map(([, s, v]) => [s, ...v.map(x => nfmt(x, 1))]))
       + h3t('Tensão de operação contínua mínima Uc — Tabela 49') + tabelaHTML(['Modo de proteção', 'TN-S / TN-C-S', 'TT'], [['Fase–neutro', '1,1 × U0', '1,1 × U0'], ['Fase–PE', '1,1 × U0', '1,1 × U0 (a jusante do DR)'], ['Neutro–PE', 'U0', 'U0 (centelhador, ligação n+1 a montante do DR)']], false)
       + h3t('Correntes de descarga') + tabelaHTML(['Parâmetro', 'Critério'], [['In (8/20 µs) — classe II', '≥ 5 kA por modo (NBR 5410)'], ['Iimp (10/350 µs) — classe I', '≥ 12,5 kA por modo; com SPDA: NP I 25 kA · NP II 18,75 kA · NP III e IV 12,5 kA (3F+N)'], ['Iimp N–PE na ligação n+1', 'soma dos modos: NP I 100 kA · NP II 75 kA · NP III e IV 50 kA'], ...Object.values(EXPO_DPS).map(([v, t]) => [`Imáx classe II — ${t.split(' — ')[0].toLowerCase()}`, `${v} kA · ${t.split(' — ')[1]}`])], false)
-      + h3t('Instalação') + tabelaHTML(['Item', 'Critério'], [['Condutores de ligação', 'comprimento total ≤ 0,5 m; ligação em V quando maior'], ['Seção mínima', '4 mm² Cu; 16 mm² Cu para DPS classe I ou estrutura com SPDA'], ['Nível efetivo', 'Up/f = Up + ΔU; ΔU ≈ 1 kV/m na classe I (IEC 62305-4)'], ['Retaguarda', 'fusível ou disjuntor máximo indicado pelo fabricante'], ['Coordenação', 'DPS declarados coordenados pelo fabricante ou distância entre estágios conforme o catálogo']], false);
-    nota = 'NBR 5410:2004 (vigente; revisão em andamento) e NBR 5419-4:2026. As faixas de Imáx por exposição e os valores de Iimp por polo seguem catálogos de fabricantes do mercado (ex.: DEHN, Clamper, Schneider, Finder, MarGirius). Confirme os valores da Tabela 31, da Tabela 49 e dos itens 6.3.5.2 no seu exemplar da norma, e os dados de Up, retaguarda e Isccr na ficha técnica do produto escolhido.';
+      + h3t('Instalação') + tabelaHTML(['Item', 'Critério'], [['Condutores de ligação', 'comprimento total ≤ 0,5 m; ligação em V quando maior'], ['Seção mínima', '4 mm² Cu; 16 mm² Cu para DPS classe I ou estrutura com SPDA'], ['Nível efetivo', 'varistor: Up/f = Up + ΔU; centelhador: Up/f = máx(Up; ΔU); ΔU ≈ 1 kV/m na classe I e ≈ 0 na ligação em V (IEC 62305-4)'], ['Retaguarda', 'fusível ou disjuntor máximo indicado pelo fabricante'], ['Coordenação', `DPS declarados coordenados pelo fabricante ou pelo menos ${D_COORD} m de cabo entre estágios (IEC 61643-12, informativo); abaixo disso, indutor de desacoplamento`]], false)
+      + h3t('Parâmetros complementares de seleção') + tabelaHTML(['Parâmetro', 'Critério'], [['Sobretensão temporária (TOV)', `UT ≥ ${nfmt(UT_FATOR, 2)} × U0 por 5 s (falhas na BT); N–PE no TT: ${UT_NPE_TT} V por 200 ms (falhas na AT) — IEC 61643-11`], ['Corrente subsequente (centelhador)', 'Ifi ≥ corrente de curto-circuito presumida no ponto; N–PE: Ifi ≥ 100 A (IEC 60364-5-534)'], ['Distância de proteção por oscilação', `lpo = (Uw − Up/f) / ${K_OSC} V/m; desconsiderada se o circuito tem menos de 10 m ou Up/f < Uw/2 (IEC 62305-4, Anexo D)`], ['Tecnologia do DPS classe I', 'varistor (limitador, sem corrente subsequente) ou centelhador (comutador, exige Ifi)'], ['DR a montante', 'DPS a jusante de DR geral: DR seletivo (tipo S), imune a surtos']], false);
+    nota = 'NBR 5410:2004 (vigente; revisão em andamento) e NBR 5419-4:2026. As faixas de Imáx por exposição e os valores de Iimp por polo seguem catálogos de fabricantes do mercado (ex.: DEHN, Clamper, Schneider, Finder, MarGirius). Os valores de TOV e Ifi seguem a IEC 61643-11 / IEC 60364-5-534 e catálogos de fabricantes. Confirme os valores da Tabela 31, da Tabela 49 e dos itens 6.3.5.2 no seu exemplar da norma, e os dados de Up, UT, Ifi, retaguarda e Isccr na ficha técnica do produto escolhido.';
   } else if (REFTAB === 'spda') {
     const nps = ['I', 'II', 'III', 'IV'], hs = [2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
     corpo = tabelaHTML(['Nível de proteção', 'Esfera rolante (m)', 'Malha (m)', 'Descidas e anéis (m)', 'ki', 'Corrente de pico (kA)', 'PB', 'PEB / PSPD'], nps.map(k => { const P = NP_SPDA[k]; return [`NP ${k}`, String(P.r), `${P.malha} × ${P.malha}`, String(P.desc), fp(P.ki), String(P.Ip), fp(P.PB), fp(PSPD_NIV[k])]; }))
