@@ -14,9 +14,10 @@ function normalizarDPS(d) {
 const ICONE_VER = { ok: 'ok', fail: 'fail', warn: 'warn', info: 'info' };
 function dpsResHTML(r) {
   if (!r.ativo) return '<p class="mini" style="padding:10px 14px;margin:0">Quadro sem DPS (desmarcado).</p>';
+  const fig = `<div class="diag-folha" style="margin:0 14px 12px;max-width:640px">${ligacaoDPSSVG(r)}</div>`;
   return `<div class="spec" style="padding:10px 14px"><div class="linha"><span><small>Especificação</small><b>${esc(r.spec)}</b></span></div></div>
     <ul class="verif">${r.verifs.map(([st, t]) => `<li class="${ICONE_VER[st]}"><span>${esc(t)}</span></li>`).join('')}</ul>
-    <div class="tw" style="margin:0 14px 12px"><table class="tbl"><thead><tr><th>Material</th><th class="r">Qtd.</th></tr></thead><tbody>${r.materiais.map(([d, q, u]) => `<tr><td class="wrap">${esc(d)}</td><td class="r">${q} ${u}</td></tr>`).join('')}</tbody></table></div>`;
+    <div class="tw" style="margin:0 14px 12px"><table class="tbl"><thead><tr><th>Material</th><th class="r">Qtd.</th></tr></thead><tbody>${r.materiais.map(([d, q, u]) => `<tr><td class="wrap">${esc(d)}</td><td class="r">${q} ${u}</td></tr>`).join('')}</tbody></table></div>${fig}`;
 }
 function renderDPS() {
   const D = PROJ.dps, c = CALC.dps, P = PROJ.params, ps = CALC.spda && CALC.spda.projeto;
@@ -33,8 +34,13 @@ function renderDPS() {
     : fSel('dg', 'exposicao', 'Exposição a surtos (Imáx dos DPS classe II)', D.exposicao, Object.entries(EXPO_DPS).map(([k, v]) => [k, `${v[1].split(' — ')[0]} — Imáx ${v[0]} kA`]), { cls: 'w2', struct: true, dica: EXPO_DPS[D.exposicao][1].split(' — ')[1] })}
     ${fSel('dg', 'catEq', 'Equipamentos protegidos (categoria de suportabilidade)', D.catEq, Object.entries(CAT_UW_TXT).map(([k, v]) => [k, `${v} — Uw ${nfmt(uwTab31(P.U0, k), 1)} kV`]), { cls: 'w2' })}
     ${fSel('dg', 'critDist', 'Distância de proteção até os equipamentos', D.critDist, Object.entries(DIST_DPS), { cls: 'w2' })}
+    ${ps ? fNum('dg', 'nServ', 'Serviços metálicos que entram na estrutura', D.nServ, { dica: 'energia, telecom, água, gás — divide a Iimp (NBR 5419-1, Anexo E); 1 = conservador' }) : ''}
     ${fNum('dg', 'nSens', 'Pontos com equipamentos sensíveis (DPS classe III)', D.nSens, { dica: 'junto aos equipamentos distantes do quadro' })}
     ${fInfo('Esquema / tensão', `${esc(P.aterramento)} · ${P.U0}/${P.U} V`)}
+  </div></fieldset>
+  <fieldset data-scope="dpsg"><legend>Linhas de sinal que entram na edificação</legend><div class="grade">
+    ${Object.entries(SINAL_DPS).map(([k, [nome]]) => fNum('dg', k, nome, D[k], { dica: 'quantidade de linhas' })).join('')}
+    ${fInfo('DPS de sinal', `junto ao BEP · categoria ${esc(c.catSinal)}`)}
   </div></fieldset>
   <div id="dps-resumo"></div>
   ${Q.map(q => { const Qd = PROJ.quadros[q.q] || {}, r = c.quadros[q.q], pre = 'dq-' + safeId(q.q), cl1 = r.ativo && r.classe === 'I+II';
@@ -50,15 +56,17 @@ function renderDPS() {
         ${fNum(pre, 'dpsUc', 'Uc do produto', Qd.dpsUc, { u: 'V', ph: r.ativo ? ucDPS(P.U0) : '' })}${fNum(pre, 'dpsIn', 'In do produto', Qd.dpsIn, { u: 'kA', ph: r.ativo ? `≥ ${nfmt(r.InReq, 0)}` : '' })}
         ${r.ativo && r.lig === 'npe' ? fNum(pre, 'dpsUpPE', 'Up fase–PE (n+1)', Qd.dpsUpPE, { u: 'kV', ph: 'catálogo' }) : ''}
         ${fNum(pre, 'dpsL', 'Condutores de ligação (total)', Qd.dpsL, { u: 'm', ph: 0.5 })}${fNum(pre, 'dpsS', 'Seção dos condutores de ligação', Qd.dpsS, { u: 'mm²', ph: r.ativo ? r.Srec : '' })}
-        ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr do DPS (fabricante)', Qd.dpsIsccr, { u: 'kA', ph: 'catálogo' })}
+        ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr com retaguarda', Qd.dpsIsccr, { u: 'kA', ph: 'catálogo' })}${fNum(pre, 'dpsIscSem', 'Curto suportável sem retaguarda', Qd.dpsIscSem, { u: 'kA', ph: 'desligador' })}
         ${fChk(pre, 'dpsV', 'Ligação em V — série (ΔU desprezível)', !!Qd.dpsV)}${q.alim ? fChk(pre, 'dpsCoord', 'Coordenado com o DPS a montante (fabricante)', !!Qd.dpsCoord) : ''}${fChk(pre, 'dpsJusDR', 'DPS a jusante de DR geral', !!Qd.dpsJusDR)}
-      </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}`;
+      </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}
+  <article class="quadro"><div class="quadro-cab"><div><h3>Zonas de proteção e cascata</h3><span class="mini">NBR 5419-4 — classe do DPS em cada fronteira de zona</span></div></div><div id="dps-zpr" style="padding:12px 14px"></div></article>`;
   renderDPSResumo();
 }
 function renderDPSResumo() {
   const box = $('#dps-resumo'); if (!box) return; const c = CALC.dps, L = Object.values(c.quadros).filter(r => r.ativo);
+  const z = $('#dps-zpr'); if (z) z.innerHTML = `<div class="diag-folha" style="max-width:760px">${zprDPSSVG(c, CALC)}</div>`;
   box.innerHTML = `<div class="res" style="margin-bottom:14px"><div class="res-cab"><h3>Resumo</h3><span class="pill ${c.status}">${statusTxt(c.status)}</span></div>
-    <ul class="verif"><li class="${c.necess.obrig == null ? 'info' : 'ok'}"><span>Obrigatoriedade (NBR 5410): ${esc(c.necess.txt)}</span></li><li class="info"><span>Corrente nominal dos DPS classe II: ${esc(c.InTxt)}</span></li></ul>
+    <ul class="verif"><li class="${c.necess.obrig == null ? 'info' : 'ok'}"><span>Obrigatoriedade (NBR 5410): ${esc(c.necess.txt)}</span></li><li class="info"><span>Corrente nominal dos DPS classe II: ${esc(c.InTxt)}</span></li>${c.sinal.length ? `<li class="info"><span>Linhas de sinal: ${c.sinal.map(x => `${x.n} × ${esc(x.nome.toLowerCase())}`).join('; ')} — DPS na entrada, ligado ao BEP (categoria ${esc(c.catSinal)})</span></li>` : ''}${c.semEntrada ? '<li class="fail"><span>DPS obrigatório no ponto de entrada: ative o DPS do quadro de entrada.</span></li>' : ''}</ul>
     <div class="metr num">${L.map(r => `<div><small>${esc(r.q)}</small><span${r.status === 'fail' ? ' class="bad"' : ''}>${r.classe} · ${r.classe === 'I+II' ? `${nfmt(r.Iimp, 1)} kA` : `${r.Imax} kA`}</span><small style="text-transform:none;letter-spacing:0">${r.lig === 'npe' ? `${r.nF}+1` : `${r.nF + 1}+0`} · Up ${nfmt(r.Up, 1)} kV</small></div>`).join('')}${c.classe3 ? `<div><small>Classe III</small><span>${c.classe3.n} ponto(s)</span></div>` : ''}</div>
     ${c.avisos.length ? `<ul class="msgs">${c.avisos.map(x => `<li class="warn">${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
 }

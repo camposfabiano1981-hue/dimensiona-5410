@@ -12,7 +12,7 @@ vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, construirMemorialDPS };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, construirMemorialDPS, ligacaoDPSSVG, zprDPSSVG, formasLigacaoDPS };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -172,6 +172,32 @@ test('DPS — métodos de fabricantes (catálogo Siemens 5SD7) e verificações 
   assert.ok(A.lqDPS(false, true, 80).fora); assert.equal(A.lqDPS(false, false, 160).F2, 125); assert.equal(A.lqDPS(true, false, 200).fase, 35);
   P3.quadros.QM = { ...P3.quadros.QM, dpsTec: 'varistor', dpsV: true }; const d4 = A.calcDPS(P3, K3);
   perto(d4.quadros.QM.Upf, d4.quadros.QM.Up, 1e-9, 'ligação em V: ΔU desprezível');
+});
+
+test('DPS — zonas de proteção, divisão da Iimp, retaguarda pelo curto, linhas de sinal e desenhos', () => {
+  const qm = K.dps.quadros.QM, qd = K.dps.quadros['QD-1'];
+  assert.deepEqual([qm.zpr, qd.zpr, qm.esquema, qd.esquema], ['ZPR 0 → 1', 'ZPR 1 → 2', 2, 2]);
+  const calc = Px => { const Kx = A.calcularProjeto(Px); Kx.aterr = A.calcAterramento(Px, Kx); Kx.spda = A.calcSPDA(Px, Kx); return [A.calcDPS(Px, Kx), Kx]; };
+  // NBR 5419-1, Anexo E: NP I (200 kA) com 2 serviços e 4 condutores → 200 × 0,5 / (2 × 4) = 12,5 kA; com 1 serviço, 25 kA
+  const P4 = JSON.parse(JSON.stringify(P)); P4.spda.np = 'I'; P4.dps.nServ = 2;
+  perto(calc(P4)[0].quadros.QM.IimpSPDA, 12.5, 1e-9, 'Iimp com 2 serviços'); P4.dps.nServ = 1; perto(calc(P4)[0].quadros.QM.IimpMin, 25, 1e-9, 'Iimp NP I');
+  // retaguarda pelo curto suportável do desligador (prática Clamper): 3 kA > 2 kA → fusível de 100 A por fase
+  const P5 = JSON.parse(JSON.stringify(P)); P5.quadros['QD-1'] = { ...P5.quadros['QD-1'], dpsIscSem: 2 }; P5.dps.sinTel = 2; P5.dps.sinCoax = 1;
+  const [d5, K5] = calc(P5); const q5 = d5.quadros['QD-1'];
+  assert.ok(q5.F2cc && q5.F2 === 100, 'retaguarda pelo curto-circuito'); assert.ok(q5.materiais.some(m => /retaguarda/.test(m[0]) && m[1] === 1 * q5.nF));
+  // linhas de sinal: DPS na entrada, categoria D1 com SPDA, na lista de materiais
+  assert.equal(d5.sinal.length, 2); assert.ok(d5.catSinal.startsWith('D1'));
+  K5.dps = d5; const M5 = A.calcMateriais(P5, K5); assert.equal(M5.auto.find(i => i.key === 'dps|sinal|sinTel').q, 2);
+  // DPS obrigatório e quadro de entrada sem DPS → falha
+  const P6 = JSON.parse(JSON.stringify(P)); P6.quadros.QM = { ...(P6.quadros.QM || {}), dps: false }; const d6 = calc(P6)[0];
+  assert.ok(d6.semEntrada && d6.status === 'fail', 'DPS obrigatório na entrada');
+  // desenhos: esquema de ligação por quadro, zonas de proteção e galeria das formas de ligação
+  const P7 = JSON.parse(JSON.stringify(P)); P7.params.aterramento = 'TT'; const d7 = calc(P7)[0];
+  assert.equal(d7.quadros.QM.esquema, 3); assert.ok(A.ligacaoDPSSVG(d7.quadros.QM).includes('centelhador N–PE'));
+  assert.ok(A.ligacaoDPSSVG(qd).startsWith('<svg') && A.zprDPSSVG(K.dps, K).includes('ZPR 3'));
+  assert.equal(A.formasLigacaoDPS(127).length, 5);
+  const B = A.construirMemorialDPS(P, K);
+  assert.ok(B.filter(b => b.t === 'fig').length >= 8 && B.some(b => b.t === 'h1' && /Formas de ligação/.test(b.text)) && B.some(b => b.t === 'h1' && /Linhas de sinal/.test(b.text)));
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

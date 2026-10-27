@@ -61,6 +61,11 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
 - **Condutores de ligação:** ≤ 0,5 m; seção mínima de 4 ou 16 mm² (NBR 5410) e seção do fabricante pela proteção a montante, em série (V) ou paralelo (T), com o fusível F2 quando exigido (catálogo Siemens).
 - **Distância de proteção:** lpo = (Uw − Up/f) / 25 V/m (IEC 62305-4, Anexo D) ou 30 m (prática de fabricante), com a lista dos circuitos que pedem DPS classe III.
 - **Demais verificações:** retaguarda e Isccr do fabricante, coordenação entre estágios (declaração do fabricante ou 10 m de cabo) e DR a montante com imunidade ≥ 3 kA (8/20 µs).
+- **Zonas de proteção (NBR 5419-4) — método também usado pela Clamper:** entrada na fronteira ZPR 0 → 1 (classe I+II com SPDA, II sem), quadros na ZPR 1 → 2 (classe II) e equipamentos na ZPR 2 → 3 (classe III).
+- **Iimp com SPDA (NBR 5419-1, Anexo E):** Ip × 0,5 / (serviços metálicos × condutores), mínimo de 12,5 kA.
+- **Retaguarda pelo curto-circuito (prática Clamper):** acima do curto suportável pelo desligador interno, fusível gL/gG dedicado por fase.
+- **Linhas de sinal:** DPS na entrada de telefonia, rede de dados e coaxial, ligado ao BEP (categoria D1 com SPDA, C2 sem); DPS obrigatório no quadro de entrada.
+- **Desenhos:** esquema de ligação de cada quadro (Figura 13, esquemas 1, 2 e 3; ligação em T com F2 ou em V; cota a + b ≤ 0,5 m), zonas de proteção com a cascata de DPS e galeria das formas de ligação — na aba DPS, na aba Tabelas e na memória.
 - **Saídas:** memória própria (PDF, Word e HTML) anexável ao memorial descritivo; especificação nos diagramas unifilar e multifilar (com o desenho da ligação n+1) e na lista de materiais.
 
 **SPDA — proteção contra descargas atmosféricas (ABNT NBR 5419:2026)**

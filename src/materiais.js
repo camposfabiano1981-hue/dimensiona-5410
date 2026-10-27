@@ -106,6 +106,7 @@ function materiaisAuto(proj, calc) {
   const ps = calc.spda && calc.spda.projeto;
   if (calc.dps) {
     Object.values(calc.dps.quadros).filter(r => r.ativo).forEach(r => r.materiais.forEach(([d, q, u, n]) => add(`${/condutor/i.test(d) ? 'dpscond' : /retaguarda/i.test(d) ? 'dpsback' : 'dps'}|${d}`, 'prot', d, u, n, q, r.q)));
+    (calc.dps.sinal || []).forEach(x => add(`dps|sinal|${x.k}`, 'prot', `${x.mat} — categoria ${calc.dps.catSinal}`, 'un', 'IEC 61643-21', x.n, 'linhas de sinal'));
     if (calc.dps.classe3) add(`dps|III|${calc.dps.classe3.Uc}`, 'prot', `DPS classe III junto ao equipamento sensível — Uc ${calc.dps.classe3.Uc} V`, 'un', 'ABNT NBR IEC 61643-11', calc.dps.classe3.n, 'equipamentos sensíveis');
   }
   // SPDA (NBR 5419-3)

@@ -40,8 +40,12 @@ function lqDPS(cl1, emV, F1) {
   return x ? { fase: x[1], pe: x[2], F2: x[3] || null } : { fora: true, max: t[t.length - 1][0] };
 }
 const DIST_DPS = { norma: 'Distância por oscilação lpo (IEC 62305-4, Anexo D)', fab: 'Prática de fabricante — 30 m (catálogo Siemens)' };
-const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3;
-function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma' }; }
+const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3, BACK_CLAMPER = 100;
+/* zonas de proteção contra raios (NBR 5419-4): classe do DPS em cada fronteira, na simplificação usual dos catálogos (Clamper, Finder) */
+const ZPR_DPS = [['ZPR 0 → 1', 'entrada da linha na edificação', 'I ou I+II com SPDA; II sem SPDA'], ['ZPR 1 → 2', 'quadros de distribuição', 'II'], ['ZPR 2 → 3', 'junto ao equipamento sensível', 'III']];
+/* linhas de sinal externas (NBR 5410: toda linha externa de sinal recebe DPS na entrada da edificação, ligado ao BEP) */
+const SINAL_DPS = { sinTel: ['Telefonia ou dados em par metálico', 'DPS para linha de sinal em par metálico (telefonia/dados), junto ao DG e ao BEP'], sinRede: ['Rede de dados externa (Ethernet / PoE)', 'DPS para rede de dados RJ45 (Ethernet/PoE), junto ao BEP'], sinCoax: ['Cabo coaxial (antena, CATV, CFTV)', 'DPS coaxial para antena/CATV/CFTV, junto ao BEP'] };
+function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma', nServ: 1, sinTel: 0, sinRede: 0, sinCoax: 0 }; }
 
 function calcDPS(proj, calc) {
   const P = proj.params, D = { ...dpsPadrao(), ...(proj.dps || {}) }, ps = calc.spda && calc.spda.projeto, out = { quadros: {}, falhas: [], avisos: [] };
@@ -49,7 +53,12 @@ function calcDPS(proj, calc) {
   const metodo = METODO_DPS[D.metodo] ? D.metodo : 'F', critDist = DIST_DPS[D.critDist] ? D.critDist : 'norma';
   const Td = +D.Td > 0 ? +D.Td : null, sub = D.alim === 'subterranea', delta = DELTA_DPS.some(x => x[0] === +D.delta) ? +D.delta : 0.5;
   const LBT = sub ? 0 : Math.min(Math.max(+D.LBT || 0, 0), 0.5);
-  Object.assign(out, { exp, catEq, metodo, critDist, Td, sub, delta, LBT, nSens: Math.max(0, Math.round(+D.nSens || 0)), Uw: UW_TAB31.find(x => P.U0 <= x[0]) });
+  const nServ = Math.max(1, Math.round(+D.nServ || 1));
+  Object.assign(out, { exp, catEq, metodo, critDist, Td, sub, delta, LBT, nServ, nSens: Math.max(0, Math.round(+D.nSens || 0)), Uw: UW_TAB31.find(x => P.U0 <= x[0]) });
+  // linhas de sinal que entram na edificação
+  out.sinal = Object.keys(SINAL_DPS).map(k => ({ k, n: Math.max(0, Math.round(+D[k] || 0)), nome: SINAL_DPS[k][0], mat: SINAL_DPS[k][1] })).filter(x => x.n);
+  out.catSinal = ps ? 'D1 (10/350 µs, descargas diretas)' : 'C2 (8/20 µs)';
+  const prof = q => { let d = 0, x = q; while (x && x.alim && d < 12) { d++; x = calc.quadros[x.alim.quadro]; } return d; };
   // obrigatoriedade (NBR 5410, influências externas AQ): estrutura com SPDA (AQ3) ou linha aérea com Td > 25 (AQ2)
   out.necess = ps ? { obrig: true, txt: 'obrigatório — edificação com SPDA (AQ3)' }
     : sub ? { obrig: false, txt: 'não obrigatório — alimentação em baixa tensão totalmente subterrânea; recomendado para proteger os equipamentos' }
@@ -70,7 +79,8 @@ function calcDPS(proj, calc) {
     const Qd = proj.quadros[q.q] || {}, r = out.quadros[q.q] = { q: q.q, desc: Qd.desc || '', ativo: Qd.dps !== false, verifs: [], materiais: [] };
     if (!r.ativo) { r.status = 'off'; return; }
     const nF = q.usadas.length, origem = !q.alim, v = (st, t) => r.verifs.push([st, t]);
-    r.origem = origem; r.nF = nF;
+    r.origem = origem; r.nF = nF; r.fases = q.usadas.slice();
+    r.nivel = prof(q); r.zpr = ZPR_DPS[Math.min(r.nivel, 1)][0];
     // classe: I+II na entrada quando há SPDA (descargas diretas); II nos demais quadros
     r.classeAuto = origem && (ps || (metodo === 'faixa' && exp === 'alta')) ? 'I+II' : 'II';
     r.classe = ['I+II', 'II'].includes(Qd.dpsClasse) ? Qd.dpsClasse : r.classeAuto;
@@ -79,13 +89,14 @@ function calcDPS(proj, calc) {
     r.lig = Qd.dpsLig === 'pe' || Qd.dpsLig === 'npe' ? Qd.dpsLig : (P.aterramento === 'TT' ? 'npe' : 'pe');
     r.semNPE = r.lig === 'pe' && origem && P.aterramento === 'TN-C-S';
     r.nPolos = r.semNPE ? nF : nF + 1;
+    r.esquema = r.lig === 'npe' ? 3 : r.semNPE ? 1 : 2;
     r.ligTxt = r.lig === 'npe' ? `${nF}+1 — fases ao neutro e centelhador N–PE` : r.semNPE ? `${nF}+0 — fases ao PEN / BEP (neutro aterrado no BEP)` : `${nF + 1}+0 — fases e neutro ao PE`;
     // tensão de operação contínua (Tabela 49): valor do produto ou menor valor comercial
     r.UcMinF = 1.1 * P.U0; r.UcMinN = P.U0; r.UcProd = +Qd.dpsUc > 0; r.Uc = r.UcProd ? +Qd.dpsUc : ucDPS(P.U0);
     r.UcN = r.lig === 'npe' ? Math.max(255, ucDPS(P.U0 / 1.1)) : r.Uc;
     // correntes: In pelo método escolhido (mínimo de 5 kA da NBR 5410); Iimp ≥ 12,5 kA ou o do nível do SPDA
     r.Imax = out.ImaxExp; r.InReq = Math.max(5, out.InExp, cl1 ? 20 : 0); r.InProd = +Qd.dpsIn > 0; r.In = r.InProd ? +Qd.dpsIn : r.InReq;
-    if (cl1) { r.IimpMin = Math.max(12.5, ps ? ps.Iimp : 0); r.Iimp = Math.max(12.5, +Qd.dpsIimp || 0, r.IimpMin); r.IimpNPE = r.lig === 'npe' ? r.Iimp * (nF + 1) : r.Iimp; }
+    if (cl1) { r.IimpSPDA = ps ? ps.Iimp / nServ : 0; r.IimpMin = Math.max(12.5, r.IimpSPDA); r.Iimp = Math.max(12.5, +Qd.dpsIimp || 0, r.IimpMin); r.IimpNPE = r.lig === 'npe' ? r.Iimp * (nF + 1) : r.Iimp; }
     // nível de proteção (Tabela 31) e nível efetivo com os condutores de ligação
     r.Uw2 = uwTab31(P.U0, 'II'); r.Uw3 = uwTab31(P.U0, 'III'); r.UwEq = uwTab31(P.U0, catEq);
     r.Up = +Qd.dpsUp > 0 ? +Qd.dpsUp : (cl1 ? 1.5 : (P.U0 <= 150 ? 1.2 : 1.5)); r.UpPadrao = !(+Qd.dpsUp > 0);
@@ -105,6 +116,9 @@ function calcDPS(proj, calc) {
     r.Srec = Math.max(r.SminNBR, r.lq && !r.lq.fora ? Math.max(r.lq.fase, r.lq.pe) : 0);
     r.S = +Qd.dpsS > 0 ? +Qd.dpsS : r.Srec;
     r.F2 = r.back && r.Imont && r.Imont > r.back ? r.back : (!r.back && r.lq && r.lq.F2 ? r.lq.F2 : null);
+    // retaguarda pelo curto-circuito (prática Clamper): acima do curto suportável pelo desligador interno, fusível dedicado por fase
+    r.iscSem = +Qd.dpsIscSem > 0 ? +Qd.dpsIscSem : null; r.F2cc = !!(r.iscSem && r.icc && r.icc > r.iscSem + 1e-9);
+    if (r.F2cc && !r.F2) r.F2 = r.back || BACK_CLAMPER;
     // distância de proteção: oscilação (lpo = (Uw − Up/f) / k, dispensada se Up/f < Uw/2 ou circuito < 10 m) ou 30 m do fabricante
     if (critDist === 'fab') { r.dProt = D_PROT_FAB; r.distDispensa = false; }
     else { r.dProt = Math.max(0, (r.UwEq - r.Upf) * 1000 / K_OSC); r.distDispensa = r.Upf < r.UwEq / 2; }
@@ -117,7 +131,7 @@ function calcDPS(proj, calc) {
     v(r.Up <= r.Uw2 + 1e-9 ? 'ok' : 'fail', `Up = ${nfmt(r.Up, 2)} kV ≤ ${nfmt(r.Uw2, 1)} kV (categoria II da Tabela 31)${r.UpPadrao ? ' — valor típico; confirme no catálogo' : ''}`);
     if (cl1) {
       if (r.tec === 'centelhador') v(r.ifi && r.icc ? (r.ifi >= r.icc - 1e-9 ? 'ok' : 'fail') : 'info', r.ifi && r.icc ? `Corrente subsequente interrompida Ifi = ${nfmt(r.ifi, 1)} kA ${cmp(r.ifi, r.icc)} curto-circuito presumido de ${nfmt(r.icc, 1)} kA` : `Centelhador: a corrente subsequente interrompida Ifi deve ser ≥ ${r.icc ? nfmt(r.icc, 1) + ' kA (curto-circuito presumido)' : 'a corrente de curto-circuito presumida no quadro'}; informe o valor do catálogo`);
-      v(r.Iimp >= r.IimpMin - 1e-9 ? 'ok' : 'fail', `Iimp = ${nfmt(r.Iimp, 2)} kA (10/350 µs) por modo ≥ ${nfmt(r.IimpMin, 2)} kA${ps && origem ? ` (NP ${ps.base} do SPDA)` : ' (mínimo de 12,5 kA)'}`);
+      v(r.Iimp >= r.IimpMin - 1e-9 ? 'ok' : 'fail', `Iimp = ${nfmt(r.Iimp, 2)} kA (10/350 µs) por modo ≥ ${nfmt(r.IimpMin, 2)} kA${ps ? ` — NP ${ps.base}: ${ps.Ip} kA × 0,5 / (${nServ} serviço${nServ > 1 ? 's' : ''} × ${ps.nModos} condutores) = ${nfmt(r.IimpSPDA, 2)} kA (NBR 5419-1, Anexo E)${r.IimpSPDA < 12.5 ? '; mínimo de 12,5 kA' : ''}` : ' (mínimo de 12,5 kA)'}`);
       if (r.lig === 'npe') v('info', `Centelhador N–PE: Iimp ≥ ${nfmt(r.IimpNPE, 1)} kA (soma das correntes dos ${nF + 1} condutores)`);
     }
     if (r.lig === 'npe') v('info', 'Centelhador N–PE: corrente subsequente interrompida Ifi ≥ 100 A (NBR 5410).');
@@ -138,6 +152,7 @@ function calcDPS(proj, calc) {
     else if (r.back == null) v('info', 'Proteção de retaguarda: informe a corrente máxima do fusível ou disjuntor indicada pelo fabricante do DPS.');
     else if (r.Imont && r.Imont > r.back) v('warn', `A proteção a montante (${r.Imont} A) excede a retaguarda máxima do DPS (${r.back} A): instalar dispositivo de retaguarda dedicado de ${r.back} A — valor menor pode romper com surtos abaixo dos nominais do DPS.`);
     else v('ok', `Proteção a montante${r.Imont ? ` de ${r.Imont} A` : ''} dentro da retaguarda máxima do fabricante (${r.back} A)`);
+    if (r.iscSem && r.icc) v(r.F2cc ? 'info' : 'ok', r.F2cc ? `Curto-circuito presumido ${nfmt(r.icc, 1)} kA > ${nfmt(r.iscSem, 1)} kA suportados pelo desligador interno do DPS: fusível de retaguarda dedicado por fase, de ${r.F2} A gL/gG (prática Clamper)` : `Curto-circuito presumido ${nfmt(r.icc, 1)} kA ≤ ${nfmt(r.iscSem, 1)} kA suportados pelo desligador interno: retaguarda dedicada dispensada pelo curto-circuito`);
     if (r.isccr && r.icc) v(r.icc <= r.isccr + 1e-9 ? 'ok' : 'fail', `Corrente de curto-circuito presumida ${nfmt(r.icc, 1)} kA ≤ ${nfmt(r.isccr, 1)} kA suportável pelo DPS com a retaguarda (Isccr)`);
     else v('info', 'Informe a corrente de curto-circuito suportável do DPS (Isccr) para comparar com a do quadro.');
     if (P.aterramento === 'TT') v(r.lig === 'npe' ? 'ok' : 'warn', r.lig === 'npe' ? 'Esquema TT: DPS a montante do DR com ligação n+1 (NBR 5410, Figura 13, esquema de conexão 3)' : 'Esquema TT com DPS ao PE: só a jusante do DR; a montante do DR use a ligação n+1 (NBR 5410, Figura 13)');
@@ -165,6 +180,10 @@ function calcDPS(proj, calc) {
   if (out.nSens) out.classe3 = { n: out.nSens, Uc: ucDPS(P.U0) };
   if (lista.some(r => r.foraDist && r.foraDist.length) && !out.nSens) out.avisos.push('Há circuitos além da distância de proteção do DPS do quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III junto a eles.');
   else if (lista.some(r => r.status === 'warn' && r.Upf > r.UwRef) && !out.nSens) out.avisos.push('O nível de proteção efetivo excede a suportabilidade dos equipamentos em algum quadro: informe os pontos com equipamentos sensíveis para prever DPS classe III.');
-  out.status = lista.some(r => r.status === 'fail') ? 'fail' : (lista.some(r => r.status === 'warn') || out.avisos.length ? 'warn' : 'ok');
+  // o DPS obrigatório fica no ponto de entrada ou no quadro de distribuição principal (NBR 5410)
+  const ent = Object.values(out.quadros).find(r => calc.quadros[r.q] && !calc.quadros[r.q].alim);
+  out.semEntrada = !!(out.necess.obrig && ent && !ent.ativo);
+  if (out.semEntrada) out.avisos.push(`DPS obrigatório (${out.necess.txt.split(' — ')[1]}) e o quadro de entrada ${ent.q} está sem DPS: instale-o no ponto de entrada ou no quadro de distribuição principal (NBR 5410).`);
+  out.status = out.semEntrada || lista.some(r => r.status === 'fail') ? 'fail' : (lista.some(r => r.status === 'warn') || out.avisos.length ? 'warn' : 'ok');
   return out;
 }
