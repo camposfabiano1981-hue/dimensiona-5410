@@ -16,8 +16,8 @@ function projetoExemplo() {
   proj.exemplo = true;
   Object.assign(proj.info, { obra: 'Residência unifamiliar — exemplo', cliente: 'Proprietário (exemplo)', endereco: 'Rua Exemplo, 100 — Centro', cidade: 'Cidade – UF', responsavel: 'Nome do responsável técnico', registro: 'CREA/CFT nº 000000', art: 'a emitir', concessionaria: 'Norma de fornecimento da distribuidora local' });
   proj.quadros = {
-    'QM': { desc: 'Quadro de medição (ponto de entrega)', fd: null, icc: 5, dvMont: 0 },
-    'QD-1': { desc: 'Quadro de distribuição de circuitos', fd: null, icc: 3, dvMont: 0 }
+    'QM': { desc: 'Quadro de medição (ponto de entrega)', fd: null, icc: 5, dvMont: 0, dpsProd: 'clamper-frontv-275-12-60-4' },
+    'QD-1': { desc: 'Quadro de distribuição de circuitos', fd: null, icc: 3, dvMont: 0, dpsV: true }
   };
   proj.trechos = {
     'E1': { tipo: 'pvc_rigido', comp: 9, curvas: 2, local: 'interno' },

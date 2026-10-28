@@ -12,7 +12,7 @@ vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, construirMemorialDPS, ligacaoDPSSVG, zprDPSSVG, formasLigacaoDPS };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, CAT_DPS, construirMemorialDPS, ligacaoDPSSVG, zprDPSSVG, formasLigacaoDPS };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -82,8 +82,9 @@ test('Diagramas — unifilar e multifilar refletem os circuitos de cada quadro',
   assert.equal(c1.fs.length + (c1.N ? 1 : 0) + (c1.PE ? 1 : 0), r1.nVias, 'condutores do circuito 1');
   assert.equal(d.cs.filter(c => c.dr).length, q.cs.filter(c => K.res[c.id].drUsado).length, 'DR nos diagramas');
   // DPS no quadro e na lista de materiais (fases + neutro)
-  const dps = MT.auto.filter(i => i.key.startsWith('dps|') && !i.key.startsWith('dps|III')).reduce((s, i) => s + i.q, 0);
-  assert.equal(dps, Object.values(K.quadros).filter(x => x.cs.length).reduce((s, x) => s + x.usadas.length + 1, 0), 'DPS no quantitativo');
+  const dps = MT.auto.filter(i => i.key.startsWith('dps|') && !i.key.startsWith('dps|III') && !i.key.startsWith('dps|sinal'));
+  assert.ok(dps.some(i => i.un === 'cj' && /4\+0/.test(i.desc) && /CLAMPER/.test(i.desc) && i.q === 1), 'conjunto 4+0 de referência no QM');
+  assert.equal(dps.filter(i => i.un === 'un').reduce((s, i) => s + i.q, 0), K.quadros['QD-1'].usadas.length + 1, 'DPS unipolares do QD-1');
   assert.equal(A.dadosQuadro(P, K, 'QM').dps.classe, 'I+II', 'DPS classe I+II no quadro de entrada quando há SPDA');
   const B = A.construirDiagramas(P, K);
   assert.ok(B.filter(b => b.t === 'fig' && b.full).length >= 4, 'figuras dos diagramas');
@@ -150,8 +151,11 @@ test('DPS — métodos de fabricantes (catálogo Siemens 5SD7) e verificações 
   const inF = (Td, LBT, delta) => { const Px = JSON.parse(JSON.stringify(P)); Px.dps = { ...Px.dps, Td, LBT, delta }; return A.calcDPS(Px, { ...K, spda: null }); };
   const x1 = inF(10, 0.2, 0.5); perto(x1.F, 25, 1e-9, 'F = 10 × 2,5'); assert.equal(x1.InExp, 5); assert.equal(x1.necess.obrig, false);
   assert.equal(inF(30, 0.1, 0).InExp, 10); assert.equal(inF(30, 2, 1).F, 30 * (1.6 + 1 + 1));
-  // seção pela proteção a montante: QD-1 em T com F1 = 63 A → 10 mm²; entrada classe I+II → 16 mm²
-  assert.deepEqual([qd.Imont, qd.lq.fase, qd.lq.pe, qd.S], [63, 10, 10, 10]); assert.equal(qm.S, 16);
+  // seção pela proteção a montante: QD-1 em V com F1 = 63 A → 10 mm²; entrada classe I+II → 16 mm²
+  assert.deepEqual([qd.emV, qd.Imont, qd.lq.fase, qd.lq.pe, qd.S], [true, 63, 10, 10, 10]); assert.equal(qm.S, 16);
+  // ΔU de 1 kV/m também na classe II (ligação em T); desprezível em V
+  const PT = JSON.parse(JSON.stringify(P)); PT.quadros['QD-1'].dpsV = false; const dT = A.calcDPS(PT, K).quadros['QD-1'];
+  perto(dT.dU, 0.5, 1e-9, 'ΔU classe II em T'); perto(dT.Upf, 1.7, 1e-9, 'Up/f'); assert.equal(dT.verifs.find(v => v[1].startsWith('Nível efetivo'))[0], 'warn'); perto(qd.dU, 0, 1e-9, 'ΔU em V');
   // lpo = (Uw − Up/f) / 25 V/m = (1,5 − 1,2) kV / 25 V/m = 12 m; circuitos terminais acima disso, com 10 m ou mais
   perto(qd.dProt, 12, 1e-9, 'lpo'); assert.ok(qd.foraDist.includes('13') && !qd.foraDist.includes('9'), 'circuitos além de lpo');
   assert.equal(qd.verifs.find(v => v[1].startsWith('Distância de proteção'))[0], 'ok', 'classe III prevista cobre os circuitos longos');
@@ -181,9 +185,11 @@ test('DPS — zonas de proteção, divisão da Iimp, retaguarda pelo curto, linh
   // NBR 5419-1, Anexo E: NP I (200 kA) com 2 serviços e 4 condutores → 200 × 0,5 / (2 × 4) = 12,5 kA; com 1 serviço, 25 kA
   const P4 = JSON.parse(JSON.stringify(P)); P4.spda.np = 'I'; P4.dps.nServ = 2;
   perto(calc(P4)[0].quadros.QM.IimpSPDA, 12.5, 1e-9, 'Iimp com 2 serviços'); P4.dps.nServ = 1; perto(calc(P4)[0].quadros.QM.IimpMin, 25, 1e-9, 'Iimp NP I');
-  // retaguarda pelo curto suportável do desligador (prática Clamper): 3 kA > 2 kA → fusível de 100 A por fase
+  // retaguarda pelo curto suportável sem retaguarda (ficha do fabricante): 3 kA > 2 kA → retaguarda dedicada do valor do fabricante
   const P5 = JSON.parse(JSON.stringify(P)); P5.quadros['QD-1'] = { ...P5.quadros['QD-1'], dpsIscSem: 2 }; P5.dps.sinTel = 2; P5.dps.sinCoax = 1;
-  const [d5, K5] = calc(P5); const q5 = d5.quadros['QD-1'];
+  let [d5, K5] = calc(P5);
+  assert.ok(d5.quadros['QD-1'].F2cc && !d5.quadros['QD-1'].F2 && d5.quadros['QD-1'].verifs.some(v => v[0] === 'warn' && /retaguarda máxima/.test(v[1])), 'sem valor automático de retaguarda');
+  P5.quadros['QD-1'].dpsBack = 100; [d5, K5] = calc(P5); const q5 = d5.quadros['QD-1'];
   assert.ok(q5.F2cc && q5.F2 === 100, 'retaguarda pelo curto-circuito'); assert.ok(q5.materiais.some(m => /retaguarda/.test(m[0]) && m[1] === 1 * q5.nF));
   // linhas de sinal: DPS na entrada, categoria D1 com SPDA, na lista de materiais
   assert.equal(d5.sinal.length, 2); assert.ok(d5.catSinal.startsWith('D1'));
@@ -198,6 +204,39 @@ test('DPS — zonas de proteção, divisão da Iimp, retaguarda pelo curto, linh
   assert.equal(A.formasLigacaoDPS(127).length, 5);
   const B = A.construirMemorialDPS(P, K);
   assert.ok(B.filter(b => b.t === 'fig').length >= 8 && B.some(b => b.t === 'h1' && /Formas de ligação/.test(b.text)) && B.some(b => b.t === 'h1' && /Linhas de sinal/.test(b.text)));
+});
+
+test('DPS — correções e catálogo: In N–PE, símbolos, linha exposta, retaguarda e produtos de referência', () => {
+  const calc = Px => { const Kx = A.calcularProjeto(Px); Kx.aterr = A.calcAterramento(Px, Kx); Kx.spda = A.calcSPDA(Px, Kx); return A.calcDPS(Px, Kx); };
+  // TT sem SPDA e F ≤ 40 (In 5 kA): centelhador N–PE com In ≥ 20 kA no trifásico (NBR 5410, 6.3.5.2.4)
+  const P1 = JSON.parse(JSON.stringify(P)); P1.params.aterramento = 'TT'; P1.spda.ativo = false; Object.assign(P1.dps, { Td: 10, LBT: 0, delta: 0 });
+  const t1 = calc(P1).quadros['QD-1'];
+  assert.equal(t1.In, 5); assert.equal(t1.InNPE, 20); assert.ok(t1.materiais.some(m => /Centelhador N–PE/.test(m[0]) && /In 20 kA/.test(m[0])));
+  assert.equal(t1.verifs.find(v => v[1].startsWith('Centelhador N–PE: In'))[0], 'ok');
+  // símbolo da verificação dos condutores quando falha
+  const P2 = JSON.parse(JSON.stringify(P)); P2.quadros['QD-1'].dpsL = 1;
+  assert.ok(calc(P2).quadros['QD-1'].verifs.some(v => v[0] === 'fail' && v[1].includes('1,00 m > 0,5 m')));
+  // sem SPDA, linha aérea exposta a descargas diretas → classe I+II na entrada
+  const P3 = JSON.parse(JSON.stringify(P)); P3.spda.ativo = false; delete P3.quadros.QM.dpsProd; assert.equal(calc(P3).quadros.QM.classe, 'II');
+  P3.dps.linhaExposta = true; const e3 = calc(P3).quadros.QM; assert.equal(e3.classe, 'I+II'); perto(e3.IimpMin, 12.5, 1e-9, 'Iimp mínima');
+  // retaguarda por disjuntor: capacidade de interrupção menor que o curto → falha; fusível gL/gG: 50 kA usual
+  const P4 = JSON.parse(JSON.stringify(P)); Object.assign(P4.quadros['QD-1'], { dpsIscSem: 2, dpsBack: 100, dpsBackTipo: 'disj', dpsBackIcn: 2 });
+  assert.equal(calc(P4).quadros['QD-1'].verifs.find(v => v[1].startsWith('Retaguarda F2'))[0], 'fail');
+  P4.quadros['QD-1'].dpsBackTipo = 'fus'; delete P4.quadros['QD-1'].dpsBackIcn; assert.equal(calc(P4).quadros['QD-1'].verifs.find(v => v[1].startsWith('Retaguarda F2'))[0], 'ok');
+  // catálogo: entrada com CLAMPER Front V 12,5/60 kA 4+0 (TN-S 3F+N → 4+0) atende; produto classe II na entrada ou configuração errada falham
+  const qm = K.dps.quadros.QM; assert.equal(qm.prod.fab, 'CLAMPER'); assert.deepEqual([qm.Uc, qm.Iimp, qm.In, qm.isccr, qm.back], [275, 12.5, 30, 5, 125]); assert.notEqual(qm.status, 'fail');
+  const P5 = JSON.parse(JSON.stringify(P)); P5.quadros.QM.dpsProd = 'weg-spw03-275-45'; assert.equal(calc(P5).quadros.QM.status, 'fail');
+  P5.quadros.QM.dpsProd = 'clamper-frontv-275-12-60-4'; P5.params.aterramento = 'TN-C-S'; const c5 = calc(P5).quadros.QM;
+  assert.ok(c5.verifs.some(v => v[0] === 'fail' && /4\+0 ≠ 3\+0/.test(v[1])), 'configuração 4+0 onde se exige 3+0');
+  // WEG SPW03-275-45 no QD-1: 3 kA sem retaguarda — curto de 3 kA dispensa a retaguarda dedicada, F1 de 63 A ≤ 125 A
+  const P6 = JSON.parse(JSON.stringify(P)); P6.quadros['QD-1'].dpsProd = 'weg-spw03-275-45'; const w6 = calc(P6).quadros['QD-1'];
+  assert.deepEqual([w6.Up, w6.iscSem, w6.isccr, w6.back, w6.F2], [1.5, 3, 50, 125, null]); assert.ok(w6.verifs.some(v => v[0] === 'ok' && /segue como retaguarda/.test(v[1])));
+  // Siemens 5SD7 464-1 (3+1) em TT a 127 V: Up 1,6 kV > 1,5 kV da categoria II
+  const P7 = JSON.parse(JSON.stringify(P)); P7.params.aterramento = 'TT'; P7.quadros['QD-1'].dpsProd = 'siemens-5sd7464-1'; const s7 = calc(P7).quadros['QD-1'];
+  assert.ok(s7.verifs.some(v => v[0] === 'fail' && v[1].startsWith('Up = 1,60 kV > 1,5 kV'))); assert.ok(s7.verifs.some(v => v[0] === 'ok' && /3\+1 = 3\+1/.test(v[1])));
+  const P8 = JSON.parse(JSON.stringify(P)); P8.quadros['QD-1'].dpsProd = 'siemens-5sd7464-1'; const s8 = calc(P8).quadros['QD-1'];
+  assert.equal(s8.lig, 'npe', 'TN-S com produto 3+1 → esquema 3'); assert.ok(s8.verifs.some(v => v[0] === 'ok' && /3\+1 = 3\+1/.test(v[1])));
+  assert.equal(A.CAT_DPS.length, 8);
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

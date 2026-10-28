@@ -56,12 +56,16 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
 - **Correntes da classe I:** Iimp ≥ 12,5 kA ou o do nível do SPDA (25 / 18,75 / 12,5 kA por polo; N–PE com a soma); Ifi dos centelhadores ≥ curto-circuito presumido e N–PE ≥ 100 A.
 - **Nível de proteção:**
   - Up ≤ categoria II da Tabela 31;
-  - nível efetivo: varistor Up + ΔU, centelhador máx(Up; ΔU); ΔU de 1 kV/m na classe I e desprezível na ligação em V;
+  - nível efetivo: varistor Up + ΔU, centelhador máx(Up; ΔU); ΔU de 1 kV/m nas classes I e II (guia Schneider) e desprezível na ligação em V;
   - Up fase–PE na ligação n+1.
 - **Condutores de ligação:** ≤ 0,5 m; seção mínima de 4 ou 16 mm² (NBR 5410) e seção do fabricante pela proteção a montante, em série (V) ou paralelo (T), com o fusível F2 quando exigido (catálogo Siemens).
 - **Distância de proteção:** lpo = (Uw − Up/f) / 25 V/m (IEC 62305-4, Anexo D) ou 30 m (prática de fabricante), com a lista dos circuitos que pedem DPS classe III.
 - **Demais verificações:** retaguarda e Isccr do fabricante, coordenação entre estágios (declaração do fabricante ou 10 m de cabo) e DR a montante com imunidade ≥ 3 kA (8/20 µs).
-- **Zonas de proteção (NBR 5419-4) — método também usado pela Clamper:** entrada na fronteira ZPR 0 → 1 (classe I+II com SPDA, II sem), quadros na ZPR 1 → 2 (classe II) e equipamentos na ZPR 2 → 3 (classe III).
+- **Centelhador N–PE no esquema 3 (NBR 5410, 6.3.5.2.4):** In ≥ 20 kA trifásico ou 10 kA monofásico; Iimp sem valor determinado ≥ 50 ou 25 kA.
+- **Classe I sem SPDA:** opção de linha aérea exposta a descargas diretas (área rural, fim de rede), com DPS classe I+II na entrada.
+- **Retaguarda:** corrente máxima do fabricante, tipo (fusível gL/gG ou disjuntor) e capacidade de interrupção ≥ curto presumido; sem valor automático — o conjunto DPS + retaguarda é o ensaiado pelo fabricante.
+- **Catálogo de DPS de referência:** CLAMPER (Front V 12,5/60 kA 4+0, Front V 45 kA 3+0, Front Mini 45 kA), WEG (SPW03-275-45 e SPW03-275-60/12,5), Schneider (PRD1 25r) e Siemens (5SD7 444-1 e 464-1). Ao escolher o produto no quadro, o motor usa os dados da ficha, confere classe, configuração (3+0, 4+0, 3+1), Uc, In, Iimp, Up, retaguarda e Isccr, e escreve "ou equivalente" na especificação.
+- **Zonas de proteção (NBR 5419-4:2026, que mantém as ZPR; IEC 62305-4:2024) — método também usado pela Clamper:** entrada na fronteira ZPR 0 → 1 (classe I+II com SPDA, II sem), quadros na ZPR 1 → 2 (classe II) e equipamentos na ZPR 2 → 3 (classe III).
 - **Iimp com SPDA (NBR 5419-1, Anexo E):** Ip × 0,5 / (serviços metálicos × condutores), mínimo de 12,5 kA.
 - **Retaguarda pelo curto-circuito (prática Clamper):** acima do curto suportável pelo desligador interno, fusível gL/gG dedicado por fase.
 - **Linhas de sinal:** DPS na entrada de telefonia, rede de dados e coaxial, ligado ao BEP (categoria D1 com SPDA, C2 sem); DPS obrigatório no quadro de entrada.
@@ -209,7 +213,7 @@ Baixe o arquivo `index.html` e abra-o no navegador (Chrome, Edge ou Firefox atua
 - **Iluminação externa:**
   - os níveis da NBR 5101 são os da edição 2018 (a edição 2024 usa as classes M, C e P, com requisitos de luminância) e os da EN 12464-2 são de referência; confirme na edição vigente e nas exigências da prefeitura ou da distribuidora;
   - os projetores do catálogo são genéricos e o modelo de intensidade é simétrico em torno do eixo de mira; para luminárias viárias assimétricas e projetos executivos, confirme com a fotometria do fabricante (IES/LDT) em software de cálculo.
-- **DPS:** confira na sua NBR 5410 os valores das Tabelas 31 e 49 e dos itens 6.3.5.2 usados no motor, e informe Uc, Up, In, Iimp, Ifi, retaguarda e Isccr do produto escolhido (os valores-padrão são típicos de catálogo). O nível de exposição F, as seções pela proteção a montante e a distância de 30 m são do catálogo Siemens 5SD7 (2021); a coordenação por 10 m de cabo é informativa e cede à declaração do fabricante. O Td (dias de trovoada por ano) vem do mapa isoceráunico da região.
+- **DPS:** confira na sua NBR 5410 os valores das Tabelas 31 e 49 e dos itens 6.3.5.2 usados no motor, e informe Uc, Up, In, Iimp, Ifi, retaguarda e Isccr do produto escolhido, ou escolha um produto do catálogo (os valores-padrão são típicos; os do catálogo são os declarados nas fichas — confira a versão do produto). O nível de exposição F, as seções pela proteção a montante e a distância de 30 m são do catálogo Siemens 5SD7 (2021); a coordenação por 10 m de cabo é informativa e cede à declaração do fabricante. O Td (dias de trovoada por ano) vem do mapa isoceráunico da região.
 - **SPDA:**
   - a densidade NG vem da tabela municipal do Anexo F da NBR 5419-2:2026: os 79 municípios de Mato Grosso do Sul estão no motor de cálculo (o memorial cita só o município escolhido; o exemplo usa Campo Grande, NG = 30); para outros estados, informe o valor;
   - as probabilidades e perdas seguem as tabelas da Parte 2 e ficam listadas no memorial; os limites da frequência de danos (1 e 0,1 por ano) e as seções de materiais da revisão foram obtidos de resumos técnicos — confira-os no texto oficial da ABNT.

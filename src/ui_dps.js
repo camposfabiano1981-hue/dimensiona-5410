@@ -34,6 +34,7 @@ function renderDPS() {
     : fSel('dg', 'exposicao', 'Exposição a surtos (Imáx dos DPS classe II)', D.exposicao, Object.entries(EXPO_DPS).map(([k, v]) => [k, `${v[1].split(' — ')[0]} — Imáx ${v[0]} kA`]), { cls: 'w2', struct: true, dica: EXPO_DPS[D.exposicao][1].split(' — ')[1] })}
     ${fSel('dg', 'catEq', 'Equipamentos protegidos (categoria de suportabilidade)', D.catEq, Object.entries(CAT_UW_TXT).map(([k, v]) => [k, `${v} — Uw ${nfmt(uwTab31(P.U0, k), 1)} kV`]), { cls: 'w2' })}
     ${fSel('dg', 'critDist', 'Distância de proteção até os equipamentos', D.critDist, Object.entries(DIST_DPS), { cls: 'w2' })}
+    ${ps ? '' : fChk('dg', 'linhaExposta', 'Linha aérea exposta a descargas diretas (área rural, fim de rede, edificação isolada) — DPS classe I+II na entrada', !!D.linhaExposta, { cls: 'w2', struct: true })}
     ${ps ? fNum('dg', 'nServ', 'Serviços metálicos que entram na estrutura', D.nServ, { dica: 'energia, telecom, água, gás — divide a Iimp (NBR 5419-1, Anexo E); 1 = conservador' }) : ''}
     ${fNum('dg', 'nSens', 'Pontos com equipamentos sensíveis (DPS classe III)', D.nSens, { dica: 'junto aos equipamentos distantes do quadro' })}
     ${fInfo('Esquema / tensão', `${esc(P.aterramento)} · ${P.U0}/${P.U} V`)}
@@ -49,14 +50,16 @@ function renderDPS() {
         ${fChk(pre, 'dps', 'DPS neste quadro', Qd.dps !== false, { struct: true })}
         ${fSel(pre, 'dpsClasse', 'Classe', Qd.dpsClasse || 'auto', [['auto', `Automática (${r.classeAuto || '—'})`], ['I+II', 'I+II — ponto de entrada'], ['II', 'II — quadro de distribuição']], { struct: true })}
         ${fSel(pre, 'dpsLig', 'Ligação', Qd.dpsLig || 'auto', Object.entries(LIG_DPS), { cls: 'w2', struct: true })}
+        ${fSel(pre, 'dpsProd', 'Produto de referência (catálogo)', Qd.dpsProd || '', [['', 'Genérico — valores típicos'], ...CAT_DPS.map(x => [x.id, `${x.fab} ${x.mod} — classe ${x.classe}`])], { cls: 'w2', struct: true, dica: r.ativo && r.prod ? 'Os campos preenchidos abaixo prevalecem sobre os dados do produto.' : '' })}
         ${fNum(pre, 'dpsUp', 'Up do produto', Qd.dpsUp, { u: 'kV', ph: r.ativo ? r.Up : '' })}
         ${cl1 ? fSel(pre, 'dpsTec', 'Tecnologia (classe I)', Qd.dpsTec || 'varistor', [['varistor', 'Varistor'], ['centelhador', 'Centelhador']], { struct: true }) : ''}
-        ${cl1 ? fNum(pre, 'dpsIimp', 'Iimp do produto por modo', Qd.dpsIimp, { u: 'kA', ph: r.IimpMin }) : ''}
-        ${cl1 && r.tec === 'centelhador' ? fNum(pre, 'dpsIfi', 'Ifi do centelhador', Qd.dpsIfi, { u: 'kA', ph: 'catálogo' }) : ''}
-        ${fNum(pre, 'dpsUc', 'Uc do produto', Qd.dpsUc, { u: 'V', ph: r.ativo ? ucDPS(P.U0) : '' })}${fNum(pre, 'dpsIn', 'In do produto', Qd.dpsIn, { u: 'kA', ph: r.ativo ? `≥ ${nfmt(r.InReq, 0)}` : '' })}
-        ${r.ativo && r.lig === 'npe' ? fNum(pre, 'dpsUpPE', 'Up fase–PE (n+1)', Qd.dpsUpPE, { u: 'kV', ph: 'catálogo' }) : ''}
+        ${cl1 ? fNum(pre, 'dpsIimp', 'Iimp do produto por modo', Qd.dpsIimp, { u: 'kA', ph: r.Iimp }) : ''}
+        ${cl1 && r.tec === 'centelhador' ? fNum(pre, 'dpsIfi', 'Ifi do centelhador', Qd.dpsIfi, { u: 'kA', ph: r.ifi || 'catálogo' }) : ''}
+        ${fNum(pre, 'dpsUc', 'Uc do produto', Qd.dpsUc, { u: 'V', ph: r.ativo ? r.Uc : '' })}${fNum(pre, 'dpsIn', 'In do produto', Qd.dpsIn, { u: 'kA', ph: r.ativo ? (r.InProd ? r.In : `≥ ${nfmt(r.InReq, 0)}`) : '' })}
+        ${r.ativo && r.lig === 'npe' ? fNum(pre, 'dpsUpPE', 'Up fase–PE (n+1)', Qd.dpsUpPE, { u: 'kV', ph: r.UpPE != null ? r.UpPE : 'catálogo' }) : ''}
         ${fNum(pre, 'dpsL', 'Condutores de ligação (total)', Qd.dpsL, { u: 'm', ph: 0.5 })}${fNum(pre, 'dpsS', 'Seção dos condutores de ligação', Qd.dpsS, { u: 'mm²', ph: r.ativo ? r.Srec : '' })}
-        ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr com retaguarda', Qd.dpsIsccr, { u: 'kA', ph: 'catálogo' })}${fNum(pre, 'dpsIscSem', 'Curto suportável sem retaguarda', Qd.dpsIscSem, { u: 'kA', ph: 'desligador' })}
+        ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: r.back || 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr com retaguarda', Qd.dpsIsccr, { u: 'kA', ph: r.isccr || 'catálogo' })}${fNum(pre, 'dpsIscSem', 'Curto suportável sem retaguarda', Qd.dpsIscSem, { u: 'kA', ph: r.iscSem || 'ficha' })}
+        ${fSel(pre, 'dpsBackTipo', 'Dispositivo de retaguarda', Qd.dpsBackTipo || 'fus', [['fus', 'Fusível gL/gG'], ['disj', 'Disjuntor']])}${fNum(pre, 'dpsBackIcn', 'Capacidade de interrupção da retaguarda', Qd.dpsBackIcn, { u: 'kA', ph: r.backTipo === 'fus' ? 50 : 'Icu' })}
         ${fChk(pre, 'dpsV', 'Ligação em V — série (ΔU desprezível)', !!Qd.dpsV)}${q.alim ? fChk(pre, 'dpsCoord', 'Coordenado com o DPS a montante (fabricante)', !!Qd.dpsCoord) : ''}${fChk(pre, 'dpsJusDR', 'DPS a jusante de DR geral', !!Qd.dpsJusDR)}
       </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}
   <article class="quadro"><div class="quadro-cab"><div><h3>Zonas de proteção e cascata</h3><span class="mini">NBR 5419-4 — classe do DPS em cada fronteira de zona</span></div></div><div id="dps-zpr" style="padding:12px 14px"></div></article>`;
