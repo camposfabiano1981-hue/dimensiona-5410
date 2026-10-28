@@ -12,7 +12,7 @@ vm.createContext(ctx);
 vm.runInContext(MODULOS.map(f => fs.readFileSync(path.join(SRC, f + '.js'), 'utf8')).join('\n') + `
 this.api = { projetoExemplo, calcularProjeto, calcEnergisa, calcClima, pmvPPD, propsCons, conducaoPeriodica, consPadrao, irradiancia, climaPadrao,
   calcAreaExt, ambExtPadrao, mDeFacho, construirRelatorioLumi, dadosQuadro, unifilarSVG, multifilarSVG, partesDiagrama, construirDiagramas, DIAG_MULTI,
-  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, CAT_DPS, construirMemorialDPS, ligacaoDPSSVG, zprDPSSVG, formasLigacaoDPS };`, ctx);
+  WdeTBU, URdeW, pAtm, calcAterramento, calcSolo, calcMalha, arrPadrao, reqHastes, rHaste, rhoApar2c, MEMORIAS, docMemoria, calcMateriais, INFLUENCIAS, calcSPDA, calcRiscoSPDA, anguloProtecao, l1Aterr, spdaPadrao, construirMemorialSPDA, NP_SPDA, NG_ANEXO_F, ngSPDA, calcDPS, uwTab31, ucDPS, lqDPS, CAT_DPS, construirMemorialDPS, ligacaoDPSSVG, zprDPSSVG, formasLigacaoDPS, bepDPSSVG };`, ctx);
 const A = ctx.api;
 
 const P = A.projetoExemplo();
@@ -237,6 +237,30 @@ test('DPS — correções e catálogo: In N–PE, símbolos, linha exposta, reta
   const P8 = JSON.parse(JSON.stringify(P)); P8.quadros['QD-1'].dpsProd = 'siemens-5sd7464-1'; const s8 = calc(P8).quadros['QD-1'];
   assert.equal(s8.lig, 'npe', 'TN-S com produto 3+1 → esquema 3'); assert.ok(s8.verifs.some(v => v[0] === 'ok' && /3\+1 = 3\+1/.test(v[1])));
   assert.equal(A.CAT_DPS.length, 8);
+});
+
+test('DPS — ligação em V e em T, BEP e opções da memória', () => {
+  const calc = Px => { const Kx = A.calcularProjeto(Px); Kx.aterr = A.calcAterramento(Px, Kx); Kx.spda = A.calcSPDA(Px, Kx); return [A.calcDPS(Px, Kx), Kx]; };
+  // ligação em V no QD-1: corrente de carga nos bornes (IL) ≥ proteção a montante de 63 A; borne ≥ condutor do alimentador
+  const P1 = JSON.parse(JSON.stringify(P)); Object.assign(P1.quadros['QD-1'], { dpsForma: 'V', dpsIL: 50, dpsSmax: 10 });
+  const v1 = calc(P1)[0].quadros['QD-1'];
+  assert.ok(v1.emV && v1.verifs.some(v => v[0] === 'fail' && /IL = 50 A < proteção a montante de 63 A/.test(v[1])), 'IL menor que a proteção a montante');
+  assert.ok(v1.verifs.some(v => v[0] === 'fail' && /alimentador 16 mm² > 10 mm²/.test(v[1])), 'condutor do alimentador maior que o borne');
+  Object.assign(P1.quadros['QD-1'], { dpsIL: 125, dpsSmax: 25 }); const v2 = calc(P1)[0].quadros['QD-1'];
+  assert.ok(v2.verifs.some(v => v[0] === 'ok' && /IL = 125 A ≥/.test(v[1])) && v2.verifs.some(v => v[0] === 'ok' && /16 mm² ≤ 25 mm²/.test(v[1])));
+  P1.quadros['QD-1'].dpsForma = 'T'; assert.equal(calc(P1)[0].quadros['QD-1'].emV, false, 'forma T');
+  // BEP: barra PE do quadro como BEP (padrão), seção de equipotencialização = metade do maior PE (16 mm²) → 10 mm²; com SPDA, 16 e 6 mm²
+  const b = K.dps.bep; assert.equal(b.local, 'quadro'); assert.equal(b.ligDPS, 'BEP'); assert.equal(b.Seq, 10); assert.deepEqual([b.Sbar, b.Sint], [16, 6]);
+  assert.ok(b.eletrodo && b.eletrodo.n === 4 && b.eletrodo.S === 16);
+  const P2 = JSON.parse(JSON.stringify(P)); P2.dps.bep = 'separado'; const [d2, K2] = calc(P2);
+  assert.equal(d2.bep.ligDPS, 'barra PE do quadro de entrada'); assert.ok(d2.quadros.QM.verifs.some(v => /barra PE do quadro de entrada/.test(v[1])));
+  assert.ok(A.bepDPSSVG(d2, K2, P2).includes('PE principal') && A.bepDPSSVG(K.dps, K, P).includes('barra PE = BEP'));
+  // memória: seções opcionais conforme a escolha
+  const h1 = Bx => Bx.filter(x => x.t === 'h1').map(x => x.text).join(' | ');
+  const B1 = A.construirMemorialDPS(P, K); assert.ok(/Ligação em V e em T/.test(h1(B1)) && /BEP/.test(h1(B1)) && /Figura 13/.test(h1(B1)));
+  const P3 = JSON.parse(JSON.stringify(P)); P3.dps.mem = { ligacao: false, vt: false, formas: false, bep: false, zpr: false }; const [d3, K3] = calc(P3); K3.dps = d3;
+  const B3 = A.construirMemorialDPS(P3, K3);
+  assert.ok(!/Ligação em V e em T|BEP|Figura 13/.test(h1(B3)) && B3.filter(x => x.t === 'fig').length === 0, 'memória sem as seções opcionais');
 });
 
 test('Energisa NDU 001 — demanda e categoria da UC de exemplo', () => {

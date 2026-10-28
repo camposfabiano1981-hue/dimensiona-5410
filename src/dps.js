@@ -24,12 +24,12 @@ const TEC_DPS = { varistor: 'Varistor (limitador de tensão)', centelhador: 'Cen
    cfg: módulos do produto ('mono' = unipolar, combinável); back / backV: retaguarda máxima em T e em V (A gL/gG);
    isccr: curto-circuito suportável com a retaguarda (kA); iscSem: sem retaguarda dedicada (kA) */
 const CAT_DPS = [
-  { id: 'clamper-frontv-275-12-60-4', fab: 'CLAMPER', mod: 'Front V 275 V 12,5/60 kA 4+0 (cód. 026979)', classe: 'I+II', tec: 'varistor', cfg: '4+0', Uc: 275, In: 30, Imax: 60, Iimp: 12.5, Up: 1.5, back: 125, isccr: 5, fonte: 'ficha técnica CLAMPER Front V 026979 (fusível gL/gG até 125 A ou disjuntor até 100 A)' },
+  { id: 'clamper-frontv-275-12-60-4', fab: 'CLAMPER', mod: 'Front V 275 V 12,5/60 kA 4+0 (cód. 026979)', classe: 'I+II', tec: 'varistor', cfg: '4+0', Uc: 275, In: 30, Imax: 60, Iimp: 12.5, Up: 1.5, back: 125, isccr: 5, Smax: 25, fonte: 'ficha técnica CLAMPER Front V 026979 (fusível gL/gG até 125 A ou disjuntor até 100 A)' },
   { id: 'weg-spw03-275-60-12', fab: 'WEG', mod: 'SPW03-275-60/12,5', classe: 'I+II', tec: 'varistor', cfg: 'mono', Uc: 275, In: 30, Imax: 60, Iimp: 12.5, Up: 1.4, fonte: 'catálogo WEG — soluções integradas para instalações elétricas' },
   { id: 'schneider-prd1-25r', fab: 'Schneider', mod: 'Acti9 PRD1 25r', classe: 'I+II', cfg: 'mono', Uc: 350, In: 25, Imax: 40, Iimp: 25, Up: 1.5, fonte: 'catálogo Schneider Electric (tecnologia a confirmar)' },
   { id: 'siemens-5sd7444-1', fab: 'Siemens', mod: '5SD7 444-1 (3F+N)', classe: 'I+II', tec: 'centelhador', cfg: '3+1', Uc: 350, In: 25, InNPE: 100, Iimp: 25, IimpNPE: 100, Up: 1.5, UpPE: 2.2, ifi: 25, back: 315, backV: 125, fonte: 'catálogo Siemens DPS 5SD7 (2021)' },
   { id: 'clamper-frontmini-275-45', fab: 'CLAMPER', mod: 'Front Mini 275 V 45 kA (monopolar)', classe: 'II', tec: 'varistor', cfg: 'mono', Uc: 275, In: 20, Imax: 45, Up: 1.5, fonte: 'ficha técnica CLAMPER Front Mini monopolar' },
-  { id: 'clamper-frontv-275-45-3', fab: 'CLAMPER', mod: 'Front V 275 V 45 kA 3+0 (cód. 027104)', classe: 'II', tec: 'varistor', cfg: '3+0', Uc: 275, In: 20, Imax: 45, Up: 1.5, back: 100, isccr: 125, fonte: 'ficha técnica CLAMPER Front V 027104' },
+  { id: 'clamper-frontv-275-45-3', fab: 'CLAMPER', mod: 'Front V 275 V 45 kA 3+0 (cód. 027104)', classe: 'II', tec: 'varistor', cfg: '3+0', Uc: 275, In: 20, Imax: 45, Up: 1.5, back: 100, isccr: 125, Smax: 25, fonte: 'ficha técnica CLAMPER Front V 027104' },
   { id: 'weg-spw03-275-45', fab: 'WEG', mod: 'SPW03-275-45', classe: 'II', tec: 'varistor', cfg: 'mono', Uc: 275, In: 20, Imax: 45, Up: 1.5, back: 125, isccr: 50, iscSem: 3, fonte: 'catálogo WEG — soluções integradas para instalações elétricas' },
   { id: 'siemens-5sd7464-1', fab: 'Siemens', mod: '5SD7 464-1 (3F+N)', classe: 'II', tec: 'varistor', cfg: '3+1', Uc: 350, UcN: 260, In: 20, InNPE: 20, Imax: 40, Up: 1.6, UpPE: 1.9, back: 125, backV: 80, fonte: 'catálogo Siemens DPS 5SD7 (2021)' }
 ];
@@ -53,13 +53,32 @@ function lqDPS(cl1, emV, F1) {
   return x ? { fase: x[1], pe: x[2], F2: x[3] || null } : { fora: true, max: t[t.length - 1][0] };
 }
 const DIST_DPS = { norma: 'Distância por oscilação lpo (IEC 62305-4, Anexo D)', fab: 'Prática de fabricante — 30 m (catálogo Siemens)' };
-const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3, ICN_FUS = 50;
+const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3, ICN_FUS = 50, IL_TIP = 125;
+/* ligação em T (paralelo, derivação) × ligação em V (série, passante) — IEC 60364-5-534, catálogos Siemens e DEHN */
+const VT_DPS = [
+  ['Como liga', 'derivação do barramento até o DPS e do DPS à barra PE / BEP', 'o condutor de chegada entra e sai pelos bornes do DPS (borne duplo); só o lado do PE é derivação'],
+  ['Comprimento dos condutores', 'a + b ≤ 0,5 m (fase → DPS → PE)', 'b ≤ 0,5 m (DPS → PE); a ≈ 0'],
+  ['Queda nos condutores (ΔU)', '≈ 1 kV/m × (a + b), soma ao Up', 'desprezível no lado da fase: Up/f ≈ Up'],
+  ['Corrente nos bornes', 'só a corrente de surto', `corrente de carga contínua: limitada à corrente nominal de carga em V do DPS (IL, típica de ${IL_TIP} A)`],
+  ['Retaguarda', 'fusível ou disjuntor F2 no ramal, até o máximo do fabricante (ex.: 315 A gL/gG); F2 dedicado se a proteção a montante for maior', 'a própria proteção a montante, limitada ao máximo em V do fabricante (ex.: 125 A gL/gG)'],
+  ['Falha do DPS', 'atua o F2: só o DPS sai de serviço — use a sinalização remota', 'atua a proteção a montante: desliga a instalação a jusante'],
+  ['Seção dos condutores', 'Lq2 e Lq3 pela proteção a montante (tabela do fabricante)', 'o condutor do alimentador passa pelo borne: limitado à seção máxima do borne'],
+  ['Uso típico', 'quadros de maior corrente ou sem espaço para passar o alimentador pelo DPS', 'quadros menores (residências, pequeno comércio), quando a + b ≤ 0,5 m não é viável']
+];
+/* posição do BEP e ligação dos DPS (NBR 5410, Figura 13, nota a) */
+const minIni = t => t.charAt(0).toLowerCase() + t.slice(1);
+const BEP_DPS = {
+  quadro: 'A barra PE do quadro de entrada acumula a função de BEP — DPS ligados ao BEP',
+  junto: 'BEP próprio junto ao ponto de entrada, com os DPS instalados junto ao BEP — DPS ligados ao BEP',
+  separado: 'BEP próprio a montante e DPS no quadro de entrada, cuja barra PE não é o BEP — DPS ligados à barra PE do quadro'
+};
+const MEM_DPS = { ligacao: 'Esquema de ligação de cada quadro', vt: 'Ligação em V e em T — comparação e desenhos', formas: 'Formas de ligação da Figura 13 (esquemas 1, 2 e 3)', bep: 'Equipotencialização no BEP — desenho, ligações e seções', zpr: 'Zonas de proteção e DPS em cascata' };
 /* zonas de proteção contra raios (NBR 5419-4:2026, que mantém as ZPR; IEC 62305-4:2024): classe do DPS em cada fronteira,
    na simplificação usual dos catálogos (Clamper, Finder) */
 const ZPR_DPS = [['ZPR 0 → 1', 'entrada da linha na edificação', 'I ou I+II com SPDA; II sem SPDA'], ['ZPR 1 → 2', 'quadros de distribuição', 'II'], ['ZPR 2 → 3', 'junto ao equipamento sensível', 'III']];
 /* linhas de sinal externas (NBR 5410: toda linha externa de sinal recebe DPS na entrada da edificação, ligado ao BEP) */
 const SINAL_DPS = { sinTel: ['Telefonia ou dados em par metálico', 'DPS para linha de sinal em par metálico (telefonia/dados), junto ao DG e ao BEP'], sinRede: ['Rede de dados externa (Ethernet / PoE)', 'DPS para rede de dados RJ45 (Ethernet/PoE), junto ao BEP'], sinCoax: ['Cabo coaxial (antena, CATV, CFTV)', 'DPS coaxial para antena/CATV/CFTV, junto ao BEP'] };
-function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma', nServ: 1, sinTel: 0, sinRede: 0, sinCoax: 0, linhaExposta: false }; }
+function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma', nServ: 1, sinTel: 0, sinRede: 0, sinCoax: 0, linhaExposta: false, bep: 'quadro', mem: { ligacao: true, vt: true, formas: true, bep: true, zpr: true } }; }
 
 function calcDPS(proj, calc) {
   const P = proj.params, D = { ...dpsPadrao(), ...(proj.dps || {}) }, ps = calc.spda && calc.spda.projeto, out = { quadros: {}, falhas: [], avisos: [] };
@@ -72,6 +91,14 @@ function calcDPS(proj, calc) {
   // linhas de sinal que entram na edificação
   out.sinal = Object.keys(SINAL_DPS).map(k => ({ k, n: Math.max(0, Math.round(+D[k] || 0)), nome: SINAL_DPS[k][0], mat: SINAL_DPS[k][1] })).filter(x => x.n);
   out.catSinal = ps ? 'D1 (10/350 µs, descargas diretas)' : 'C2 (8/20 µs)';
+  // equipotencialização principal (BEP): posição, ligação dos DPS, seções e eletrodo de aterramento
+  const bepLocal = BEP_DPS[D.bep] ? D.bep : 'quadro', maxPE = Math.max(0, ...Object.values(calc.res || {}).map(x => +x.SPE || 0));
+  const A0 = ((proj.aterr && proj.aterr.arr) || []).find(a => a.funcao === 'entrada' || a.funcao === 'massas') || ((proj.aterr && proj.aterr.arr) || [])[0];
+  const RA = A0 && calc.aterr && calc.aterr.arr && calc.aterr.arr[A0.id];
+  out.bep = { local: bepLocal, txt: BEP_DPS[bepLocal], ligDPS: bepLocal === 'separado' ? 'barra PE do quadro de entrada' : 'BEP', maxPE,
+    Seq: SECOES_CU.find(x => x >= Math.min(25, Math.max(6, maxPE / 2)) - 1e-9), Sbar: ps ? 16 : null, Sint: ps ? 6 : null,
+    eletrodo: A0 ? { nome: A0.nome || 'eletrodo de aterramento', n: (RA && RA.nH) || +A0.n || 3, R: RA && isFinite(RA.R) ? RA.R : null, S: +A0.Scond || 16 } : null };
+  out.mem = { ...dpsPadrao().mem, ...(D.mem || {}) };
   const prof = q => { let d = 0, x = q; while (x && x.alim && d < 12) { d++; x = calc.quadros[x.alim.quadro]; } return d; };
   // obrigatoriedade (NBR 5410, influências externas AQ): estrutura com SPDA (AQ3) ou linha aérea com Td > 25 (AQ2)
   out.necess = ps ? { obrig: true, txt: 'obrigatório — edificação com SPDA (AQ3)' }
@@ -127,7 +154,7 @@ function calcDPS(proj, calc) {
     // nível de proteção (Tabela 31) e nível efetivo com os condutores de ligação
     r.Uw2 = uwTab31(P.U0, 'II'); r.Uw3 = uwTab31(P.U0, 'III'); r.UwEq = uwTab31(P.U0, catEq);
     r.Up = pv('dpsUp', 'Up') || (cl1 ? 1.5 : (P.U0 <= 150 ? 1.2 : 1.5)); r.UpPadrao = pv('dpsUp', 'Up') == null;
-    r.tec = cl1 && (Qd.dpsTec || (pr && pr.tec)) === 'centelhador' ? 'centelhador' : 'varistor'; r.emV = !!Qd.dpsV;
+    r.tec = cl1 && (Qd.dpsTec || (pr && pr.tec)) === 'centelhador' ? 'centelhador' : 'varistor'; r.emV = Qd.dpsForma ? Qd.dpsForma === 'V' : !!Qd.dpsV;
     // ΔU ≈ 1 kV por metro de condutor de ligação (≈ 8 kA em 8/20 µs ou corrente de raio parcial), nas classes I e II; desprezível na ligação em V
     r.L = +Qd.dpsL > 0 ? +Qd.dpsL : 0.5; r.dU = r.emV ? 0 : r.L * 1;
     r.Upf = r.tec === 'centelhador' ? Math.max(r.Up, r.dU) : r.Up + r.dU;
@@ -181,6 +208,14 @@ function calcDPS(proj, calc) {
     if (r.lq && !r.lq.fora) { const sl = Math.max(r.lq.fase, r.lq.pe); v(r.S >= sl - 1e-9 ? 'ok' : 'warn', `Seção pela proteção a montante de ${r.Imont} A — ${lig}, catálogo Siemens: lado da fase ${r.lq.fase} mm², lado do PE ${r.lq.pe} mm²${r.lq.F2 ? `, com fusível F2 de ${r.lq.F2} A gL/gG no ramal do DPS` : ''}${r.S < sl - 1e-9 ? ` — adotados ${fS(r.S)} mm²` : ''}`); }
     else if (r.lq) v('warn', `Ligação em série (em V) com proteção a montante de ${r.Imont} A: o fabricante prevê até ${r.lq.max} A — use a ligação em paralelo (em T) com retaguarda própria.`);
     else v('info', 'Informe o disjuntor geral do quadro para obter a seção dos condutores de ligação pela proteção a montante (catálogo Siemens).');
+    // ligação em V: a corrente de carga passa pelos bornes do DPS; em T, a atuação do F2 tira só o DPS de serviço
+    if (r.emV) {
+      r.IL = pv('dpsIL', 'IL'); r.Smax = pv('dpsSmax', 'Smax'); r.Salim = q.alim ? calc.res[q.alim.id].Sf : null;
+      v(r.IL && r.Imont ? (r.IL >= r.Imont - 1e-9 ? 'ok' : 'fail') : 'info', r.IL && r.Imont ? `Ligação em V: corrente nominal de carga dos bornes IL = ${r.IL} A ${cmp(r.IL, r.Imont)} proteção a montante de ${r.Imont} A` : `Ligação em V: a corrente de carga passa pelos bornes do DPS — confirme na ficha a corrente nominal de carga em V (IL, típica de ${IL_TIP} A), que deve ser ≥ ${r.Imont ? `${r.Imont} A da proteção a montante` : 'a proteção a montante'}`);
+      if (r.Smax && r.Salim) v(r.Salim <= r.Smax + 1e-9 ? 'ok' : 'fail', `Ligação em V: condutor do alimentador ${fS(r.Salim)} mm² ${le(r.Salim, r.Smax)} ${fS(r.Smax)} mm² aceitos pelos bornes do DPS`);
+      v('info', 'Ligação em V: a retaguarda é a própria proteção a montante; se ela atuar por falha do DPS, desliga a instalação a jusante (catálogo Siemens).');
+    } else if (r.F2) v('info', 'Ligação em T com retaguarda F2: se o F2 atuar, só o DPS sai de serviço e a instalação segue energizada sem proteção — ligue o contato de sinalização remota (catálogo Siemens).');
+    if (origem) v('info', `Ligação dos DPS de entrada: ${out.bep.ligDPS} — ${minIni(out.bep.txt.split(' — ')[0])} (NBR 5410, Figura 13, nota a)`);
     v(r.Upf <= r.UwRef + 1e-9 ? 'ok' : 'warn', `Nível efetivo Up/f = ${r.tec === 'centelhador' ? 'máx(Up; ΔU)' : 'Up + ΔU'} = ${r.tec === 'centelhador' ? `máx(${nfmt(r.Up, 2)}; ${nfmt(r.dU, 2)})` : `${nfmt(r.Up, 2)} + ${nfmt(r.dU, 2)}`} = ${nfmt(r.Upf, 2)} kV ${r.Upf <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV (categoria ${r.catRef}${r.soDist ? ', quadro só de distribuição' : ''})${r.Upf > r.UwRef + 1e-9 ? ': prever DPS classe III junto aos equipamentos ou ligação em V' : ''}`);
     if (r.lig === 'npe') v(r.UpfPE == null ? 'info' : r.UpfPE <= r.UwRef + 1e-9 ? 'ok' : 'warn', r.UpfPE == null ? 'Ligação n+1: confirme no catálogo o Up entre fase e PE (módulo da fase em série com o centelhador N–PE; na linha Siemens 5SD7, de 1,7 a 2,5 kV).' : `Nível de proteção fase–PE da ligação n+1: ${nfmt(r.UpPE, 2)} + ${nfmt(r.dU, 2)} = ${nfmt(r.UpfPE, 2)} kV ${r.UpfPE <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV${r.UpfPE > r.UwRef + 1e-9 ? ': proteger os equipamentos com DPS classe II ou III a jusante' : ''}`);
     if (!r.soDist) {

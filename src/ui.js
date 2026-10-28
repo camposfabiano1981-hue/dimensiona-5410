@@ -131,6 +131,7 @@ function onCampo(ev, isChange) {
   else if (sc === 'desclocal') { const l = PROJ.descritivo.locais[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
   else if (sc === 'dpsg') { PROJ.dps[k] = v; }
+  else if (sc === 'dpsmem') { PROJ.dps.mem = { ...dpsPadrao().mem, ...(PROJ.dps.mem || {}), [k]: v }; }
   else if (sc === 'dpsq') { const q = PROJ.quadros[box.dataset.q] = PROJ.quadros[box.dataset.q] || {}; q[k] = v; }
   else if (sc === 'spda') { PROJ.spda[k] = v; struct = efeitosSPDA(k) || struct; }
   else if (sc === 'spdalin') { const l = PROJ.spda.linhas[+box.dataset.i]; if (l) l[k] = v; }
@@ -886,6 +887,9 @@ function renderTabelas() {
       + h3t('Catálogo de DPS de referência (dados declarados pelos fabricantes)') + tabelaHTML(['Fabricante e modelo', 'Classe', 'Config.', 'Uc (V)', 'In / Imáx (kA)', 'Iimp (kA)', 'Up (kV)', 'Retaguarda', 'Isccr (kA)'], CAT_DPS.map(x => [`${esc(x.fab)} ${esc(x.mod)}`, x.classe, x.cfg, String(x.Uc), `${x.In} / ${x.Imax || '—'}`, x.Iimp ? nfmt(x.Iimp, 1) : '—', nfmt(x.Up, 1), x.back ? `${x.back} A${x.backV ? ` (V: ${x.backV} A)` : ''}` : '—', `${x.isccr || '—'}${x.iscSem ? ` (sem retaguarda ${x.iscSem})` : ''}`]), false)
       + h3t('Classe do DPS por zona de proteção contra raios — NBR 5419-4:2026') + tabelaHTML(['Fronteira', 'Onde', 'Classe do DPS'], ZPR_DPS, false)
       + h3t('Formas de ligação — NBR 5410, Figura 13, e ligação em T ou em V') + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px">${formasLigacaoDPS(PROJ.params.U0).map(f => `<figure style="margin:0" class="diag-folha">${f.svg}<figcaption class="mini"><b>${esc(f.caption)}.</b> ${esc(f.sub)}</figcaption></figure>`).join('')}</div>`
+      + h3t('Ligação em T (paralelo) × ligação em V (série)') + tabelaHTML(['Aspecto', 'T — paralelo (derivação)', 'V — série (passante)'], VT_DPS.map(([a, t, v]) => [`<b>${esc(a)}</b>`, esc(t), esc(v)]), false)
+      + h3t('Ligação dos DPS de entrada ao BEP ou à barra PE — NBR 5410, Figura 13, nota a') + tabelaHTML(['Posição do BEP', 'Ligação dos DPS'], Object.values(BEP_DPS).map(t => t.split(' — ')), false)
+      + h3t('Equipotencialização principal — seções mínimas (cobre)') + tabelaHTML(['Condutor', 'Seção', 'Referência'], [['Equipotencialização principal (ao BEP)', 'metade do maior PE; mínimo 6 mm², até 25 mm²', 'NBR 5410'], ['Entre barramentos e ao aterramento, com SPDA', '16 mm²', 'NBR 5419-3'], ['Instalações metálicas internas ao barramento, com SPDA', '6 mm²', 'NBR 5419-3'], ['DPS ao BEP / barra PE', '4 mm²; 16 mm² na classe I ou com SPDA', 'NBR 5410']], false)
       + h3t('Obrigatoriedade do DPS — NBR 5410 (influências externas AQ)') + tabelaHTML(['Edificação e alimentação', 'Td ≤ 25 dias/ano (AQ1)', 'Td > 25 dias/ano (AQ2)'], [['Edificação com SPDA (AQ3)', 'obrigatório', 'obrigatório'], ['Linha de BT total ou parcialmente aérea', 'não obrigatório', 'obrigatório'], ['Linha de BT totalmente subterrânea', 'não obrigatório', 'não obrigatório']], false)
       + h3t('Nível de exposição F = Td × (1,6 + 2 × LBT + δ) — catálogo Siemens') + tabelaHTML(['Situação da linha aérea e da edificação', 'δ'], DELTA_DPS.map(([d, t]) => [t, nfmt(d, 2)]), false)
       + tabelaHTML(['Nível de exposição F', 'In do DPS classe II'], [['F ≤ 40', '5 kA'], ['40 < F ≤ 80', '10 kA'], ['F > 80', '20 kA']], false)

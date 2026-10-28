@@ -2782,12 +2782,12 @@ const TEC_DPS = { varistor: 'Varistor (limitador de tensão)', centelhador: 'Cen
    cfg: módulos do produto ('mono' = unipolar, combinável); back / backV: retaguarda máxima em T e em V (A gL/gG);
    isccr: curto-circuito suportável com a retaguarda (kA); iscSem: sem retaguarda dedicada (kA) */
 const CAT_DPS = [
-  { id: 'clamper-frontv-275-12-60-4', fab: 'CLAMPER', mod: 'Front V 275 V 12,5/60 kA 4+0 (cód. 026979)', classe: 'I+II', tec: 'varistor', cfg: '4+0', Uc: 275, In: 30, Imax: 60, Iimp: 12.5, Up: 1.5, back: 125, isccr: 5, fonte: 'ficha técnica CLAMPER Front V 026979 (fusível gL/gG até 125 A ou disjuntor até 100 A)' },
+  { id: 'clamper-frontv-275-12-60-4', fab: 'CLAMPER', mod: 'Front V 275 V 12,5/60 kA 4+0 (cód. 026979)', classe: 'I+II', tec: 'varistor', cfg: '4+0', Uc: 275, In: 30, Imax: 60, Iimp: 12.5, Up: 1.5, back: 125, isccr: 5, Smax: 25, fonte: 'ficha técnica CLAMPER Front V 026979 (fusível gL/gG até 125 A ou disjuntor até 100 A)' },
   { id: 'weg-spw03-275-60-12', fab: 'WEG', mod: 'SPW03-275-60/12,5', classe: 'I+II', tec: 'varistor', cfg: 'mono', Uc: 275, In: 30, Imax: 60, Iimp: 12.5, Up: 1.4, fonte: 'catálogo WEG — soluções integradas para instalações elétricas' },
   { id: 'schneider-prd1-25r', fab: 'Schneider', mod: 'Acti9 PRD1 25r', classe: 'I+II', cfg: 'mono', Uc: 350, In: 25, Imax: 40, Iimp: 25, Up: 1.5, fonte: 'catálogo Schneider Electric (tecnologia a confirmar)' },
   { id: 'siemens-5sd7444-1', fab: 'Siemens', mod: '5SD7 444-1 (3F+N)', classe: 'I+II', tec: 'centelhador', cfg: '3+1', Uc: 350, In: 25, InNPE: 100, Iimp: 25, IimpNPE: 100, Up: 1.5, UpPE: 2.2, ifi: 25, back: 315, backV: 125, fonte: 'catálogo Siemens DPS 5SD7 (2021)' },
   { id: 'clamper-frontmini-275-45', fab: 'CLAMPER', mod: 'Front Mini 275 V 45 kA (monopolar)', classe: 'II', tec: 'varistor', cfg: 'mono', Uc: 275, In: 20, Imax: 45, Up: 1.5, fonte: 'ficha técnica CLAMPER Front Mini monopolar' },
-  { id: 'clamper-frontv-275-45-3', fab: 'CLAMPER', mod: 'Front V 275 V 45 kA 3+0 (cód. 027104)', classe: 'II', tec: 'varistor', cfg: '3+0', Uc: 275, In: 20, Imax: 45, Up: 1.5, back: 100, isccr: 125, fonte: 'ficha técnica CLAMPER Front V 027104' },
+  { id: 'clamper-frontv-275-45-3', fab: 'CLAMPER', mod: 'Front V 275 V 45 kA 3+0 (cód. 027104)', classe: 'II', tec: 'varistor', cfg: '3+0', Uc: 275, In: 20, Imax: 45, Up: 1.5, back: 100, isccr: 125, Smax: 25, fonte: 'ficha técnica CLAMPER Front V 027104' },
   { id: 'weg-spw03-275-45', fab: 'WEG', mod: 'SPW03-275-45', classe: 'II', tec: 'varistor', cfg: 'mono', Uc: 275, In: 20, Imax: 45, Up: 1.5, back: 125, isccr: 50, iscSem: 3, fonte: 'catálogo WEG — soluções integradas para instalações elétricas' },
   { id: 'siemens-5sd7464-1', fab: 'Siemens', mod: '5SD7 464-1 (3F+N)', classe: 'II', tec: 'varistor', cfg: '3+1', Uc: 350, UcN: 260, In: 20, InNPE: 20, Imax: 40, Up: 1.6, UpPE: 1.9, back: 125, backV: 80, fonte: 'catálogo Siemens DPS 5SD7 (2021)' }
 ];
@@ -2811,13 +2811,32 @@ function lqDPS(cl1, emV, F1) {
   return x ? { fase: x[1], pe: x[2], F2: x[3] || null } : { fora: true, max: t[t.length - 1][0] };
 }
 const DIST_DPS = { norma: 'Distância por oscilação lpo (IEC 62305-4, Anexo D)', fab: 'Prática de fabricante — 30 m (catálogo Siemens)' };
-const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3, ICN_FUS = 50;
+const K_OSC = 25, D_COORD = 10, D_PROT_FAB = 30, IMUN_DR = 3, ICN_FUS = 50, IL_TIP = 125;
+/* ligação em T (paralelo, derivação) × ligação em V (série, passante) — IEC 60364-5-534, catálogos Siemens e DEHN */
+const VT_DPS = [
+  ['Como liga', 'derivação do barramento até o DPS e do DPS à barra PE / BEP', 'o condutor de chegada entra e sai pelos bornes do DPS (borne duplo); só o lado do PE é derivação'],
+  ['Comprimento dos condutores', 'a + b ≤ 0,5 m (fase → DPS → PE)', 'b ≤ 0,5 m (DPS → PE); a ≈ 0'],
+  ['Queda nos condutores (ΔU)', '≈ 1 kV/m × (a + b), soma ao Up', 'desprezível no lado da fase: Up/f ≈ Up'],
+  ['Corrente nos bornes', 'só a corrente de surto', `corrente de carga contínua: limitada à corrente nominal de carga em V do DPS (IL, típica de ${IL_TIP} A)`],
+  ['Retaguarda', 'fusível ou disjuntor F2 no ramal, até o máximo do fabricante (ex.: 315 A gL/gG); F2 dedicado se a proteção a montante for maior', 'a própria proteção a montante, limitada ao máximo em V do fabricante (ex.: 125 A gL/gG)'],
+  ['Falha do DPS', 'atua o F2: só o DPS sai de serviço — use a sinalização remota', 'atua a proteção a montante: desliga a instalação a jusante'],
+  ['Seção dos condutores', 'Lq2 e Lq3 pela proteção a montante (tabela do fabricante)', 'o condutor do alimentador passa pelo borne: limitado à seção máxima do borne'],
+  ['Uso típico', 'quadros de maior corrente ou sem espaço para passar o alimentador pelo DPS', 'quadros menores (residências, pequeno comércio), quando a + b ≤ 0,5 m não é viável']
+];
+/* posição do BEP e ligação dos DPS (NBR 5410, Figura 13, nota a) */
+const minIni = t => t.charAt(0).toLowerCase() + t.slice(1);
+const BEP_DPS = {
+  quadro: 'A barra PE do quadro de entrada acumula a função de BEP — DPS ligados ao BEP',
+  junto: 'BEP próprio junto ao ponto de entrada, com os DPS instalados junto ao BEP — DPS ligados ao BEP',
+  separado: 'BEP próprio a montante e DPS no quadro de entrada, cuja barra PE não é o BEP — DPS ligados à barra PE do quadro'
+};
+const MEM_DPS = { ligacao: 'Esquema de ligação de cada quadro', vt: 'Ligação em V e em T — comparação e desenhos', formas: 'Formas de ligação da Figura 13 (esquemas 1, 2 e 3)', bep: 'Equipotencialização no BEP — desenho, ligações e seções', zpr: 'Zonas de proteção e DPS em cascata' };
 /* zonas de proteção contra raios (NBR 5419-4:2026, que mantém as ZPR; IEC 62305-4:2024): classe do DPS em cada fronteira,
    na simplificação usual dos catálogos (Clamper, Finder) */
 const ZPR_DPS = [['ZPR 0 → 1', 'entrada da linha na edificação', 'I ou I+II com SPDA; II sem SPDA'], ['ZPR 1 → 2', 'quadros de distribuição', 'II'], ['ZPR 2 → 3', 'junto ao equipamento sensível', 'III']];
 /* linhas de sinal externas (NBR 5410: toda linha externa de sinal recebe DPS na entrada da edificação, ligado ao BEP) */
 const SINAL_DPS = { sinTel: ['Telefonia ou dados em par metálico', 'DPS para linha de sinal em par metálico (telefonia/dados), junto ao DG e ao BEP'], sinRede: ['Rede de dados externa (Ethernet / PoE)', 'DPS para rede de dados RJ45 (Ethernet/PoE), junto ao BEP'], sinCoax: ['Cabo coaxial (antena, CATV, CFTV)', 'DPS coaxial para antena/CATV/CFTV, junto ao BEP'] };
-function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma', nServ: 1, sinTel: 0, sinRede: 0, sinCoax: 0, linhaExposta: false }; }
+function dpsPadrao() { return { metodo: 'F', Td: null, alim: 'aerea', LBT: 0.5, delta: 0.5, exposicao: 'media', catEq: 'II', nSens: 0, critDist: 'norma', nServ: 1, sinTel: 0, sinRede: 0, sinCoax: 0, linhaExposta: false, bep: 'quadro', mem: { ligacao: true, vt: true, formas: true, bep: true, zpr: true } }; }
 
 function calcDPS(proj, calc) {
   const P = proj.params, D = { ...dpsPadrao(), ...(proj.dps || {}) }, ps = calc.spda && calc.spda.projeto, out = { quadros: {}, falhas: [], avisos: [] };
@@ -2830,6 +2849,14 @@ function calcDPS(proj, calc) {
   // linhas de sinal que entram na edificação
   out.sinal = Object.keys(SINAL_DPS).map(k => ({ k, n: Math.max(0, Math.round(+D[k] || 0)), nome: SINAL_DPS[k][0], mat: SINAL_DPS[k][1] })).filter(x => x.n);
   out.catSinal = ps ? 'D1 (10/350 µs, descargas diretas)' : 'C2 (8/20 µs)';
+  // equipotencialização principal (BEP): posição, ligação dos DPS, seções e eletrodo de aterramento
+  const bepLocal = BEP_DPS[D.bep] ? D.bep : 'quadro', maxPE = Math.max(0, ...Object.values(calc.res || {}).map(x => +x.SPE || 0));
+  const A0 = ((proj.aterr && proj.aterr.arr) || []).find(a => a.funcao === 'entrada' || a.funcao === 'massas') || ((proj.aterr && proj.aterr.arr) || [])[0];
+  const RA = A0 && calc.aterr && calc.aterr.arr && calc.aterr.arr[A0.id];
+  out.bep = { local: bepLocal, txt: BEP_DPS[bepLocal], ligDPS: bepLocal === 'separado' ? 'barra PE do quadro de entrada' : 'BEP', maxPE,
+    Seq: SECOES_CU.find(x => x >= Math.min(25, Math.max(6, maxPE / 2)) - 1e-9), Sbar: ps ? 16 : null, Sint: ps ? 6 : null,
+    eletrodo: A0 ? { nome: A0.nome || 'eletrodo de aterramento', n: (RA && RA.nH) || +A0.n || 3, R: RA && isFinite(RA.R) ? RA.R : null, S: +A0.Scond || 16 } : null };
+  out.mem = { ...dpsPadrao().mem, ...(D.mem || {}) };
   const prof = q => { let d = 0, x = q; while (x && x.alim && d < 12) { d++; x = calc.quadros[x.alim.quadro]; } return d; };
   // obrigatoriedade (NBR 5410, influências externas AQ): estrutura com SPDA (AQ3) ou linha aérea com Td > 25 (AQ2)
   out.necess = ps ? { obrig: true, txt: 'obrigatório — edificação com SPDA (AQ3)' }
@@ -2885,7 +2912,7 @@ function calcDPS(proj, calc) {
     // nível de proteção (Tabela 31) e nível efetivo com os condutores de ligação
     r.Uw2 = uwTab31(P.U0, 'II'); r.Uw3 = uwTab31(P.U0, 'III'); r.UwEq = uwTab31(P.U0, catEq);
     r.Up = pv('dpsUp', 'Up') || (cl1 ? 1.5 : (P.U0 <= 150 ? 1.2 : 1.5)); r.UpPadrao = pv('dpsUp', 'Up') == null;
-    r.tec = cl1 && (Qd.dpsTec || (pr && pr.tec)) === 'centelhador' ? 'centelhador' : 'varistor'; r.emV = !!Qd.dpsV;
+    r.tec = cl1 && (Qd.dpsTec || (pr && pr.tec)) === 'centelhador' ? 'centelhador' : 'varistor'; r.emV = Qd.dpsForma ? Qd.dpsForma === 'V' : !!Qd.dpsV;
     // ΔU ≈ 1 kV por metro de condutor de ligação (≈ 8 kA em 8/20 µs ou corrente de raio parcial), nas classes I e II; desprezível na ligação em V
     r.L = +Qd.dpsL > 0 ? +Qd.dpsL : 0.5; r.dU = r.emV ? 0 : r.L * 1;
     r.Upf = r.tec === 'centelhador' ? Math.max(r.Up, r.dU) : r.Up + r.dU;
@@ -2939,6 +2966,14 @@ function calcDPS(proj, calc) {
     if (r.lq && !r.lq.fora) { const sl = Math.max(r.lq.fase, r.lq.pe); v(r.S >= sl - 1e-9 ? 'ok' : 'warn', `Seção pela proteção a montante de ${r.Imont} A — ${lig}, catálogo Siemens: lado da fase ${r.lq.fase} mm², lado do PE ${r.lq.pe} mm²${r.lq.F2 ? `, com fusível F2 de ${r.lq.F2} A gL/gG no ramal do DPS` : ''}${r.S < sl - 1e-9 ? ` — adotados ${fS(r.S)} mm²` : ''}`); }
     else if (r.lq) v('warn', `Ligação em série (em V) com proteção a montante de ${r.Imont} A: o fabricante prevê até ${r.lq.max} A — use a ligação em paralelo (em T) com retaguarda própria.`);
     else v('info', 'Informe o disjuntor geral do quadro para obter a seção dos condutores de ligação pela proteção a montante (catálogo Siemens).');
+    // ligação em V: a corrente de carga passa pelos bornes do DPS; em T, a atuação do F2 tira só o DPS de serviço
+    if (r.emV) {
+      r.IL = pv('dpsIL', 'IL'); r.Smax = pv('dpsSmax', 'Smax'); r.Salim = q.alim ? calc.res[q.alim.id].Sf : null;
+      v(r.IL && r.Imont ? (r.IL >= r.Imont - 1e-9 ? 'ok' : 'fail') : 'info', r.IL && r.Imont ? `Ligação em V: corrente nominal de carga dos bornes IL = ${r.IL} A ${cmp(r.IL, r.Imont)} proteção a montante de ${r.Imont} A` : `Ligação em V: a corrente de carga passa pelos bornes do DPS — confirme na ficha a corrente nominal de carga em V (IL, típica de ${IL_TIP} A), que deve ser ≥ ${r.Imont ? `${r.Imont} A da proteção a montante` : 'a proteção a montante'}`);
+      if (r.Smax && r.Salim) v(r.Salim <= r.Smax + 1e-9 ? 'ok' : 'fail', `Ligação em V: condutor do alimentador ${fS(r.Salim)} mm² ${le(r.Salim, r.Smax)} ${fS(r.Smax)} mm² aceitos pelos bornes do DPS`);
+      v('info', 'Ligação em V: a retaguarda é a própria proteção a montante; se ela atuar por falha do DPS, desliga a instalação a jusante (catálogo Siemens).');
+    } else if (r.F2) v('info', 'Ligação em T com retaguarda F2: se o F2 atuar, só o DPS sai de serviço e a instalação segue energizada sem proteção — ligue o contato de sinalização remota (catálogo Siemens).');
+    if (origem) v('info', `Ligação dos DPS de entrada: ${out.bep.ligDPS} — ${minIni(out.bep.txt.split(' — ')[0])} (NBR 5410, Figura 13, nota a)`);
     v(r.Upf <= r.UwRef + 1e-9 ? 'ok' : 'warn', `Nível efetivo Up/f = ${r.tec === 'centelhador' ? 'máx(Up; ΔU)' : 'Up + ΔU'} = ${r.tec === 'centelhador' ? `máx(${nfmt(r.Up, 2)}; ${nfmt(r.dU, 2)})` : `${nfmt(r.Up, 2)} + ${nfmt(r.dU, 2)}`} = ${nfmt(r.Upf, 2)} kV ${r.Upf <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV (categoria ${r.catRef}${r.soDist ? ', quadro só de distribuição' : ''})${r.Upf > r.UwRef + 1e-9 ? ': prever DPS classe III junto aos equipamentos ou ligação em V' : ''}`);
     if (r.lig === 'npe') v(r.UpfPE == null ? 'info' : r.UpfPE <= r.UwRef + 1e-9 ? 'ok' : 'warn', r.UpfPE == null ? 'Ligação n+1: confirme no catálogo o Up entre fase e PE (módulo da fase em série com o centelhador N–PE; na linha Siemens 5SD7, de 1,7 a 2,5 kV).' : `Nível de proteção fase–PE da ligação n+1: ${nfmt(r.UpPE, 2)} + ${nfmt(r.dU, 2)} = ${nfmt(r.UpfPE, 2)} kV ${r.UpfPE <= r.UwRef + 1e-9 ? '≤' : '>'} Uw = ${nfmt(r.UwRef, 1)} kV${r.UpfPE > r.UwRef + 1e-9 ? ': proteger os equipamentos com DPS classe II ou III a jusante' : ''}`);
     if (!r.soDist) {
@@ -5170,6 +5205,68 @@ function zprDPSSVG(c, calc) {
     + caixa(490, 160, 'Equip.', c.classe3 ? `III · ${c.classe3.n} ponto(s)` : 'classe III se preciso');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zonas de proteção e DPS em cascata">${g}</svg>`;
 }
+/* equipotencialização principal: eletrodo de aterramento, BEP, DPS ligados ao BEP e linhas e tubulações que entram
+   (NBR 5410, 6.4.2.1 e nota a da Figura 13; NBR 5419-3 com SPDA) */
+function bepDPSSVG(c, calc, proj) {
+  const W = 600, H = 432, P = proj.params, b = c.bep, ps = calc.spda && calc.spda.projeto, yG = 262, yB = 228;
+  const Q = Object.values(c.quadros), ent = Q.find(r => r.ativo && r.origem), qd = Q.find(r => r.ativo && !r.origem), loc = b.local;
+  const bep = loc === 'quadro' ? { x1: 212, x2: 292 } : loc === 'junto' ? { x1: 148, x2: 432 } : { x1: 172, x2: 432 };
+  const COR = { tel: '#7a4fb3', agua: '#3b8ed8', terra: '#8a6d3b', parede: '#b9c3cb' };
+  const dpsMini = (x, y, h = 22) => `<rect x="${x - 5}" y="${y}" width="10" height="${h}" fill="#fff" stroke="${DG_COR.ink}" stroke-width="1.2"/>` + lD(x - 3, y + h - 4, x + 3, y + 4, { w: 1 });
+  const liga = (x, y) => lD(x, y, x, yB, { cor: COR_COND.PE, w: 2 }) + (x > bep.x2 ? lD(x, yB, bep.x2, yB, { cor: COR_COND.PE, w: 2 }) : '') + `<circle cx="${Math.min(x, bep.x2)}" cy="${yB}" r="2.6" fill="${COR_COND.PE}"/>`;
+  let g = `<rect width="${W}" height="${H}" fill="#fff"/><rect x="0" y="${yG}" width="${W}" height="${386 - yG}" fill="#f4eee4"/>` + lD(0, yG, W, yG, { w: 1.6, cor: COR.terra });
+  g += `<rect x="138" y="44" width="6" height="${yG - 44}" fill="${COR.parede}"/>` + lD(138, 44, 592, 44, { w: 2, cor: COR.parede }) + tD(580, 58, 'edificação', { fs: 9, anc: 'end', cor: DG_COR.mut })
+    + tD(12, 20, 'Equipotencialização principal — aterramento, BEP e DPS', { fs: 12.5, b: true }) + tD(12, 35, b.txt, { fs: 9, cor: DG_COR.mut });
+  // linha de sinal com DPS no distribuidor geral (DG)
+  g += lD(8, 60, 330, 60, { cor: COR.tel, w: 2 }) + tD(10, 54, 'linha de sinal', { fs: 8.5, cor: COR.tel }) + tD(10, 72, '(telefonia, dados)', { fs: 8.5, cor: COR.tel })
+    + `<rect x="330" y="50" width="44" height="20" fill="#fff" stroke="${COR.tel}" stroke-width="1.2"/>` + tD(352, 64, 'DG', { fs: 9, b: true, anc: 'middle', cor: COR.tel }) + dpsMini(384, 52, 16) + lD(374, 60, 379, 60, { cor: COR.tel }) + liga(384, 68)
+    + tD(392, 64, 'DPS de sinal', { fs: 8.5, cor: COR.tel });
+  // quadro de entrada e quadro de distribuição
+  const qmB = loc === 'quadro' ? 244 : 180, n = ent ? Math.min(4, ent.lig === 'npe' ? ent.nF + 1 : ent.nPolos) : 4;
+  g += `<rect x="200" y="74" width="104" height="${qmB - 74}" fill="#fff" stroke="${DG_COR.ink}" stroke-width="1.3"/>` + tD(252, 88, ent ? ent.q : 'Quadro de entrada', { fs: 10.5, b: true, anc: 'middle' });
+  if (qd) g += `<rect x="470" y="74" width="104" height="70" fill="#fff" stroke="${DG_COR.ink}" stroke-width="1.3"/>` + tD(522, 88, qd.q, { fs: 10.5, b: true, anc: 'middle' }) + fioD(482, 134, 562, 134, 'PE', true) + tD(522, 128, 'barra PE', { fs: 8.5, anc: 'middle', cor: DG_COR.mut });
+  const neu = P.aterramento === 'TN-C-S' ? 'fases e PEN' : P.aterramento === 'TT' ? 'fases e N (TT)' : 'fases, N e PE (TN-S)';
+  g += lD(8, 100, 200, 100, { w: 3 }) + lD(200, 100, 296, 100, { w: 2.2 }) + tD(10, 93, 'rede de BT', { fs: 8.5, cor: DG_COR.mut }) + tD(10, 112, neu, { fs: 8.5, cor: DG_COR.mut });
+  if (qd) g += lD(304, 100, 470, 100, { w: 2.2 }) + tD(432, 94, 'alimentador', { fs: 8.5, anc: 'middle', cor: DG_COR.mut });
+  // DPS de entrada: junto ao BEP ou no quadro
+  if (loc === 'junto') {
+    const xs = Array.from({ length: n }, (_, i) => 156 + i * 12);
+    g += lD(192, 100, 192, 124) + lD(xs[0], 124, 192, 124) + `<circle cx="192" cy="100" r="2.6" fill="${DG_COR.ink}"/>` + xs.map(x => lD(x, 124, x, 140) + dpsMini(x, 140) + lD(x, 162, x, yB, { cor: COR_COND.PE, w: 2 })).join('') + tD(174, 176, 'DPS', { fs: 8.5, b: true, anc: 'middle' });
+    g += fioD(212, 168, 292, 168, 'PE', true) + tD(252, 178, 'barra PE', { fs: 8, anc: 'middle', cor: DG_COR.mut }) + liga(290, 172) + tD(306, 206, 'PE principal', { fs: 8.5, cor: DG_COR.mut });
+  } else {
+    const xs = Array.from({ length: n }, (_, i) => 220 + i * 16), yPE = loc === 'quadro' ? yB : 168;
+    g += xs.map(x => lD(x, 100, x, 112) + `<circle cx="${x}" cy="100" r="2.4" fill="${DG_COR.ink}"/>` + dpsMini(x, 112) + lD(x, 134, x, yPE, { cor: COR_COND.PE, w: 2 })).join('') + tD(xs[n - 1] + 10, 128, 'DPS', { fs: 8.5, b: true });
+    if (loc === 'separado') g += fioD(212, 168, 292, 168, 'PE', true) + tD(252, 178, 'barra PE', { fs: 8, anc: 'middle', cor: DG_COR.mut }) + liga(290, 172) + tD(306, 206, 'PE principal', { fs: 8.5, cor: DG_COR.mut });
+  }
+  // neutro na origem
+  if (P.aterramento !== 'TT') g += lD(300, 100, 300, loc === 'quadro' ? yB : 180, { w: 1.6, dash: '4 2' }) + (loc === 'quadro' ? `<circle cx="292" cy="${yB}" r="2.4" fill="${DG_COR.ink}"/>` + lD(300, yB, 292, yB, { w: 1.6, dash: '4 2' }) : lD(300, 180, 300, yB, { w: 1.6, dash: '4 2' }));
+  g += tD(310, 150, P.aterramento === 'TN-C-S' ? 'PEN aterrado' : P.aterramento === 'TT' ? 'TT: N não' : 'PE da rede', { fs: 8.5, cor: DG_COR.mut })
+    + tD(310, 161, P.aterramento === 'TT' ? 'ligado ao BEP' : 'no BEP', { fs: 8.5, cor: DG_COR.mut });
+  // BEP
+  g += fioD(bep.x1, yB, bep.x2, yB, 'PE', true) + (loc === 'quadro' ? tD(258, yB + 12, 'barra PE = BEP', { fs: 8.5, b: true, anc: 'middle' }) : tD(bep.x2 - 2, yB - 7, 'BEP', { fs: 10, b: true, anc: 'end' }));
+  // tubulações metálicas e armaduras
+  g += lD(8, 250, 566, 250, { cor: COR.agua, w: 4 }) + tD(10, 244, 'tubulações (água, gás)', { fs: 8.5, cor: COR.agua }) + `<rect x="405" y="245" width="10" height="10" fill="#fff" stroke="${DG_COR.ink}"/>` + liga(410, 245);
+  g += lD(bep.x1 + 4, yB, bep.x1 + 4, yG + 8, { dash: '4 3', w: 1.2 }) + lD(bep.x1 + 4, yG + 8, 141, yG + 8, { dash: '4 3', w: 1.2 }) + lD(141, yG, 141, yG + 14, { w: 3, cor: COR.parede }) + tD(136, yG + 22, 'armaduras / fundação', { fs: 8, anc: 'end', cor: DG_COR.mut });
+  // PE principal até o quadro de distribuição
+  if (qd) g += lD(bep.x2, yB, bep.x2, 212, { cor: COR_COND.PE, w: 2 }) + lD(bep.x2, 212, 522, 212, { cor: COR_COND.PE, w: 2 }) + lD(522, 212, 522, 144, { cor: COR_COND.PE, w: 2 }) + tD(470, 207, `PE → ${qd.q}`, { fs: 8.5, cor: DG_COR.mut });
+  // eletrodo de aterramento (anel do SPDA ou hastes) e condutor de aterramento
+  const xa = bep.x1 + 44, e = b.eletrodo;
+  g += lD(xa, yB, xa, ps ? 300 : 288, { cor: COR.terra, w: 2.2 }) + tD(xa + 6, 280, `condutor de aterramento${e ? ` ${fS(e.S)} mm²` : ''}`, { fs: 8.5, cor: COR.terra });
+  if (ps) {
+    g += lD(30, 300, 592, 300, { cor: COR.terra, w: 3 }) + tD(300, 316, 'anel de aterramento do SPDA (arranjo B), interligado ao BEP', { fs: 8.5, anc: 'middle', cor: COR.terra })
+      + lD(592, 30, 592, 300, { w: 2 }) + lD(588, 30, 596, 30, { w: 2 }) + tD(584, 238, 'descida do SPDA', { fs: 8.5, anc: 'end', cor: DG_COR.mut }) + `<circle cx="592" cy="300" r="2.6" fill="${COR.terra}"/><circle cx="${xa}" cy="300" r="2.6" fill="${COR.terra}"/>`;
+  } else {
+    const nh = Math.max(1, Math.min(4, e ? e.n : 3)), xs = Array.from({ length: nh }, (_, i) => xa + i * 50);
+    g += lD(xa, 288, xs[nh - 1], 288, { cor: COR.terra, w: 2.2 }) + xs.map(x => lD(x, 288, x, 352, { cor: COR.terra, w: 3 })).join('')
+      + tD(xs[nh - 1] + 10, 330, `${e ? `${e.n} haste(s)` : 'hastes'}${e && e.R != null ? ` — R = ${nfmt(e.R, 1)} Ω` : ''}`, { fs: 8.5, cor: COR.terra });
+  }
+  // notas: seções
+  g += `<rect x="0" y="386" width="${W}" height="${H - 386}" fill="#fff"/>`
+    + tD(12, 402, `Equipotencialização principal: condutores ≥ ${fS(b.Seq)} mm² Cu (metade do maior PE, ${fS(b.maxPE || 0)} mm²; mínimo 6 e até 25 mm² — NBR 5410).`, { fs: 9, cor: DG_COR.ink })
+    + tD(12, 416, ps ? `Com SPDA: ${b.Sbar} mm² Cu entre barramentos e ao aterramento; ${b.Sint} mm² Cu para as instalações metálicas internas (NBR 5419-3).` : 'Linhas de energia e de sinal e tubulações metálicas que entram na edificação: ligadas ao BEP, diretamente ou por DPS.', { fs: 9, cor: DG_COR.ink })
+    + tD(12, 429, `DPS de entrada ligados ${b.ligDPS === 'BEP' ? 'ao BEP' : 'à barra PE do quadro'}, com condutores curtos (≤ 0,5 m), retilíneos e sem laços.`, { fs: 9, cor: DG_COR.ink });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Equipotencialização principal: aterramento, BEP e DPS">${g}</svg>`;
+}
 /* galeria de referência: formas de ligar o DPS */
 function formasLigacaoDPS(U0 = 127) {
   const Uc = ucDPS(U0), base = { q: '', fases: ['A', 'B', 'C'], nF: 3, Uc, In: 20, Iimp: 12.5, Up: 1.5, S: 10, Imont: null };
@@ -5229,7 +5326,7 @@ function construirMemorialDPS(proj, calc, opt = {}) {
       ['Retaguarda do fabricante', r.back ? `até ${r.back} A` : 'conforme o fabricante', 'Distância de proteção', r.soDist ? 'quadro só de distribuição' : r.distDispensa ? 'dispensada (Up/f < Uw/2)' : c.critDist === 'fab' ? `${D_PROT_FAB} m (fabricante)` : `lpo = ${f1(r.dProt)} m`]] });
     r.verifs.forEach(([st, t]) => B.push(st === 'info' ? { t: 'note', text: t } : { t: 'ver', ok: VER_DPS[st], text: t }));
     const sl = ligacaoDPSSVG(r);
-    B.push({ t: 'fig', svg: svgDoc(sl, 480, 300), ar: 0.625, px: 960, w: 112, caption: `Esquema de ligação dos DPS do ${r.q}: ${ESQ_DPS[r.esquema].split(' — ')[0].toLowerCase()}, ${r.emV ? 'ligação em V (série)' : 'ligação em T (paralelo)'}${r.F2 ? `, retaguarda F2 de ${r.F2} A` : ''}; condutores de ligação de ${fS(r.S)} mm².` });
+    if (c.mem.ligacao) B.push({ t: 'fig', svg: svgDoc(sl, 480, 300), ar: 0.625, px: 960, w: 112, caption: `Esquema de ligação dos DPS do ${r.q}: ${ESQ_DPS[r.esquema].split(' — ')[0].toLowerCase()}, ${r.emV ? 'ligação em V (série)' : 'ligação em T (paralelo)'}${r.F2 ? `, retaguarda F2 de ${r.F2} A` : ''}; condutores de ligação de ${fS(r.S)} mm².` });
   });
   const prods = [...new Map(Q.filter(r => r.prod).map(r => [r.prod.id, r.prod])).values()];
   if (prods.length) {
@@ -5238,9 +5335,9 @@ function construirMemorialDPS(proj, calc, opt = {}) {
       rows: prods.map(x => [`${x.fab} ${x.mod}`, x.classe, `${x.Uc} V`, `${x.In} / ${x.Imax || '—'} kA`, x.Iimp ? `${nfmt(x.Iimp, 1)} kA` : '—', `${nfmt(x.Up, 1)} kV`, `${x.back ? `${x.back} A gL/gG` : '—'}${x.isccr ? ` · ${x.isccr} kA` : ''}${x.iscSem ? ` (sem retaguarda ${x.iscSem} kA)` : ''}`]) });
     B.push({ t: 'note', text: `Valores declarados pelos fabricantes (${prods.map(x => x.fonte).join('; ')}). São referência de especificação — admite-se produto equivalente que atenda às mesmas verificações; confira a versão e a configuração do produto na ficha técnica.` });
   }
-  sec('Zonas de proteção, classe III e coordenação');
+  sec(c.mem.zpr ? 'Zonas de proteção, classe III e coordenação' : 'Classe III e coordenação');
   const sz = zprDPSSVG(c, calc);
-  B.push({ t: 'fig', svg: svgDoc(sz, 560, 270), ar: 270 / 560, full: true, px: 1120, w: 172, caption: 'Zonas de proteção contra raios (NBR 5419-4) e DPS em cascata: entrada na fronteira ZPR 0 → 1, quadros na ZPR 1 → 2 e DPS classe III junto aos equipamentos sensíveis (ZPR 2 → 3).' });
+  if (c.mem.zpr) B.push({ t: 'fig', svg: svgDoc(sz, 560, 270), ar: 270 / 560, full: true, px: 1120, w: 172, caption: 'Zonas de proteção contra raios (NBR 5419-4) e DPS em cascata: entrada na fronteira ZPR 0 → 1, quadros na ZPR 1 → 2 e DPS classe III junto aos equipamentos sensíveis (ZPR 2 → 3).' });
   const longe = Q.filter(r => r.foraDist && r.foraDist.length).map(r => `${r.q} (circuitos ${r.foraDist.join(', ')}; distância de proteção ${f1(r.dProt)} m)`);
   B.push({ t: 'p', text: (c.classe3 ? `Previstos ${c.classe3.n} DPS classe III (Uc ${c.classe3.Uc} V) junto aos equipamentos sensíveis, coordenados com os DPS do quadro que os alimenta.` : 'Não foram indicados pontos com equipamentos sensíveis que exijam DPS classe III; avaliar junto a equipamentos eletrônicos distantes do quadro.')
     + (longe.length ? ` Circuitos além da distância de proteção do DPS do quadro: ${longe.join('; ')} — os equipamentos sensíveis alimentados por eles devem receber DPS classe III próprio.` : '') });
@@ -5248,9 +5345,38 @@ function construirMemorialDPS(proj, calc, opt = {}) {
   const sS = sec('Linhas de sinal');
   B.push({ t: 'p', text: c.sinal.length ? `Linhas externas de sinal que entram na edificação, com DPS no ponto de entrada ligado ao BEP (categoria de ensaio ${c.catSinal}, IEC 61643-21):` : 'Não foram informadas linhas externas de sinal. Toda linha que vier a entrar na edificação (telefonia, dados, vídeo, antena) deve receber DPS no ponto de entrada, ligado ao BEP (NBR 5410).' });
   if (c.sinal.length) B.push({ t: 'table', head: ['Linha', 'Quantidade', 'DPS'], widths: [34, 14, 52], align: 'lrl', rows: c.sinal.map(x => [x.nome, String(x.n), x.mat]) });
-  sec('Formas de ligação dos DPS');
-  B.push({ t: 'p', text: 'A NBR 5410 (Figura 13) define três esquemas de conexão conforme o neutro e o esquema de aterramento; os condutores de ligação podem ser derivados do barramento (ligação em T, paralelo) ou passar pelos bornes do DPS (ligação em V, série). Os desenhos abaixo resumem as formas de ligar; o esquema adotado em cada quadro está na seção de seleção.' });
-  formasLigacaoDPS(P.U0).forEach(f => B.push({ t: 'fig', svg: svgDoc(f.svg, 480, 300), ar: 0.625, px: 960, w: 112, caption: `${f.caption}. ${f.sub}` }));
+  const formas = formasLigacaoDPS(P.U0);
+  if (c.mem.vt) {
+    sec('Ligação em V e em T');
+    B.push({ t: 'p', text: `Os condutores de ligação do DPS podem ser derivados do barramento até o DPS e do DPS à barra PE (ligação em T, paralelo), com a + b ≤ 0,5 m, ou o condutor de chegada pode entrar e sair pelos bornes do DPS (ligação em V, série), restando só o trecho b até a barra PE (IEC 60364-5-534; NBR 5410). Neste projeto: ${Q.map(r => `${r.q} em ${r.emV ? 'V' : 'T'}`).join('; ')}.` });
+    B.push({ t: 'table', small: true, head: ['Aspecto', 'T — paralelo (derivação)', 'V — série (passante)'], widths: [20, 40, 40], align: 'lll', rows: VT_DPS.map(x => x.slice()) });
+    formas.slice(3).forEach(f => B.push({ t: 'fig', svg: svgDoc(f.svg, 480, 300), ar: 0.625, px: 960, w: 112, caption: `${f.caption}. ${f.sub}` }));
+  }
+  if (c.mem.formas) {
+    sec('Formas de ligação dos DPS (Figura 13)');
+    B.push({ t: 'p', text: 'A NBR 5410 (Figura 13) define três esquemas de conexão conforme o neutro e o esquema de aterramento: neutro aterrado no BEP — DPS só nas fases (esquema 1); DPS entre cada condutor vivo e o PE (esquema 2); DPS entre fases e neutro e centelhador entre neutro e PE (esquema 3). O esquema adotado em cada quadro está na seção de seleção.' });
+    formas.slice(0, 3).forEach(f => B.push({ t: 'fig', svg: svgDoc(f.svg, 480, 300), ar: 0.625, px: 960, w: 112, caption: `${f.caption}. ${f.sub}` }));
+  }
+  if (c.mem.bep) {
+    const bp = c.bep, ps2 = calc.spda && calc.spda.projeto, TT = P.aterramento === 'TT';
+    sec('Equipotencialização principal (BEP)');
+    B.push({ t: 'p', text: `O barramento de equipotencialização principal (BEP) fica junto ou próximo do ponto de entrada da alimentação. Neste projeto: ${minIni(bp.txt)}. Pela nota a da Figura 13 da NBR 5410, os DPS são ligados ao BEP quando instalados junto a ele ou quando a barra PE do quadro principal acumula a função de BEP, e à barra PE do quadro quando ela não é o BEP.` });
+    B.push({ t: 'list', items: [
+      `Condutor de aterramento, do eletrodo ao BEP${bp.eletrodo ? ` — ${bp.eletrodo.nome}, ${fS(bp.eletrodo.S)} mm² Cu${bp.eletrodo.R != null ? `, R = ${f1(bp.eletrodo.R)} Ω` : ''}` : ''}.`,
+      'Condutor(es) de proteção principal(is) da instalação — barra PE dos quadros.',
+      TT ? 'Neutro: no esquema TT o neutro da alimentação não é ligado ao BEP.' : `Neutro da alimentação (${P.aterramento === 'TN-C-S' ? 'PEN de chegada, aterrado no BEP' : 'PE da rede ligado ao BEP'}).`,
+      `DPS das linhas de energia (ligados ao ${bp.ligDPS}) e DPS das linhas de sinal que entram na edificação.`,
+      'Tubulações metálicas de água, gás, esgoto e ar-condicionado; condutos, blindagens e capas metálicas de cabos que entram ou saem da edificação.',
+      'Armaduras do concreto e demais elementos estruturais metálicos.',
+      ...(ps2 ? ['Subsistema de aterramento do SPDA (anel, arranjo B) e descidas, interligados ao BEP — equipotencialização para descargas atmosféricas (NBR 5419-3).'] : [])] });
+    B.push({ t: 'table', head: ['Condutor', 'Seção mínima (cobre)', 'Referência'], widths: [46, 22, 32], rows: [
+      ['Equipotencialização principal (ao BEP)', `${fS(bp.Seq)} mm²`, `NBR 5410 — metade do maior PE (${fS(bp.maxPE || 0)} mm²), mínimo 6 mm², até 25 mm²`],
+      ...(bp.eletrodo ? [['Condutor de aterramento (eletrodo → BEP)', `${fS(bp.eletrodo.S)} mm²`, 'adotado no projeto de aterramento']] : []),
+      ...(ps2 ? [['Entre barramentos e ao subsistema de aterramento', `${bp.Sbar} mm²`, 'NBR 5419-3 (com SPDA)'], ['Instalações metálicas internas ao barramento', `${bp.Sint} mm²`, 'NBR 5419-3 (com SPDA)']] : []),
+      ['DPS de entrada ao BEP / barra PE', `${fS((Q.find(r => r.origem) || {}).S || 16)} mm²`, 'NBR 5410 e fabricante — condutor ≤ 0,5 m']] });
+    const sb = bepDPSSVG(c, calc, proj);
+    B.push({ t: 'fig', svg: svgDoc(sb, 600, 432), ar: 432 / 600, full: true, px: 1200, w: 172, caption: `Equipotencialização principal: eletrodo de aterramento, BEP, DPS de entrada ligados ao ${bp.ligDPS}, linha de sinal com DPS no DG, tubulações metálicas e armaduras${ps2 ? ', com o anel de aterramento e a descida do SPDA' : ''}.` });
+  }
   sec('Instalação');
   B.push({ t: 'list', items: ['Instalar os DPS junto ao barramento de proteção do quadro, com condutores curtos, retilíneos e sem laços; preferir a ligação em V (entrada e saída nos mesmos bornes) quando o comprimento passar de 0,5 m.',
     'Manter separados os condutores de chegada (não protegidos) e os condutores já protegidos que saem do quadro, sem percursos paralelos próximos, para evitar o reacoplamento do surto.',
@@ -6887,6 +7013,8 @@ function normalizarDPS(d) {
   if (!DIST_DPS[out.critDist]) out.critDist = 'norma';
   if (!DELTA_DPS.some(x => x[0] === +out.delta)) out.delta = 0.5;
   if (out.alim !== 'subterranea') out.alim = 'aerea';
+  if (!BEP_DPS[out.bep]) out.bep = 'quadro';
+  out.mem = { ...dpsPadrao().mem, ...(out.mem || {}) };
   return out;
 }
 const ICONE_VER = { ok: 'ok', fail: 'fail', warn: 'warn', info: 'info' };
@@ -6917,6 +7045,14 @@ function renderDPS() {
     ${fNum('dg', 'nSens', 'Pontos com equipamentos sensíveis (DPS classe III)', D.nSens, { dica: 'junto aos equipamentos distantes do quadro' })}
     ${fInfo('Esquema / tensão', `${esc(P.aterramento)} · ${P.U0}/${P.U} V`)}
   </div></fieldset>
+  <fieldset data-scope="dpsg"><legend>Equipotencialização principal (BEP)</legend><div class="grade">
+    ${fSel('dg', 'bep', 'Posição do BEP e ligação dos DPS de entrada (NBR 5410, Figura 13, nota a)', D.bep, Object.entries(BEP_DPS), { cls: 'w2', struct: true })}
+    ${fInfo('Condutores de equipotencialização principal', `≥ ${fS(c.bep.Seq)} mm² Cu (maior PE: ${fS(c.bep.maxPE || 0)} mm²)`)}
+    ${fInfo('Com SPDA (NBR 5419-3)', c.bep.Sbar ? `${c.bep.Sbar} mm² entre barramentos e ao aterramento; ${c.bep.Sint} mm² nas massas internas` : 'sem SPDA')}
+  </div></fieldset>
+  <fieldset data-scope="dpsmem"><legend>Conteúdo da memória de cálculo do DPS</legend><div class="grade">
+    ${Object.entries(MEM_DPS).map(([k, t]) => fChk('dm', k, t, D.mem[k] !== false)).join('')}
+  </div></fieldset>
   <fieldset data-scope="dpsg"><legend>Linhas de sinal que entram na edificação</legend><div class="grade">
     ${Object.entries(SINAL_DPS).map(([k, [nome]]) => fNum('dg', k, nome, D[k], { dica: 'quantidade de linhas' })).join('')}
     ${fInfo('DPS de sinal', `junto ao BEP · categoria ${esc(c.catSinal)}`)}
@@ -6938,14 +7074,21 @@ function renderDPS() {
         ${fNum(pre, 'dpsL', 'Condutores de ligação (total)', Qd.dpsL, { u: 'm', ph: 0.5 })}${fNum(pre, 'dpsS', 'Seção dos condutores de ligação', Qd.dpsS, { u: 'mm²', ph: r.ativo ? r.Srec : '' })}
         ${fNum(pre, 'dpsBack', 'Retaguarda máxima (fabricante)', Qd.dpsBack, { u: 'A', ph: r.back || 'catálogo' })}${fNum(pre, 'dpsIsccr', 'Isccr com retaguarda', Qd.dpsIsccr, { u: 'kA', ph: r.isccr || 'catálogo' })}${fNum(pre, 'dpsIscSem', 'Curto suportável sem retaguarda', Qd.dpsIscSem, { u: 'kA', ph: r.iscSem || 'ficha' })}
         ${fSel(pre, 'dpsBackTipo', 'Dispositivo de retaguarda', Qd.dpsBackTipo || 'fus', [['fus', 'Fusível gL/gG'], ['disj', 'Disjuntor']])}${fNum(pre, 'dpsBackIcn', 'Capacidade de interrupção da retaguarda', Qd.dpsBackIcn, { u: 'kA', ph: r.backTipo === 'fus' ? 50 : 'Icu' })}
-        ${fChk(pre, 'dpsV', 'Ligação em V — série (ΔU desprezível)', !!Qd.dpsV)}${q.alim ? fChk(pre, 'dpsCoord', 'Coordenado com o DPS a montante (fabricante)', !!Qd.dpsCoord) : ''}${fChk(pre, 'dpsJusDR', 'DPS a jusante de DR geral', !!Qd.dpsJusDR)}
+        ${fSel(pre, 'dpsForma', 'Forma de ligação', r.ativo && r.emV ? 'V' : 'T', [['T', 'T — paralelo (derivação)'], ['V', 'V — série (passante)']], { struct: true })}
+        ${r.ativo && r.emV ? fNum(pre, 'dpsIL', 'IL — corrente de carga em V', Qd.dpsIL, { u: 'A', ph: r.IL || 'ficha' }) + fNum(pre, 'dpsSmax', 'Seção máxima do borne', Qd.dpsSmax, { u: 'mm²', ph: r.Smax || 'ficha' }) : ''}${q.alim ? fChk(pre, 'dpsCoord', 'Coordenado com o DPS a montante (fabricante)', !!Qd.dpsCoord) : ''}${fChk(pre, 'dpsJusDR', 'DPS a jusante de DR geral', !!Qd.dpsJusDR)}
       </div></div><div id="${pre}-res">${dpsResHTML(r)}</div></article>`; }).join('')}
+  <article class="quadro"><div class="quadro-cab"><div><h3>Ligação em V e em T</h3><span class="mini">IEC 60364-5-534 e catálogos Siemens e DEHN — formas de ligar os condutores do DPS</span></div></div>
+    <div class="tw" style="margin:12px 14px"><table class="tbl"><thead><tr><th>Aspecto</th><th>T — paralelo (derivação)</th><th>V — série (passante)</th></tr></thead><tbody>${VT_DPS.map(([a, t, v]) => `<tr><td class="wrap"><b>${esc(a)}</b></td><td class="wrap">${esc(t)}</td><td class="wrap">${esc(v)}</td></tr>`).join('')}</tbody></table></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:12px;padding:0 14px 14px">${formasLigacaoDPS(P.U0).slice(3).map(f => `<figure style="margin:0" class="diag-folha">${f.svg}<figcaption class="mini"><b>${esc(f.caption)}.</b> ${esc(f.sub)}</figcaption></figure>`).join('')}</div>
+    <p class="mini" style="margin:0 14px 14px">Quadros deste projeto: ${Object.values(c.quadros).filter(r => r.ativo).map(r => `${esc(r.q)} em ${r.emV ? 'V' : 'T'}`).join(' · ')}. A forma de ligação é escolhida em cada quadro, acima.</p></article>
+  <article class="quadro"><div class="quadro-cab"><div><h3>Equipotencialização no BEP</h3><span class="mini">NBR 5410 (6.4.2.1 e nota a da Figura 13) e NBR 5419-3 — aterramento, BEP, DPS, linhas e tubulações que entram</span></div></div><div id="dps-bep" style="padding:12px 14px"></div></article>
   <article class="quadro"><div class="quadro-cab"><div><h3>Zonas de proteção e cascata</h3><span class="mini">NBR 5419-4 — classe do DPS em cada fronteira de zona</span></div></div><div id="dps-zpr" style="padding:12px 14px"></div></article>`;
   renderDPSResumo();
 }
 function renderDPSResumo() {
   const box = $('#dps-resumo'); if (!box) return; const c = CALC.dps, L = Object.values(c.quadros).filter(r => r.ativo);
   const z = $('#dps-zpr'); if (z) z.innerHTML = `<div class="diag-folha" style="max-width:760px">${zprDPSSVG(c, CALC)}</div>`;
+  const bp = $('#dps-bep'); if (bp) bp.innerHTML = `<div class="diag-folha" style="max-width:820px">${bepDPSSVG(c, CALC, PROJ)}</div>`;
   box.innerHTML = `<div class="res" style="margin-bottom:14px"><div class="res-cab"><h3>Resumo</h3><span class="pill ${c.status}">${statusTxt(c.status)}</span></div>
     <ul class="verif"><li class="${c.necess.obrig == null ? 'info' : 'ok'}"><span>Obrigatoriedade (NBR 5410): ${esc(c.necess.txt)}</span></li><li class="info"><span>Corrente nominal dos DPS classe II: ${esc(c.InTxt)}</span></li>${c.sinal.length ? `<li class="info"><span>Linhas de sinal: ${c.sinal.map(x => `${x.n} × ${esc(x.nome.toLowerCase())}`).join('; ')} — DPS na entrada, ligado ao BEP (categoria ${esc(c.catSinal)})</span></li>` : ''}${c.semEntrada ? '<li class="fail"><span>DPS obrigatório no ponto de entrada: ative o DPS do quadro de entrada.</span></li>' : ''}</ul>
     <div class="metr num">${L.map(r => `<div><small>${esc(r.q)}</small><span${r.status === 'fail' ? ' class="bad"' : ''}>${r.classe} · ${r.classe === 'I+II' ? `${nfmt(r.Iimp, 1)} kA` : `${r.Imax} kA`}</span><small style="text-transform:none;letter-spacing:0">${r.lig === 'npe' ? `${r.nF}+1` : `${r.nF + 1}+0`} · Up ${nfmt(r.Up, 1)} kV</small></div>`).join('')}${c.classe3 ? `<div><small>Classe III</small><span>${c.classe3.n} ponto(s)</span></div>` : ''}</div>
@@ -7269,6 +7412,7 @@ function onCampo(ev, isChange) {
   else if (sc === 'desclocal') { const l = PROJ.descritivo.locais[+box.dataset.i]; if (l) l[k] = v; }
   else if (sc === 'amed') { const m = PROJ.aterr.solo.med[+box.dataset.i]; if (m) m[k] = v; }
   else if (sc === 'dpsg') { PROJ.dps[k] = v; }
+  else if (sc === 'dpsmem') { PROJ.dps.mem = { ...dpsPadrao().mem, ...(PROJ.dps.mem || {}), [k]: v }; }
   else if (sc === 'dpsq') { const q = PROJ.quadros[box.dataset.q] = PROJ.quadros[box.dataset.q] || {}; q[k] = v; }
   else if (sc === 'spda') { PROJ.spda[k] = v; struct = efeitosSPDA(k) || struct; }
   else if (sc === 'spdalin') { const l = PROJ.spda.linhas[+box.dataset.i]; if (l) l[k] = v; }
@@ -8024,6 +8168,9 @@ function renderTabelas() {
       + h3t('Catálogo de DPS de referência (dados declarados pelos fabricantes)') + tabelaHTML(['Fabricante e modelo', 'Classe', 'Config.', 'Uc (V)', 'In / Imáx (kA)', 'Iimp (kA)', 'Up (kV)', 'Retaguarda', 'Isccr (kA)'], CAT_DPS.map(x => [`${esc(x.fab)} ${esc(x.mod)}`, x.classe, x.cfg, String(x.Uc), `${x.In} / ${x.Imax || '—'}`, x.Iimp ? nfmt(x.Iimp, 1) : '—', nfmt(x.Up, 1), x.back ? `${x.back} A${x.backV ? ` (V: ${x.backV} A)` : ''}` : '—', `${x.isccr || '—'}${x.iscSem ? ` (sem retaguarda ${x.iscSem})` : ''}`]), false)
       + h3t('Classe do DPS por zona de proteção contra raios — NBR 5419-4:2026') + tabelaHTML(['Fronteira', 'Onde', 'Classe do DPS'], ZPR_DPS, false)
       + h3t('Formas de ligação — NBR 5410, Figura 13, e ligação em T ou em V') + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px">${formasLigacaoDPS(PROJ.params.U0).map(f => `<figure style="margin:0" class="diag-folha">${f.svg}<figcaption class="mini"><b>${esc(f.caption)}.</b> ${esc(f.sub)}</figcaption></figure>`).join('')}</div>`
+      + h3t('Ligação em T (paralelo) × ligação em V (série)') + tabelaHTML(['Aspecto', 'T — paralelo (derivação)', 'V — série (passante)'], VT_DPS.map(([a, t, v]) => [`<b>${esc(a)}</b>`, esc(t), esc(v)]), false)
+      + h3t('Ligação dos DPS de entrada ao BEP ou à barra PE — NBR 5410, Figura 13, nota a') + tabelaHTML(['Posição do BEP', 'Ligação dos DPS'], Object.values(BEP_DPS).map(t => t.split(' — ')), false)
+      + h3t('Equipotencialização principal — seções mínimas (cobre)') + tabelaHTML(['Condutor', 'Seção', 'Referência'], [['Equipotencialização principal (ao BEP)', 'metade do maior PE; mínimo 6 mm², até 25 mm²', 'NBR 5410'], ['Entre barramentos e ao aterramento, com SPDA', '16 mm²', 'NBR 5419-3'], ['Instalações metálicas internas ao barramento, com SPDA', '6 mm²', 'NBR 5419-3'], ['DPS ao BEP / barra PE', '4 mm²; 16 mm² na classe I ou com SPDA', 'NBR 5410']], false)
       + h3t('Obrigatoriedade do DPS — NBR 5410 (influências externas AQ)') + tabelaHTML(['Edificação e alimentação', 'Td ≤ 25 dias/ano (AQ1)', 'Td > 25 dias/ano (AQ2)'], [['Edificação com SPDA (AQ3)', 'obrigatório', 'obrigatório'], ['Linha de BT total ou parcialmente aérea', 'não obrigatório', 'obrigatório'], ['Linha de BT totalmente subterrânea', 'não obrigatório', 'não obrigatório']], false)
       + h3t('Nível de exposição F = Td × (1,6 + 2 × LBT + δ) — catálogo Siemens') + tabelaHTML(['Situação da linha aérea e da edificação', 'δ'], DELTA_DPS.map(([d, t]) => [t, nfmt(d, 2)]), false)
       + tabelaHTML(['Nível de exposição F', 'In do DPS classe II'], [['F ≤ 40', '5 kA'], ['40 < F ≤ 80', '10 kA'], ['F > 80', '20 kA']], false)

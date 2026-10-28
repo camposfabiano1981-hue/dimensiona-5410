@@ -75,6 +75,68 @@ function zprDPSSVG(c, calc) {
     + caixa(490, 160, 'Equip.', c.classe3 ? `III · ${c.classe3.n} ponto(s)` : 'classe III se preciso');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zonas de proteção e DPS em cascata">${g}</svg>`;
 }
+/* equipotencialização principal: eletrodo de aterramento, BEP, DPS ligados ao BEP e linhas e tubulações que entram
+   (NBR 5410, 6.4.2.1 e nota a da Figura 13; NBR 5419-3 com SPDA) */
+function bepDPSSVG(c, calc, proj) {
+  const W = 600, H = 432, P = proj.params, b = c.bep, ps = calc.spda && calc.spda.projeto, yG = 262, yB = 228;
+  const Q = Object.values(c.quadros), ent = Q.find(r => r.ativo && r.origem), qd = Q.find(r => r.ativo && !r.origem), loc = b.local;
+  const bep = loc === 'quadro' ? { x1: 212, x2: 292 } : loc === 'junto' ? { x1: 148, x2: 432 } : { x1: 172, x2: 432 };
+  const COR = { tel: '#7a4fb3', agua: '#3b8ed8', terra: '#8a6d3b', parede: '#b9c3cb' };
+  const dpsMini = (x, y, h = 22) => `<rect x="${x - 5}" y="${y}" width="10" height="${h}" fill="#fff" stroke="${DG_COR.ink}" stroke-width="1.2"/>` + lD(x - 3, y + h - 4, x + 3, y + 4, { w: 1 });
+  const liga = (x, y) => lD(x, y, x, yB, { cor: COR_COND.PE, w: 2 }) + (x > bep.x2 ? lD(x, yB, bep.x2, yB, { cor: COR_COND.PE, w: 2 }) : '') + `<circle cx="${Math.min(x, bep.x2)}" cy="${yB}" r="2.6" fill="${COR_COND.PE}"/>`;
+  let g = `<rect width="${W}" height="${H}" fill="#fff"/><rect x="0" y="${yG}" width="${W}" height="${386 - yG}" fill="#f4eee4"/>` + lD(0, yG, W, yG, { w: 1.6, cor: COR.terra });
+  g += `<rect x="138" y="44" width="6" height="${yG - 44}" fill="${COR.parede}"/>` + lD(138, 44, 592, 44, { w: 2, cor: COR.parede }) + tD(580, 58, 'edificação', { fs: 9, anc: 'end', cor: DG_COR.mut })
+    + tD(12, 20, 'Equipotencialização principal — aterramento, BEP e DPS', { fs: 12.5, b: true }) + tD(12, 35, b.txt, { fs: 9, cor: DG_COR.mut });
+  // linha de sinal com DPS no distribuidor geral (DG)
+  g += lD(8, 60, 330, 60, { cor: COR.tel, w: 2 }) + tD(10, 54, 'linha de sinal', { fs: 8.5, cor: COR.tel }) + tD(10, 72, '(telefonia, dados)', { fs: 8.5, cor: COR.tel })
+    + `<rect x="330" y="50" width="44" height="20" fill="#fff" stroke="${COR.tel}" stroke-width="1.2"/>` + tD(352, 64, 'DG', { fs: 9, b: true, anc: 'middle', cor: COR.tel }) + dpsMini(384, 52, 16) + lD(374, 60, 379, 60, { cor: COR.tel }) + liga(384, 68)
+    + tD(392, 64, 'DPS de sinal', { fs: 8.5, cor: COR.tel });
+  // quadro de entrada e quadro de distribuição
+  const qmB = loc === 'quadro' ? 244 : 180, n = ent ? Math.min(4, ent.lig === 'npe' ? ent.nF + 1 : ent.nPolos) : 4;
+  g += `<rect x="200" y="74" width="104" height="${qmB - 74}" fill="#fff" stroke="${DG_COR.ink}" stroke-width="1.3"/>` + tD(252, 88, ent ? ent.q : 'Quadro de entrada', { fs: 10.5, b: true, anc: 'middle' });
+  if (qd) g += `<rect x="470" y="74" width="104" height="70" fill="#fff" stroke="${DG_COR.ink}" stroke-width="1.3"/>` + tD(522, 88, qd.q, { fs: 10.5, b: true, anc: 'middle' }) + fioD(482, 134, 562, 134, 'PE', true) + tD(522, 128, 'barra PE', { fs: 8.5, anc: 'middle', cor: DG_COR.mut });
+  const neu = P.aterramento === 'TN-C-S' ? 'fases e PEN' : P.aterramento === 'TT' ? 'fases e N (TT)' : 'fases, N e PE (TN-S)';
+  g += lD(8, 100, 200, 100, { w: 3 }) + lD(200, 100, 296, 100, { w: 2.2 }) + tD(10, 93, 'rede de BT', { fs: 8.5, cor: DG_COR.mut }) + tD(10, 112, neu, { fs: 8.5, cor: DG_COR.mut });
+  if (qd) g += lD(304, 100, 470, 100, { w: 2.2 }) + tD(432, 94, 'alimentador', { fs: 8.5, anc: 'middle', cor: DG_COR.mut });
+  // DPS de entrada: junto ao BEP ou no quadro
+  if (loc === 'junto') {
+    const xs = Array.from({ length: n }, (_, i) => 156 + i * 12);
+    g += lD(192, 100, 192, 124) + lD(xs[0], 124, 192, 124) + `<circle cx="192" cy="100" r="2.6" fill="${DG_COR.ink}"/>` + xs.map(x => lD(x, 124, x, 140) + dpsMini(x, 140) + lD(x, 162, x, yB, { cor: COR_COND.PE, w: 2 })).join('') + tD(174, 176, 'DPS', { fs: 8.5, b: true, anc: 'middle' });
+    g += fioD(212, 168, 292, 168, 'PE', true) + tD(252, 178, 'barra PE', { fs: 8, anc: 'middle', cor: DG_COR.mut }) + liga(290, 172) + tD(306, 206, 'PE principal', { fs: 8.5, cor: DG_COR.mut });
+  } else {
+    const xs = Array.from({ length: n }, (_, i) => 220 + i * 16), yPE = loc === 'quadro' ? yB : 168;
+    g += xs.map(x => lD(x, 100, x, 112) + `<circle cx="${x}" cy="100" r="2.4" fill="${DG_COR.ink}"/>` + dpsMini(x, 112) + lD(x, 134, x, yPE, { cor: COR_COND.PE, w: 2 })).join('') + tD(xs[n - 1] + 10, 128, 'DPS', { fs: 8.5, b: true });
+    if (loc === 'separado') g += fioD(212, 168, 292, 168, 'PE', true) + tD(252, 178, 'barra PE', { fs: 8, anc: 'middle', cor: DG_COR.mut }) + liga(290, 172) + tD(306, 206, 'PE principal', { fs: 8.5, cor: DG_COR.mut });
+  }
+  // neutro na origem
+  if (P.aterramento !== 'TT') g += lD(300, 100, 300, loc === 'quadro' ? yB : 180, { w: 1.6, dash: '4 2' }) + (loc === 'quadro' ? `<circle cx="292" cy="${yB}" r="2.4" fill="${DG_COR.ink}"/>` + lD(300, yB, 292, yB, { w: 1.6, dash: '4 2' }) : lD(300, 180, 300, yB, { w: 1.6, dash: '4 2' }));
+  g += tD(310, 150, P.aterramento === 'TN-C-S' ? 'PEN aterrado' : P.aterramento === 'TT' ? 'TT: N não' : 'PE da rede', { fs: 8.5, cor: DG_COR.mut })
+    + tD(310, 161, P.aterramento === 'TT' ? 'ligado ao BEP' : 'no BEP', { fs: 8.5, cor: DG_COR.mut });
+  // BEP
+  g += fioD(bep.x1, yB, bep.x2, yB, 'PE', true) + (loc === 'quadro' ? tD(258, yB + 12, 'barra PE = BEP', { fs: 8.5, b: true, anc: 'middle' }) : tD(bep.x2 - 2, yB - 7, 'BEP', { fs: 10, b: true, anc: 'end' }));
+  // tubulações metálicas e armaduras
+  g += lD(8, 250, 566, 250, { cor: COR.agua, w: 4 }) + tD(10, 244, 'tubulações (água, gás)', { fs: 8.5, cor: COR.agua }) + `<rect x="405" y="245" width="10" height="10" fill="#fff" stroke="${DG_COR.ink}"/>` + liga(410, 245);
+  g += lD(bep.x1 + 4, yB, bep.x1 + 4, yG + 8, { dash: '4 3', w: 1.2 }) + lD(bep.x1 + 4, yG + 8, 141, yG + 8, { dash: '4 3', w: 1.2 }) + lD(141, yG, 141, yG + 14, { w: 3, cor: COR.parede }) + tD(136, yG + 22, 'armaduras / fundação', { fs: 8, anc: 'end', cor: DG_COR.mut });
+  // PE principal até o quadro de distribuição
+  if (qd) g += lD(bep.x2, yB, bep.x2, 212, { cor: COR_COND.PE, w: 2 }) + lD(bep.x2, 212, 522, 212, { cor: COR_COND.PE, w: 2 }) + lD(522, 212, 522, 144, { cor: COR_COND.PE, w: 2 }) + tD(470, 207, `PE → ${qd.q}`, { fs: 8.5, cor: DG_COR.mut });
+  // eletrodo de aterramento (anel do SPDA ou hastes) e condutor de aterramento
+  const xa = bep.x1 + 44, e = b.eletrodo;
+  g += lD(xa, yB, xa, ps ? 300 : 288, { cor: COR.terra, w: 2.2 }) + tD(xa + 6, 280, `condutor de aterramento${e ? ` ${fS(e.S)} mm²` : ''}`, { fs: 8.5, cor: COR.terra });
+  if (ps) {
+    g += lD(30, 300, 592, 300, { cor: COR.terra, w: 3 }) + tD(300, 316, 'anel de aterramento do SPDA (arranjo B), interligado ao BEP', { fs: 8.5, anc: 'middle', cor: COR.terra })
+      + lD(592, 30, 592, 300, { w: 2 }) + lD(588, 30, 596, 30, { w: 2 }) + tD(584, 238, 'descida do SPDA', { fs: 8.5, anc: 'end', cor: DG_COR.mut }) + `<circle cx="592" cy="300" r="2.6" fill="${COR.terra}"/><circle cx="${xa}" cy="300" r="2.6" fill="${COR.terra}"/>`;
+  } else {
+    const nh = Math.max(1, Math.min(4, e ? e.n : 3)), xs = Array.from({ length: nh }, (_, i) => xa + i * 50);
+    g += lD(xa, 288, xs[nh - 1], 288, { cor: COR.terra, w: 2.2 }) + xs.map(x => lD(x, 288, x, 352, { cor: COR.terra, w: 3 })).join('')
+      + tD(xs[nh - 1] + 10, 330, `${e ? `${e.n} haste(s)` : 'hastes'}${e && e.R != null ? ` — R = ${nfmt(e.R, 1)} Ω` : ''}`, { fs: 8.5, cor: COR.terra });
+  }
+  // notas: seções
+  g += `<rect x="0" y="386" width="${W}" height="${H - 386}" fill="#fff"/>`
+    + tD(12, 402, `Equipotencialização principal: condutores ≥ ${fS(b.Seq)} mm² Cu (metade do maior PE, ${fS(b.maxPE || 0)} mm²; mínimo 6 e até 25 mm² — NBR 5410).`, { fs: 9, cor: DG_COR.ink })
+    + tD(12, 416, ps ? `Com SPDA: ${b.Sbar} mm² Cu entre barramentos e ao aterramento; ${b.Sint} mm² Cu para as instalações metálicas internas (NBR 5419-3).` : 'Linhas de energia e de sinal e tubulações metálicas que entram na edificação: ligadas ao BEP, diretamente ou por DPS.', { fs: 9, cor: DG_COR.ink })
+    + tD(12, 429, `DPS de entrada ligados ${b.ligDPS === 'BEP' ? 'ao BEP' : 'à barra PE do quadro'}, com condutores curtos (≤ 0,5 m), retilíneos e sem laços.`, { fs: 9, cor: DG_COR.ink });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Equipotencialização principal: aterramento, BEP e DPS">${g}</svg>`;
+}
 /* galeria de referência: formas de ligar o DPS */
 function formasLigacaoDPS(U0 = 127) {
   const Uc = ucDPS(U0), base = { q: '', fases: ['A', 'B', 'C'], nF: 3, Uc, In: 20, Iimp: 12.5, Up: 1.5, S: 10, Imont: null };
@@ -134,7 +196,7 @@ function construirMemorialDPS(proj, calc, opt = {}) {
       ['Retaguarda do fabricante', r.back ? `até ${r.back} A` : 'conforme o fabricante', 'Distância de proteção', r.soDist ? 'quadro só de distribuição' : r.distDispensa ? 'dispensada (Up/f < Uw/2)' : c.critDist === 'fab' ? `${D_PROT_FAB} m (fabricante)` : `lpo = ${f1(r.dProt)} m`]] });
     r.verifs.forEach(([st, t]) => B.push(st === 'info' ? { t: 'note', text: t } : { t: 'ver', ok: VER_DPS[st], text: t }));
     const sl = ligacaoDPSSVG(r);
-    B.push({ t: 'fig', svg: svgDoc(sl, 480, 300), ar: 0.625, px: 960, w: 112, caption: `Esquema de ligação dos DPS do ${r.q}: ${ESQ_DPS[r.esquema].split(' — ')[0].toLowerCase()}, ${r.emV ? 'ligação em V (série)' : 'ligação em T (paralelo)'}${r.F2 ? `, retaguarda F2 de ${r.F2} A` : ''}; condutores de ligação de ${fS(r.S)} mm².` });
+    if (c.mem.ligacao) B.push({ t: 'fig', svg: svgDoc(sl, 480, 300), ar: 0.625, px: 960, w: 112, caption: `Esquema de ligação dos DPS do ${r.q}: ${ESQ_DPS[r.esquema].split(' — ')[0].toLowerCase()}, ${r.emV ? 'ligação em V (série)' : 'ligação em T (paralelo)'}${r.F2 ? `, retaguarda F2 de ${r.F2} A` : ''}; condutores de ligação de ${fS(r.S)} mm².` });
   });
   const prods = [...new Map(Q.filter(r => r.prod).map(r => [r.prod.id, r.prod])).values()];
   if (prods.length) {
@@ -143,9 +205,9 @@ function construirMemorialDPS(proj, calc, opt = {}) {
       rows: prods.map(x => [`${x.fab} ${x.mod}`, x.classe, `${x.Uc} V`, `${x.In} / ${x.Imax || '—'} kA`, x.Iimp ? `${nfmt(x.Iimp, 1)} kA` : '—', `${nfmt(x.Up, 1)} kV`, `${x.back ? `${x.back} A gL/gG` : '—'}${x.isccr ? ` · ${x.isccr} kA` : ''}${x.iscSem ? ` (sem retaguarda ${x.iscSem} kA)` : ''}`]) });
     B.push({ t: 'note', text: `Valores declarados pelos fabricantes (${prods.map(x => x.fonte).join('; ')}). São referência de especificação — admite-se produto equivalente que atenda às mesmas verificações; confira a versão e a configuração do produto na ficha técnica.` });
   }
-  sec('Zonas de proteção, classe III e coordenação');
+  sec(c.mem.zpr ? 'Zonas de proteção, classe III e coordenação' : 'Classe III e coordenação');
   const sz = zprDPSSVG(c, calc);
-  B.push({ t: 'fig', svg: svgDoc(sz, 560, 270), ar: 270 / 560, full: true, px: 1120, w: 172, caption: 'Zonas de proteção contra raios (NBR 5419-4) e DPS em cascata: entrada na fronteira ZPR 0 → 1, quadros na ZPR 1 → 2 e DPS classe III junto aos equipamentos sensíveis (ZPR 2 → 3).' });
+  if (c.mem.zpr) B.push({ t: 'fig', svg: svgDoc(sz, 560, 270), ar: 270 / 560, full: true, px: 1120, w: 172, caption: 'Zonas de proteção contra raios (NBR 5419-4) e DPS em cascata: entrada na fronteira ZPR 0 → 1, quadros na ZPR 1 → 2 e DPS classe III junto aos equipamentos sensíveis (ZPR 2 → 3).' });
   const longe = Q.filter(r => r.foraDist && r.foraDist.length).map(r => `${r.q} (circuitos ${r.foraDist.join(', ')}; distância de proteção ${f1(r.dProt)} m)`);
   B.push({ t: 'p', text: (c.classe3 ? `Previstos ${c.classe3.n} DPS classe III (Uc ${c.classe3.Uc} V) junto aos equipamentos sensíveis, coordenados com os DPS do quadro que os alimenta.` : 'Não foram indicados pontos com equipamentos sensíveis que exijam DPS classe III; avaliar junto a equipamentos eletrônicos distantes do quadro.')
     + (longe.length ? ` Circuitos além da distância de proteção do DPS do quadro: ${longe.join('; ')} — os equipamentos sensíveis alimentados por eles devem receber DPS classe III próprio.` : '') });
@@ -153,9 +215,38 @@ function construirMemorialDPS(proj, calc, opt = {}) {
   const sS = sec('Linhas de sinal');
   B.push({ t: 'p', text: c.sinal.length ? `Linhas externas de sinal que entram na edificação, com DPS no ponto de entrada ligado ao BEP (categoria de ensaio ${c.catSinal}, IEC 61643-21):` : 'Não foram informadas linhas externas de sinal. Toda linha que vier a entrar na edificação (telefonia, dados, vídeo, antena) deve receber DPS no ponto de entrada, ligado ao BEP (NBR 5410).' });
   if (c.sinal.length) B.push({ t: 'table', head: ['Linha', 'Quantidade', 'DPS'], widths: [34, 14, 52], align: 'lrl', rows: c.sinal.map(x => [x.nome, String(x.n), x.mat]) });
-  sec('Formas de ligação dos DPS');
-  B.push({ t: 'p', text: 'A NBR 5410 (Figura 13) define três esquemas de conexão conforme o neutro e o esquema de aterramento; os condutores de ligação podem ser derivados do barramento (ligação em T, paralelo) ou passar pelos bornes do DPS (ligação em V, série). Os desenhos abaixo resumem as formas de ligar; o esquema adotado em cada quadro está na seção de seleção.' });
-  formasLigacaoDPS(P.U0).forEach(f => B.push({ t: 'fig', svg: svgDoc(f.svg, 480, 300), ar: 0.625, px: 960, w: 112, caption: `${f.caption}. ${f.sub}` }));
+  const formas = formasLigacaoDPS(P.U0);
+  if (c.mem.vt) {
+    sec('Ligação em V e em T');
+    B.push({ t: 'p', text: `Os condutores de ligação do DPS podem ser derivados do barramento até o DPS e do DPS à barra PE (ligação em T, paralelo), com a + b ≤ 0,5 m, ou o condutor de chegada pode entrar e sair pelos bornes do DPS (ligação em V, série), restando só o trecho b até a barra PE (IEC 60364-5-534; NBR 5410). Neste projeto: ${Q.map(r => `${r.q} em ${r.emV ? 'V' : 'T'}`).join('; ')}.` });
+    B.push({ t: 'table', small: true, head: ['Aspecto', 'T — paralelo (derivação)', 'V — série (passante)'], widths: [20, 40, 40], align: 'lll', rows: VT_DPS.map(x => x.slice()) });
+    formas.slice(3).forEach(f => B.push({ t: 'fig', svg: svgDoc(f.svg, 480, 300), ar: 0.625, px: 960, w: 112, caption: `${f.caption}. ${f.sub}` }));
+  }
+  if (c.mem.formas) {
+    sec('Formas de ligação dos DPS (Figura 13)');
+    B.push({ t: 'p', text: 'A NBR 5410 (Figura 13) define três esquemas de conexão conforme o neutro e o esquema de aterramento: neutro aterrado no BEP — DPS só nas fases (esquema 1); DPS entre cada condutor vivo e o PE (esquema 2); DPS entre fases e neutro e centelhador entre neutro e PE (esquema 3). O esquema adotado em cada quadro está na seção de seleção.' });
+    formas.slice(0, 3).forEach(f => B.push({ t: 'fig', svg: svgDoc(f.svg, 480, 300), ar: 0.625, px: 960, w: 112, caption: `${f.caption}. ${f.sub}` }));
+  }
+  if (c.mem.bep) {
+    const bp = c.bep, ps2 = calc.spda && calc.spda.projeto, TT = P.aterramento === 'TT';
+    sec('Equipotencialização principal (BEP)');
+    B.push({ t: 'p', text: `O barramento de equipotencialização principal (BEP) fica junto ou próximo do ponto de entrada da alimentação. Neste projeto: ${minIni(bp.txt)}. Pela nota a da Figura 13 da NBR 5410, os DPS são ligados ao BEP quando instalados junto a ele ou quando a barra PE do quadro principal acumula a função de BEP, e à barra PE do quadro quando ela não é o BEP.` });
+    B.push({ t: 'list', items: [
+      `Condutor de aterramento, do eletrodo ao BEP${bp.eletrodo ? ` — ${bp.eletrodo.nome}, ${fS(bp.eletrodo.S)} mm² Cu${bp.eletrodo.R != null ? `, R = ${f1(bp.eletrodo.R)} Ω` : ''}` : ''}.`,
+      'Condutor(es) de proteção principal(is) da instalação — barra PE dos quadros.',
+      TT ? 'Neutro: no esquema TT o neutro da alimentação não é ligado ao BEP.' : `Neutro da alimentação (${P.aterramento === 'TN-C-S' ? 'PEN de chegada, aterrado no BEP' : 'PE da rede ligado ao BEP'}).`,
+      `DPS das linhas de energia (ligados ao ${bp.ligDPS}) e DPS das linhas de sinal que entram na edificação.`,
+      'Tubulações metálicas de água, gás, esgoto e ar-condicionado; condutos, blindagens e capas metálicas de cabos que entram ou saem da edificação.',
+      'Armaduras do concreto e demais elementos estruturais metálicos.',
+      ...(ps2 ? ['Subsistema de aterramento do SPDA (anel, arranjo B) e descidas, interligados ao BEP — equipotencialização para descargas atmosféricas (NBR 5419-3).'] : [])] });
+    B.push({ t: 'table', head: ['Condutor', 'Seção mínima (cobre)', 'Referência'], widths: [46, 22, 32], rows: [
+      ['Equipotencialização principal (ao BEP)', `${fS(bp.Seq)} mm²`, `NBR 5410 — metade do maior PE (${fS(bp.maxPE || 0)} mm²), mínimo 6 mm², até 25 mm²`],
+      ...(bp.eletrodo ? [['Condutor de aterramento (eletrodo → BEP)', `${fS(bp.eletrodo.S)} mm²`, 'adotado no projeto de aterramento']] : []),
+      ...(ps2 ? [['Entre barramentos e ao subsistema de aterramento', `${bp.Sbar} mm²`, 'NBR 5419-3 (com SPDA)'], ['Instalações metálicas internas ao barramento', `${bp.Sint} mm²`, 'NBR 5419-3 (com SPDA)']] : []),
+      ['DPS de entrada ao BEP / barra PE', `${fS((Q.find(r => r.origem) || {}).S || 16)} mm²`, 'NBR 5410 e fabricante — condutor ≤ 0,5 m']] });
+    const sb = bepDPSSVG(c, calc, proj);
+    B.push({ t: 'fig', svg: svgDoc(sb, 600, 432), ar: 432 / 600, full: true, px: 1200, w: 172, caption: `Equipotencialização principal: eletrodo de aterramento, BEP, DPS de entrada ligados ao ${bp.ligDPS}, linha de sinal com DPS no DG, tubulações metálicas e armaduras${ps2 ? ', com o anel de aterramento e a descida do SPDA' : ''}.` });
+  }
   sec('Instalação');
   B.push({ t: 'list', items: ['Instalar os DPS junto ao barramento de proteção do quadro, com condutores curtos, retilíneos e sem laços; preferir a ligação em V (entrada e saída nos mesmos bornes) quando o comprimento passar de 0,5 m.',
     'Manter separados os condutores de chegada (não protegidos) e os condutores já protegidos que saem do quadro, sem percursos paralelos próximos, para evitar o reacoplamento do surto.',

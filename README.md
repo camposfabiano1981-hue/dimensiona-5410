@@ -69,6 +69,9 @@ Funciona 100% no navegador: **não precisa de servidor, banco de dados nem insta
 - **Iimp com SPDA (NBR 5419-1, Anexo E):** Ip × 0,5 / (serviços metálicos × condutores), mínimo de 12,5 kA.
 - **Retaguarda pelo curto-circuito (prática Clamper):** acima do curto suportável pelo desligador interno, fusível gL/gG dedicado por fase.
 - **Linhas de sinal:** DPS na entrada de telefonia, rede de dados e coaxial, ligado ao BEP (categoria D1 com SPDA, C2 sem); DPS obrigatório no quadro de entrada.
+- **Ligação em V e em T:** forma escolhida em cada quadro; em V, o motor confere a corrente nominal de carga dos bornes (IL, típica de 125 A) contra a proteção a montante e a seção do alimentador contra o borne; em T, a retaguarda F2 e a sinalização remota. Tabela comparativa e desenhos na aba DPS, nas tabelas e na memória.
+- **Equipotencialização principal (BEP):** posição do BEP pela nota a da Figura 13 (barra PE do quadro como BEP, BEP junto à entrada com os DPS, ou BEP separado com os DPS na barra PE do quadro); itens ligados ao BEP; seções — metade do maior PE (mínimo 6 e até 25 mm², NBR 5410) e, com SPDA, 16 e 6 mm² (NBR 5419-3); desenho com eletrodo (hastes ou anel do SPDA), condutor de aterramento, BEP, DPS, linha de sinal com DPS no DG, tubulações, armaduras e descida do SPDA.
+- **Conteúdo da memória:** o projetista escolhe se a memória do DPS traz o esquema de cada quadro, a comparação V × T, as formas da Figura 13, o BEP e as zonas de proteção.
 - **Desenhos:** esquema de ligação de cada quadro (Figura 13, esquemas 1, 2 e 3; ligação em T com F2 ou em V; cota a + b ≤ 0,5 m), zonas de proteção com a cascata de DPS e galeria das formas de ligação — na aba DPS, na aba Tabelas e na memória.
 - **Saídas:** memória própria (PDF, Word e HTML) anexável ao memorial descritivo; especificação nos diagramas unifilar e multifilar (com o desenho da ligação n+1) e na lista de materiais.
 
