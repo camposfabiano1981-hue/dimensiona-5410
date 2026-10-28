@@ -13,41 +13,50 @@ function ligacaoDPSSVG(r, o = {}) {
   const W = 480, H = 300, fases = r.fases && r.fases.length ? r.fases : ['A', 'B', 'C'].slice(0, r.nF || 3), cond = [...fases, 'N'], yb = {};
   cond.forEach((k, i) => { yb[k] = 62 + i * 15; });
   const xIni = 36, xFim = 464, x0 = 186, dx = 42, yPE = 244, hD = 26, emV = !!r.emV, F2 = r.F2 && !emV ? r.F2 : null, yDps = F2 ? 160 : 138;
-  const rot = k => k === 'N' ? 'N' : `L${fases.indexOf(k) + 1}`;
+  const rot = k => k === 'N' ? 'N' : `L${fases.indexOf(k) + 1}`, cota = { w: 0.9, cor: DG_COR.acc }, txC = (x, y, t, anc = 'end', b = true) => tD(x, y, t, { fs: 9, anc, cor: DG_COR.acc, b });
   let g = `<rect width="${W}" height="${H}" fill="${DG_COR.face}"/>` + tD(12, 20, o.titulo || `${r.q} — DPS classe ${r.classe}`, { fs: 12.5, b: true }) + tD(12, 35, o.sub || ESQ_DPS[r.esquema], { fs: 9.2, cor: DG_COR.mut });
-  // condutores vivos que chegam ao quadro e proteção a montante F1
+  // condutores vivos que chegam ao quadro e proteção a montante F1 (fusível ou disjuntor)
   cond.forEach(k => { g += fioD(xIni, yb[k], xFim, yb[k], k) + tD(xIni - 6, yb[k] + 3.5, rot(k), { fs: 9.5, b: true, anc: 'end' }); });
   fases.forEach(k => { g += `<rect x="80" y="${yb[k] - 3}" width="28" height="6" fill="${DG_COR.face}"/>` + disjH(82, 106, yb[k]); });
-  g += tD(94, yb[fases[0]] - 13, o.f1 || (r.Imont ? `F1 ${r.Imont} A` : 'F1'), { fs: 9, anc: 'middle', cor: DG_COR.mut }) + tD(xFim, 50, 'para os circuitos →', { fs: 8.5, anc: 'end', cor: DG_COR.mut });
-  // barra de equipotencialização
-  g += fioD(132, yPE, xFim, yPE, 'PE', true) + lD(132, yPE, 132, yPE + 8) + terraD(132, yPE + 8) + tD(xFim, yPE + 16, 'barra PE / BEP', { fs: 9, anc: 'end', cor: DG_COR.mut });
+  g += tD(72, yb[fases[0]] - 13, `${o.f1 || (r.Imont ? `F1 ${r.Imont} A` : 'F1')} — fusível ou disjuntor`, { fs: 9, cor: DG_COR.mut }) + tD(xFim, 50, 'para os circuitos →', { fs: 8.5, anc: 'end', cor: DG_COR.mut });
+  // ligação em V: o condutor é interrompido, desce até o borne do DPS e volta a subir; em T, derivação do condutor
   const desce = (x, k) => {
-    let t = '';
-    if (emV) t += `<rect x="${x - 6}" y="${yb[k] - 3}" width="12" height="6" fill="${DG_COR.face}"/>` + fioD(x - 3, yb[k], x - 3, yDps, k) + fioD(x + 3, yb[k], x + 3, yDps, k) + noD(x - 3, yb[k], k) + noD(x + 3, yb[k], k);
-    else t += fioD(x, yb[k], x, yDps, k) + noD(x, yb[k], k);
-    if (F2 && k !== 'N') t += fusV(x, 128, 150);
-    return t;
+    if (emV) return `<rect x="${x - 12}" y="${yb[k] - 3}" width="24" height="6" fill="${DG_COR.face}"/>` + fioD(x - 11, yb[k], x - 1.5, yDps, k) + fioD(x + 1.5, yDps, x + 11, yb[k], k) + noD(x - 11, yb[k], k) + noD(x + 11, yb[k], k);
+    return fioD(x, yb[k], x, yDps, k) + noD(x, yb[k], k) + (F2 && k !== 'N' ? fusV(x, 128, 150) : '');
   };
-  const xs = [];
+  const xs = [], lista = r.esquema === 1 ? fases : cond, vPE = emV && r.esquema !== 3;
   if (r.esquema === 3) {
     const xN = x0 + fases.length * dx, yNo = yDps + hD + 12;
     fases.forEach((k, i) => { const x = x0 + i * dx; xs.push(x); g += desce(x, k) + dpsD(x, yDps, hD) + lD(x, yDps + hD, x, yNo); });
     g += fioD(x0, yNo, xN, yNo, 'N') + fioD(xN, yb.N, xN, yNo, 'N') + noD(xN, yb.N, 'N') + `<circle cx="${xN}" cy="${yNo}" r="2.6" fill="${DG_COR.ink}"/>`
       + lD(xN, yNo, xN, yNo + 6) + centD(xN, yNo + 6, 22) + fioD(xN, yNo + 28, xN, yPE, 'PE') + noD(xN, yPE, 'PE') + tD(xN + 12, yNo + 21, 'centelhador N–PE', { fs: 8.5, cor: DG_COR.mut });
+  } else if (vPE) {
+    // em V, o lado do PE também passa pelo DPS: BEP → borne de terra do DPS → barra PE dos circuitos (≤ 0,5 m)
+    const yC = yDps + hD + 16, xL = x0 + (lista.length - 1) * dx, xB = xL + 40;
+    lista.forEach((k, i) => { const x = x0 + i * dx; xs.push(x); g += desce(x, k) + dpsD(x, yDps, hD) + fioD(x, yDps + hD, x, yC, 'PE') + noD(x, yC, 'PE'); });
+    g += fioD(x0, yC, xB, yC, 'PE') + `<rect x="${xB}" y="${yC - 5}" width="46" height="10" fill="${DG_COR.face}" stroke="${DG_COR.ink}" stroke-width="1.1"/>` + [10, 23, 36].map(d => `<circle cx="${xB + d}" cy="${yC}" r="2.2" fill="none" stroke="${DG_COR.ink}"/>`).join('')
+      + tD(xB + 23, yC - 9, 'barra PE', { fs: 8.5, anc: 'middle', cor: DG_COR.mut }) + fioD(x0, yC, x0, yPE, 'PE') + noD(x0, yPE, 'PE')
+      + lD(xL, yC + 12, xB, yC + 12, cota) + lD(xL, yC + 8, xL, yC + 16, cota) + lD(xB, yC + 8, xB, yC + 16, cota) + txC((xL + xB) / 2, yC + 24, '≤ 0,5 m', 'middle');
+    if (r.esquema === 1) { const xN = xB + 58; g += fioD(xN, yb.N, xN, yPE, 'PE') + noD(xN, yb.N, 'N') + noD(xN, yPE, 'PE') + tD(xN - 6, yPE - 28, 'N aterrado', { fs: 8.5, anc: 'end', cor: DG_COR.mut }) + tD(xN - 6, yPE - 17, 'no BEP (PEN)', { fs: 8.5, anc: 'end', cor: DG_COR.mut }); }
   } else {
-    const lista = r.esquema === 1 ? fases : cond;
     lista.forEach((k, i) => { const x = x0 + i * dx; xs.push(x); g += desce(x, k) + dpsD(x, yDps, hD) + fioD(x, yDps + hD, x, yPE, 'PE') + noD(x, yPE, 'PE'); });
     if (r.esquema === 1) { const xN = x0 + fases.length * dx + 18; g += fioD(xN, yb.N, xN, yPE, 'PE') + noD(xN, yb.N, 'N') + noD(xN, yPE, 'PE') + tD(xN + 8, yPE - 28, 'N aterrado', { fs: 8.5, cor: DG_COR.mut }) + tD(xN + 8, yPE - 17, 'no BEP (PEN)', { fs: 8.5, cor: DG_COR.mut }); }
   }
+  // barra de equipotencialização
+  g += fioD(132, yPE, xFim, yPE, 'PE', true) + lD(132, yPE, 132, yPE + 8) + terraD(132, yPE + 8) + tD(xFim, yPE + 16, vPE ? 'BEP' : 'barra PE / BEP', { fs: 9, anc: 'end', cor: DG_COR.mut, b: vPE });
   if (F2) g += tD(xs[xs.length - 1] + 14, 142, `F2 ${F2} A gL/gG`, { fs: 8.5, cor: DG_COR.mut });
-  // cotas do comprimento dos condutores de ligação
-  const xd = x0 - 26, ya = emV ? yDps + hD : yb[r.esquema === 1 ? fases[0] : cond[0]];
-  g += lD(xd, ya, xd, yPE, { w: 0.9, cor: DG_COR.acc, dash: '3 2' }) + lD(xd - 4, ya, xd + 4, ya, { w: 0.9, cor: DG_COR.acc }) + lD(xd - 4, yPE, xd + 4, yPE, { w: 0.9, cor: DG_COR.acc })
-    + tD(xd - 6, (ya + yPE) / 2 - 2, emV ? 'b ≤ 0,5 m' : 'a + b', { fs: 9, anc: 'end', cor: DG_COR.acc, b: true }) + (emV ? tD(xd - 6, (ya + yPE) / 2 + 10, 'ligação em V', { fs: 8.5, anc: 'end', cor: DG_COR.acc }) : tD(xd - 6, (ya + yPE) / 2 + 10, '≤ 0,5 m', { fs: 9, anc: 'end', cor: DG_COR.acc, b: true }));
+  // cotas: em T, a (condutor → DPS) e b (DPS → barra PE / BEP), com a + b ≤ 0,5 m; em V com n+1, b ≤ 0,5 m
+  const xd = x0 - 26, ya = yb[lista[0]], yb1 = yDps + hD;
+  if (!emV) {
+    g += lD(xd, ya, xd, yDps, cota) + lD(xd, yb1, xd, yPE, cota) + [ya, yDps, yb1, yPE].map(y => lD(xd - 4, y, xd + 4, y, cota)).join('') + lD(xd, yDps, xd, yb1, { ...cota, dash: '2 2' })
+      + txC(xd - 5, (ya + yDps) / 2 + 3, 'a') + txC(xd - 5, (yb1 + yPE) / 2 + 3, 'b') + txC(xd - 16, (ya + yPE) / 2 - 2, 'a + b') + txC(xd - 16, (ya + yPE) / 2 + 10, '≤ 0,5 m');
+  } else if (!vPE) {
+    g += lD(xd, yb1, xd, yPE, cota) + lD(xd - 4, yb1, xd + 4, yb1, cota) + lD(xd - 4, yPE, xd + 4, yPE, cota) + txC(xd - 6, (yb1 + yPE) / 2 - 2, 'b ≤ 0,5 m') + tD(xd - 6, (yb1 + yPE) / 2 + 10, 'ligação em V', { fs: 8.5, anc: 'end', cor: DG_COR.acc });
+  } else g += tD(xd - 6, yDps + 6, 'ligação', { fs: 8.5, anc: 'end', cor: DG_COR.acc }) + tD(xd - 6, yDps + 17, 'em V', { fs: 8.5, anc: 'end', cor: DG_COR.acc });
   // especificação
   const corr = r.classe === 'I+II' ? `Iimp ${nfmt(r.Iimp, 1)} kA` : `In ${nfmt(r.In, 0)} kA`;
   g += tD(12, 279, o.l1 ?? `DPS classe ${r.classe}${r.classe === 'I+II' && r.tec ? ` (${r.tec})` : ''} · Uc ${r.Uc} V · ${corr} · Up ≤ ${nfmt(r.Up, 1)} kV`, { fs: 9.5, b: true })
-    + tD(12, 293, o.l2 ?? `${emV ? 'Ligação em V (série): ΔU desprezível' : 'Ligação em T (paralelo): a + b ≤ 0,5 m'} · condutores de ligação ${fS(r.S)} mm² Cu${F2 ? ` · retaguarda F2 ${F2} A` : ''}`, { fs: 9, cor: DG_COR.mut });
+    + tD(12, 293, o.l2 ?? `${emV ? 'Ligação em V (série): o condutor passa pelo DPS; ΔU desprezível' : 'Ligação em T (paralelo): a + b ≤ 0,5 m'} · condutores de ligação ${fS(r.S)} mm² Cu${F2 ? ` · retaguarda F2 ${F2} A` : ''}`, { fs: 9, cor: DG_COR.mut });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Esquema de ligação do DPS">${g}</svg>`;
 }
 /* zonas de proteção contra raios (NBR 5419-4) e DPS em cascata */
@@ -145,8 +154,8 @@ function formasLigacaoDPS(U0 = 127) {
     [{ ...base, esquema: 2, classe: 'II' }, 'Esquema 2 — n+0 (fases e neutro ao PE)', 'TN-S e TT a jusante do DR: um DPS por condutor vivo, todos ao PE.'],
     [{ ...base, esquema: 3, classe: 'II' }, 'Esquema 3 — n+1 (fases ao neutro e centelhador N–PE)', 'TT a montante do DR (3+1): o centelhador N–PE recebe a soma das correntes.'],
     [{ ...base, esquema: 2, classe: 'II', F2: 125, Imont: 200 }, 'Ligação em T (paralelo) com retaguarda F2', 'O DPS fica num ramal com fusível próprio; a + b ≤ 0,5 m; a atuação de F2 tira só o DPS de serviço — use a sinalização remota.'],
-    [{ ...base, esquema: 2, classe: 'II', emV: true }, 'Ligação em V (série)', 'O condutor entra e sai pelos bornes do DPS: ΔU desprezível; protegido pelo F1 dentro do limite do fabricante.']
-  ].map(([r, cap, sub]) => ({ svg: ligacaoDPSSVG(r, { titulo: cap, sub: ESQ_DPS[r.esquema], f1: r.Imont ? `F1 ${r.Imont} A` : 'F1' }), caption: cap, sub }));
+    [{ ...base, esquema: 2, classe: 'II', emV: true }, 'Ligação em V (série)', 'O condutor é interrompido e passa pelos bornes do DPS; o lado do PE também: BEP → DPS → barra PE dos circuitos, a ≤ 0,5 m. ΔU desprezível; a proteção a montante (fusível ou disjuntor, dentro do limite do fabricante) é a retaguarda e, se atuar, desliga a instalação.']
+  ].map(([r, cap, sub]) => ({ svg: ligacaoDPSSVG(r, { titulo: cap, sub: ESQ_DPS[r.esquema] }), caption: cap, sub }));
 }
 function construirMemorialDPS(proj, calc, opt = {}) {
   const o = Object.assign({ assinatura: true }, opt), I = proj.info, P = proj.params, c = calc.dps || calcDPS(proj, calc), ps = calc.spda && calc.spda.projeto, B = [];
